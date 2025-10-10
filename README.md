@@ -50,7 +50,9 @@ The simulation model file (Python code) can be run on the command line. After re
 ![premesh](./doc/png/premesh.png)
 
 To see the structure of the 3D model, you can go to Tools > Visibility. In the screenshot, you can see that dielectric boxes (SiO2, Passive, AIR etc) have been added around the GDSII polygons, with an offset value in xy direction from the “margins” parameter in the model file. Around that, we have another layer of air on all six sides, using the same margins value.
+
 Metals have been created as surfaces. All polygons on each layer are merged, if possible, and then each of the resulting polygons is created as a separate surface. To be more precise, we have two surfaces for each polygon: the horizontal (xy) surfaces and the vertical (z) surfaces are assigned to different groups, for reasons explained later in this document.
+
 You can also see two ports P1 and P2 created as surfaces. The outer simulation boundary is this example is a surface “Absorbing boundary” that is defined as absorbing boundary in the Palace config file. When we are done with inspecting the model (which is optional, no user action is required!), the gmsh viewer window can be closed to proceed with meshing.
 
 After closing the gmsh geometry preview, the simulation model script will mesh these geometries, which can take a while and will show lots of status information on the command line. When meshing is completed, the gmsh 3D viewer will be displayed again, showing the overall mesh.
@@ -89,9 +91,10 @@ When “run_palace” is finished, Palace output files are created in the “out
 
 To do that conversion, the run_sim script where we started simulation with “run_palace” executes another command “combine_snp”.
 combine_snp is a script that searches for Palace s-parameter files (port-S.csv) and converts them to Touchstone file format, it is provided in the scripts folder of this repository. 
+
 If the model was simulated for selected port excitations only, missing rows in the S-parameter file will be padded with zeros.
-It should be noted that Palace frequency domain simulation cannot go down to 0 Hz, and the workflow script will replace any 0 Hz start frequency by a low value like 1 GHz.
-If simulation results include such low frequency data, combine_snp will create an additional S-Parameter file with suffix “_dc”, with a DC value extrapolated from the EM simulated data.1 Always check that DC extrapolated dataset carefully before use!
+
+It should be noted that Palace frequency domain simulation cannot go down to 0 Hz, and the workflow script will replace any 0 Hz start frequency by a low value like 1 GHz.If simulation results include such low frequency data, combine_snp will create an additional S-Parameter file with suffix “_dc”, with a DC value extrapolated from the EM simulated data.1 Always check that DC extrapolated dataset carefully before use!
 
 ![snp_output](./doc/png/snp_output.png)
 
