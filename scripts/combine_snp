@@ -1,0 +1,4 @@
+#!/bin/bash
+~/venv/palace/bin/python3 ~/scripts/combine_extend_snp.py
+
+
