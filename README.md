@@ -100,7 +100,7 @@ It should be noted that Palace frequency domain simulation cannot go down to 0 H
 
 # Showcase 
 
-As an example what is possible using this workflow, the screenshot below shows the simulation of a Butlex matrix for 93 GHz created by  Ardavan Rahimian for IHP OpenPDK  Tapeout July 2025. The design is available at https://github.com/IHP-GmbH/TO_July2025/tree/main/W_Band_Butler_Matrix_IC
+As an example what is possible using this workflow, the screenshot below shows the simulation of a compact on-chip Butler matrix layout for 93 GHz created by Ardavan Rahimian for IHP OpenPDK  Tapeout July 2025. The design is available at https://github.com/IHP-GmbH/TO_July2025/tree/main/W_Band_Butler_Matrix_IC
 
 Author of this design: https://ieeexplore.ieee.org/author/37535797800
 
