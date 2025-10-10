@@ -36,7 +36,7 @@ The screenshot below shows the workflow: user input is the GDSII layout file and
 ![Workflow overview](./doc/png/workflow_overview.png)
 
 For more details, please have a look at the detailed user's guide.
-[Palace FEM workflow for IHP gds2palace](./doc/Palace workflow October 2025.pdf) 
+[Palace FEM workflow for IHP gds2palace](./doc/Palace_workflow_October_2025.pdf) 
 
 
 # Minimum configuration
