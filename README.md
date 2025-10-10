@@ -13,7 +13,7 @@ The gds2palace workflow in this repository enables RFIC FEM simulation using Pal
 
 # Documentation
 An extensive documentation is available in PDF format here:
-[Palace FEM workflow for IHP gds2palace](./doc/Palace workflow October 2025.pdf) 
+[Palace FEM workflow for IHP gds2palace](./doc/Palace_workflow_October_2025.pdf) 
 
 # System requirements
 This workflow is designed for Linux systems. It creates model files for the AWS Palace FEM solver, 
