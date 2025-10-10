@@ -1,6 +1,6 @@
 These scripts support the workflow when using gds2palace with the AWS Palace solver.
 
-combine_extend_snp.py is a script to search for Palace S-parameter result files (port-S.csv) and convert them to the standard Touchstone SnP file format. The script will start searching at the current directory, and search through all directory levels below. If S-parameters include low frequency data, it will also run DC data extrapolation to provide a 0 Hz result, and save that into another file with suffic "_dc.snp"
+combine_extend_snp.py is a script to search for Palace S-parameter result files (port-S.csv) and convert them to the standard Touchstone SnP file format. The script will start searching at the current directory, and search through all directory levels below. If S-parameters include low frequency data, it will also run DC data extrapolation to provide a 0 Hz result, and save that into another file with suffix "_dc.snp"
 
 combine_snp is the shell script to run the combine_extend_snp.py Python script, if a Python venv names "palace" exists will all the Python libraries required for the gds2palace workflow, including scikit-rf. Please modify this as required for your environment.
 
