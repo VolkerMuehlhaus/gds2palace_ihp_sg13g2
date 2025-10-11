@@ -28,6 +28,9 @@ AWS Palace itself can be installed in multiple ways. For a smooth interaction wi
 
 For development of this workflow, Palace was installed using the Singularity/Apptainer installation method. This was rather simple and straightforward, even with no knowledge about container usage. The resulting apptainer file palace.sif can be integrated very easily in a Linux system like the Ubuntu 24.04 system used here, and can then be moved to other Linux machines using simple copy of the container file. Highly recommended! The script to start Palace from the apptainer is included in the scripts directory in this repository.
 
+Notes on installing the Palace solver using apptainer:
+[Installing Palace using Apptainer](./doc/Installing_Palace_using_Apptainer.pdf) 
+
 But of course, you can also use one of the other installation methods described on the AWS Palace web site. The gds2palace workflow does not change, it only creates the input files for Palace and does not care how you installed Palace, or on what platform you run the actual Palace simulation from these model files.
 
 # Workflow

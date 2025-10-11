@@ -1,3 +1,3 @@
 #!/bin/bash
-apptainer exec ~/palace_014.sif palace -np 16 $1
+apptainer exec ~/palace.sif palace -np 8 $1
 

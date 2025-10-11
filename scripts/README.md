@@ -4,6 +4,6 @@ combine_extend_snp.py is a script to search for Palace S-parameter result files 
 
 combine_snp is the shell script to run the combine_extend_snp.py Python script, if a Python venv named "palace" exists will all the Python libraries required for the gds2palace workflow, including scikit-rf. Please modify this as required for your environment.
 
-run_palace is the script that was used during development to run Palace from an apptainer (container) file ~/palace_014.sif, using 16 core parallel simulation. Please modify this as required for your environment. A description how to create the Palace apptainer (container) for Palace can be found here: https://awslabs.github.io/palace/stable/install/
+run_palace is the script that was used during development to run Palace from an apptainer (container) file ~/palace.sif, using 8 core parallel simulation. Please modify this as required for your environment. A description how to create the Palace apptainer (container) for Palace can be found here: https://awslabs.github.io/palace/stable/install/
 
 If you prefer to install and run Palace in a different way, no problem! The gds2palace workflow creates the input files for Palace, and it is entirely your choice how you run the simulator with these model files, local or on a sophisticated HPC cluster.
