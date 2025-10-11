@@ -13,7 +13,7 @@ The gds2palace workflow in this repository enables RFIC FEM simulation using Pal
 
 # Documentation
 An extensive documentation is available in PDF format here:
-[Palace FEM workflow for IHP gds2palace](./doc/Palace_workflow_October_2025.pdf) 
+[gds2palace FEM workflow for IHP](./doc/gds2palace_workflow_October_2025.pdf) 
 
 # System requirements
 This workflow is designed for Linux systems. It creates model files for the AWS Palace FEM solver, 
@@ -23,6 +23,10 @@ In addition to Palace that is required for simulation of the output files, these
 - gdspy (version 1.6.13 or later recommended)
 - gmsh
 - scikit-rf (for the script that converts Palace output to Touchstone SnP format)
+
+Documentation assumes that you have created a Python venv named "palace" in ~/venv/palace and installed the modules there.
+
+## Installing Palace
 
 AWS Palace itself can be installed in multiple ways. For a smooth interaction with the gds2palace workflow, it is recommended to create some scripts that help running the model and convert the Palace results to SnP Touchstone files.
 
