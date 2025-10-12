@@ -166,6 +166,11 @@ class metal_layer:
     self.material = data.get("Material")
     self.zmin = float(data.get("Zmin"))
     self.zmax = float(data.get("Zmax"))
+    
+    # force to sheet if zero thickness
+    if data.get("Zmin") == data.get("Zmax"):
+      self.type = "SHEET"
+
     self.thickness = self.zmax-self.zmin
     self.is_via = (self.type=="VIA")
     self.is_metal = (self.type=="CONDUCTOR")
