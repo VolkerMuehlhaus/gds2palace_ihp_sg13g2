@@ -1179,10 +1179,10 @@ def create_palace (excite_ports, settings):
 
     if z_semi>0 and substrate_refinement:
         # xy dimensions of dielectric boxes from stackup
-        x1 = allpolygons.xmin 
-        y1 = allpolygons.ymin 
-        x2 = allpolygons.xmax 
-        y2 = allpolygons.ymax 
+        x1 = allpolygons.get_xmin() 
+        y1 = allpolygons.get_ymin()
+        x2 = allpolygons.get_xmax()
+        y2 = allpolygons.get_ymax()
 
         refine_layer_thickness = max(30*refined_cellsize,z_semi/2)
         refine_value = min(10*refined_cellsize, 20)
