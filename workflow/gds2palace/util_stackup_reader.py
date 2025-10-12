@@ -46,7 +46,7 @@ class stackup_material:
         return default
 
     self.name = data.get("Name")
-    self.type = data.get("Type")
+    self.type = data.get("Type").upper()
     
     self.eps   = float(safe_get("Permittivity", 1))
     self.tand  = float(safe_get("DielectricLossTangent", 0))
@@ -162,15 +162,15 @@ class metal_layer:
   def __init__ (self, data):
     self.name = data.get("Name")
     self.layernum = data.get("Layer")
-    self.type = data.get("Type")
+    self.type = data.get("Type").upper()
     self.material = data.get("Material")
     self.zmin = float(data.get("Zmin"))
     self.zmax = float(data.get("Zmax"))
     self.thickness = self.zmax-self.zmin
-    self.is_via = (self.type=="via")
-    self.is_metal = (self.type=="conductor")
-    self.is_dielectric = (self.type=="dielectric")
-    self.is_sheet = (self.type=="sheet")
+    self.is_via = (self.type=="VIA")
+    self.is_metal = (self.type=="CONDUCTOR")
+    self.is_dielectric = (self.type=="DIELECTRIC")
+    self.is_sheet = (self.type=="SHEET")
     self.is_used = False
 
   def __str__ (self):

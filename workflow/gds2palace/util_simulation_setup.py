@@ -926,6 +926,17 @@ def create_palace (excite_ports, settings):
                 metal = metals_list.getbylayername(layername)
                 if metal is not None:
                     stackup_material = materials_list.get_by_name(metal.material)
+                    # check that use of conductor or sheet matches material definition
+                    if stackup_material.type == "CONDUCTOR" and metal.is_sheet:
+                        print('Invalid material assignment: conductor layer ', metal.name, ' must not use a resistor material!')
+                        print('Only conductor material (with conductivity value) allowed for conductor layer')
+                        exit(1)
+
+                    if stackup_material.type == "RESISTOR" and not metal.is_sheet:
+                        print('Invalid material assignment: sheet layer ', metal.name, ' must use a resistor material!')
+                        exit(1)
+
+
                     if stackup_material is not None:
                         Palace_conductor['Attributes']=all_phys_surfacetags_for_layer_xy
                         Palace_conductor['Conductivity']=stackup_material.sigma
