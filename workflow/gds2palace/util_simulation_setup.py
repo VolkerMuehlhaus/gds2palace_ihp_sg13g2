@@ -1181,7 +1181,7 @@ def create_palace (excite_ports, settings):
     gmsh.model.mesh.field.setNumber(2, "SizeMin", refined_cellsize)
     gmsh.model.mesh.field.setNumber(2, "SizeMax", max_cellsize)
     gmsh.model.mesh.field.setNumber(2, "DistMin", 0)
-    gmsh.model.mesh.field.setNumber(2, "DistMax", 2*max_cellsize)
+    gmsh.model.mesh.field.setNumber(2, "DistMax", max_cellsize)
 
     fields_list = [2]
 
