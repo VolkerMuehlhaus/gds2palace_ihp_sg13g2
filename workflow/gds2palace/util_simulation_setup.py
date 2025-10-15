@@ -142,7 +142,7 @@ def add_metals (allpolygons, metals_list, meshseed=0):
             
         # This returns the list of volumes inside
         # But unfortunately, it will trigger also for thinner layers enclosed inside that volume
-        volumes_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-10000,-10000,layer_zmin,10000,10000,layer_zmax,3)
+        volumes_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-math.inf,-math.inf,layer_zmin,math.inf,math.inf,layer_zmax,3)
         # not iterate over return values and check exact height
         volume_on_layer_list = []
         for volume in volumes_in_bounding_box:
@@ -166,7 +166,7 @@ def add_metals (allpolygons, metals_list, meshseed=0):
             
         # This returns the list of volumes inside
         # But unfortunately, it will trigger also for thinner layers enclosed inside that volume
-        surfaces_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-10000,-10000,sheet_zmin,10000,10000,sheet_zmax,2)
+        surfaces_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-math.inf,-math.inf,sheet_zmin,math.inf,math.inf,sheet_zmax,2)
         # not iterate over return values and check exact height
         surfaces_on_layer_list = []
         for surface in surfaces_in_bounding_box:
@@ -387,6 +387,8 @@ def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, 
 
     # dielectrics from stackup
     offset = 0 
+    offset_delta = margin/20 # some relevant offset for alternating dielectric dimensions (workaround for mesh error)
+
     for dielectric in dielectrics_list.dielectrics:
         # get CSX material object for this dielectric layers material name
         materialname = dielectric.material
@@ -426,7 +428,7 @@ def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, 
 
         # workaround to avoid gsmh meshing error: alternating size of stacked dielectric blocks
         if offset == 0:
-            offset = offset + 5
+            offset = offset_delta
         else:
             offset = 0    
 
@@ -750,7 +752,7 @@ def create_palace (excite_ports, settings):
 
 
     wavelength_air = 3e8/fstop / unit
-    max_cellsize = (wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength) 
+    max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
 
 
     kernel = gmsh.model.occ
