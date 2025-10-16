@@ -1,6 +1,8 @@
 # Create AWS Palace FEM Models from GDSII layout files
 
-The files provided here enable RFIC FEM simulation using AWS Palace from GDSII layouts created for IHP SG13G2 RFIC technology.
+![Intro](./doc/png/gds2palace_ihp_800.png)
+
+The files provided here enable RFIC FEM simulation using AWS Palace from GDSII layouts created in [IHP SG13G2](https://github.com/IHP-GmbH/IHP-Open-PDK) RFIC technology. 
 
 Palace, for PArallel LArge-scale Computational Electromagnetics, is an open-source, parallel finite element code for full-wave 3D electromagnetic simulations. It can be scaled from single computer to large high performance simulation clusters and cloud-based computing.
 
@@ -8,9 +10,8 @@ https://awslabs.github.io/palace/stable/
 
 https://aws.amazon.com/de/blogs/quantum-computing/aws-releases-open-source-software-palace-for-cloud-based-electromagnetics-simulations-of-quantum-computing-hardware/
 
-The gds2palace workflow in this repository enables RFIC FEM simulation using Palace from GDSII layout files.
-
-Special thanks to the public funded German project FMD-QNC (16ME0831) https://www.elektronikforschung.de/projekte/fmd-qnc for financial support, which has contributed to this work.
+The gds2palace workflow in this repository is pre-configured for GDSII layout files in the [IHP SG13G2 Open PDK.](https://github.com/IHP-GmbH/IHP-Open-PDK)
+Special thanks to IHP and the public funded German project FMD-QNC (16ME0831) https://www.elektronikforschung.de/projekte/fmd-qnc for financial support, which has contributed to this work.
 
 # Documentation
 An extensive documentation is available in PDF format here:
