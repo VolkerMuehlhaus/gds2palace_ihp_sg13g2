@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+  <Stackup schemaVersion="2.0">
+    <Materials>
+      <Material Name="Copper" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="3.3e7" Color="00ff00"/>
+      <Material Name="RO4003" Type="Dielectric" Permittivity="3.38" DielectricLossTangent="0.0022" Conductivity="0" Color="01e0ff"/>
+      <Material Name="AIR" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" Conductivity="0" Color="d0d0d0"/>
+    </Materials>
+    <ELayers LengthUnit="um">
+      <Dielectrics>
+        <Dielectric Name="RO4003" Material="RO4003" Thickness="510" />
+      </Dielectrics>
+      <Layers>
+        <Substrate Offset="0"/>
+        <Layer Name="Bottom" Type="Conductor" Zmin="0" Zmax="35" Material="Copper" Layer="1" />
+        <Layer Name="Top" Type="Conductor" Zmin="485" Zmax="510" Material="Copper" Layer="10" />
+      </Layers>
+    </ELayers>
+  </Stackup>
+
