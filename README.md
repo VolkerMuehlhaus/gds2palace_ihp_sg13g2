@@ -10,6 +10,7 @@ https://aws.amazon.com/de/blogs/quantum-computing/aws-releases-open-source-softw
 
 The gds2palace workflow in this repository enables RFIC FEM simulation using Palace from GDSII layout files.
 
+Special thanks to the public funded German project FMD-QNC (16ME0831) https://www.elektronikforschung.de/projekte/fmd-qnc for financial support, which has contributed to this work.
 
 # Documentation
 An extensive documentation is available in PDF format here:
