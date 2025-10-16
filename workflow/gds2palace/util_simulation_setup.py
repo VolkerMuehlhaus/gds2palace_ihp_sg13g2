@@ -632,6 +632,7 @@ def create_palace (excite_ports, settings):
     fstart = settings['fstart'] 
     fstop = settings['fstop']
     fstep = get_optional_setting (settings, "fstep", (fstop-fstart)/100)
+    f_discrete_list = [] # extra frequencies in GHz outside sweep
     
     adaptive_sweep = get_optional_setting (settings, "adaptive_sweep", True)
     
@@ -684,9 +685,12 @@ def create_palace (excite_ports, settings):
 
     # parameter check
     # DC simulation gives errors for now, so replace that
-    if fstart < 0.1e9:
-        fstart = 0.1e9
-        print('WARNING: Start frequency changed from DC to ', fstart/1e9, ' GHz!')
+    if fstart < 0.1e8:
+        fstart = fstep # start sweep from next step
+        # add low frequency to list of discrete frequencies, to replace 0 Hz from user input
+        f_DC = 0.1
+        f_discrete_list.append (f_DC)
+        print('WARNING: Start frequency changed from DC to ', f_DC, ' GHz!')
 
 
     # AdaptiveTol value enables adaptive frequency sweep, 0 means regular sweep (not adaptive)
@@ -727,15 +731,35 @@ def create_palace (excite_ports, settings):
         }
     config_data['Model'] = model
 
-
-    solver = {
-            "Driven": {
+    # user defined sweep
+    sweep = [{
+                "Type": "Linear",
                 "MinFreq": fstart/1e9,
                 "MaxFreq": fstop/1e9,
                 "FreqStep": fstep/1e9,
-                "SaveStep": 0,
-                "AdaptiveTol": AdaptiveTol
-            },
+                "SaveStep": 0                        
+            }]
+
+    # add f_discrete_list, this might have the value that replaces user input 0 GHz
+    if len(f_discrete_list) > 0:
+
+        discrete = {
+                    "Type": "Point",
+                    "Freq": f_discrete_list,
+                    "SaveStep": 0,
+        }
+
+        sweep.append(discrete)
+
+
+    allsamples = {
+                  "Samples":sweep,
+                  "AdaptiveTol": AdaptiveTol
+                  }
+
+
+
+    solver = {
             "Linear": {
                 "Type": "Default",
                 "KSPType": "GMRES",
@@ -744,7 +768,11 @@ def create_palace (excite_ports, settings):
             },
             "Order": order,
             "Device": "CPU"
-        }
+            }
+
+    solver['Driven'] = allsamples
+
+
     config_data['Solver'] = solver
 
 
