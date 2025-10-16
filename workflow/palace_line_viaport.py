@@ -60,7 +60,6 @@ settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, mu
 
 settings['meshsize_max'] = 70  # microns, override cells_per_wavelength 
 settings['adaptive_mesh_iterations'] = 0
-settings['z_thickness_factor'] = 0.33  
 
 # settings['nogui'] = True  # create files without showing 3D model
 # settings['nogui'] = ('nogui' in sys.argv)  # check if nogui specified on command line, then create files without showing 3D model

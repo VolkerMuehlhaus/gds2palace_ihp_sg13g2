@@ -666,7 +666,7 @@ def create_palace (excite_ports, settings):
     substrate_refinement = get_optional_setting (settings, "substrate_refinement", False)
 
     # separate_z_group_for_metals setting 
-    z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 0.33)
+    z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
 
     # boundary conditions default to absorbing
     boundary_condition = get_optional_setting (settings,'boundary',['PML','PML','PML','PML','PML','PML'])

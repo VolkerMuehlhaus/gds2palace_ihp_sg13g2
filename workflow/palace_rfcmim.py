@@ -60,7 +60,6 @@ settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, mu
 
 settings['meshsize_max'] = 70  # microns, override cells_per_wavelength 
 settings['adaptive_mesh_iterations'] = 0
-settings['z_thickness_factor'] = 0.33  
 
 
 # Ports from GDSII Data, polygon geometry from specified special layer
