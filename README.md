@@ -113,7 +113,7 @@ As an example what is possible using this workflow, the screenshot below shows t
 
 Author of this design: https://ieeexplore.ieee.org/author/37535797800
 
-For the simulation shown below, port 1 was excited at a frequency of 93 GHz. Simulation took ~ 4 minutes for that one excitation at one frequency.
+For the simulation shown below, port 1 was excited at a frequency of 93 GHz. Simulation took ~ 4 minutes for that one excitation at one frequency. Visualization of results was done using Paraview.
 
 ![butler 1](./doc/png/butler1.png)
 
