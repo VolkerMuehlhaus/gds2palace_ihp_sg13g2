@@ -11,8 +11,8 @@
       </Dielectrics>
       <Layers>
         <Substrate Offset="0"/>
-        <Layer Name="Bottom" Type="Conductor" Zmin="0" Zmax="35" Material="Copper" Layer="1" />
-        <Layer Name="Top" Type="Conductor" Zmin="485" Zmax="510" Material="Copper" Layer="10" />
+        <Layer Name="Bottom" Type="Conductor" Zmin="-17" Zmax="0" Material="Copper" Layer="1" />
+        <Layer Name="Top" Type="Conductor" Zmin="510" Zmax="527" Material="Copper" Layer="10" />
       </Layers>
     </ELayers>
   </Stackup>

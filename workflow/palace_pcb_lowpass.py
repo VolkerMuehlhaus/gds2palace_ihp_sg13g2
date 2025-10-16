@@ -58,11 +58,12 @@ settings['fstart']  = 0.1e9
 settings['fstop']   = 6.0e9
 settings['fstep']   = 0.05e9
 
-settings['refined_cellsize'] = 100  # mesh cell size in conductor region
+settings['refined_cellsize'] = 200  # mesh cell size in conductor region
 settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, must be 10 or more
 
 settings['meshsize_max'] = 5000  # in project units, override cells_per_wavelength 
 settings['adaptive_mesh_iterations'] = 0
+settings['z_thickness_factor'] = 1  
 
 # settings['nogui'] = True  # create files without showing 3D model
 # settings['nogui'] = ('nogui' in sys.argv)  # check if nogui specified on command line, then create files without showing 3D model
