@@ -101,18 +101,22 @@ def extrapolate_to_DC (snp_filename):
     nw = rf.Network(snp_filename)
 
     # check if we have point below 1 GHz, otherwise exit
-    if nw.frequency.start <= 1e9:
-        if True: # nw.frequency.npoints > 50:
-            # extrapolate to DC
-            extrapolated = nw.extrapolate_to_dc(points=None, dc_sparam=None,  kind='cubic', coords='polar')
-            filename, file_extension = os.path.splitext(snp_filename)
-            out_filename = filename + '_dc' # without extension
-            extrapolated.write_touchstone(out_filename, skrf_comment='DC point added by extrapolation', form='db', write_noise=True)
-            print('Created file with DC extrapolation: ', out_filename,'\n')
+    if nw.frequency.npoints > 20:
+        if nw.frequency.start <= 1e9:
+            if True: # nw.frequency.npoints > 50:
+                # extrapolate to DC
+                extrapolated = nw.extrapolate_to_dc(points=None, dc_sparam=None,  kind='cubic', coords='polar')
+                filename, file_extension = os.path.splitext(snp_filename)
+                out_filename = filename + '_dc' # without extension
+                extrapolated.write_touchstone(out_filename, skrf_comment='DC point added by extrapolation', form='db', write_noise=True)
+                print('Created file with DC extrapolation: ', out_filename,'\n')
+            else:
+                print('Not enough frequency points, skipping DC extrapolation')    
         else:
-            print('Not enough frequency points, skipping DC extrapolation')    
+            print('No data at low frequency, skipping DC extrapolation')    
     else:
-        print('No data at low frequency, skipping DC extrapolation')    
+        print('Skipping DC extrapolation, not enough freqency points')    
+
 
 # ----------------------
 
