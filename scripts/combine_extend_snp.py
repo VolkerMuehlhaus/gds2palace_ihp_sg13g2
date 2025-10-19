@@ -2,6 +2,7 @@
 # walk through directory and combine all excitation
 
 # new version for new Palace output that creates multi excitations in one common output file
+# updated 19-Oct-2025 Mue: support more than 9 ports
 
 import os,re, pathlib 
 import skrf as rf
@@ -15,8 +16,6 @@ def parse_input (input_filename, freq, S_dB, S_arg):
             aline = aline.replace(",","")
             aline = aline.replace("(dB)","")
             aline = aline.replace("(deg.)","")
-            aline = aline.replace("[","")
-            aline = aline.replace("]","")
 
             dB = {}
             arg = {}
@@ -28,23 +27,28 @@ def parse_input (input_filename, freq, S_dB, S_arg):
                 freq_unit = re.sub('[()]', '', items[1])
 
                 # find what parameters we have in this line
+                # items are like this:      |S[1][1]| arg(S[1][1])
+
+                num_ports = 0
+
                 for item in items:
                     if '|' in item:
-                        Sxx = re.sub('[S|]', '', item)
+                        Sxx = item.replace('|S', '')
+                        Sxx = Sxx.replace('|', '')
+                        # Sxx is like this: [1][1]'
+                        Sxx = Sxx.replace('][', ' ')
+                        # Sxx is like this: [1 1]
+                        Sxx = Sxx.replace('[', '')
+                        Sxx = Sxx.replace(']', '')
+                        # Sxx is like this: 1 1
                         params.append(str(Sxx))
 
-                # get number of ports from Sxx
-                if len(Sxx)==2:
-                    a = int(Sxx[0])
-                    b = int(Sxx[1])
-                elif len(Sxx)==4:   
-                    a = int(Sxx[0:1])
-                    b = int(Sxx[2:3])
-                else:
-                    print('It seems that we have an invalid number of ports, parameter Sxx=', Sxx)
-                    exit(1)    
+                        # get port indices a and b from Sxx
+                        splitted = Sxx.split()
+                        a = int(splitted [0])
+                        b = int(splitted [1])
+                        num_ports = max(num_ports,a,b)
 
-                num_ports = max(a,b)
                 print('Number of ports: ', num_ports)
 
             else:
@@ -153,9 +157,9 @@ for f in found_datafiles:
 
                 # special case 2-port data: the output is S11 S21 S12 S22 
                 if num_ports==2:
-                    param = str(j) + str(i)
+                    param = str(j) + ' ' + str(i)
                 else: 
-                    param = str(i) + str(j)
+                    param = str(i) + ' ' + str(j)
 
                 found_params = S_dB[index].keys()
                 # assume that we also have phase data then
@@ -197,7 +201,9 @@ for f in found_datafiles:
         output_file.write(line + "\n")
 
     output_file.close() 
-    print('Created combined S-parameter file for ', num_ports, 'ports, filename: ', output_filename,'\n')
+    print('Created combined S-parameter file for ', num_ports, 'ports, filename: ', output_filename)
+    print('NOTE: Port impedance not listed in Palace file, assuming 50 Ohm!')
+    print('      If required, you can change that value in Touchstone file header!\n')
 
     # try DC extrapolation
     extrapolate_to_DC(output_filename)
