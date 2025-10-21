@@ -18,10 +18,25 @@
 
 # Extract objects on IHP layers in GDSII file
 
+__version__ = "1.0.0"
+
 import gdspy
 import numpy as np
 import os
 import gds2palace.util_stackup_reader as stackup_reader
+
+# check that we have gdspy version 1.6.x or later
+# gdspy 1.4.2 is known for issues with our geometries
+
+version_str = gdspy.__version__
+major, minor, patch = version_str.split('.')
+if int(major) == 1:
+  if int(minor) < 6:
+    print('\nERROR: Your gdspy module version ', version_str, ' is too old. Please update to 1.6.13 or later!')
+    print('Consider using venv if you are not allowed to modify the global Python modules of your system.')
+    print('https://docs.python.org/3/library/venv.html')
+    exit(1)
+
 
 
 # ============= technology specific stuff ===============
