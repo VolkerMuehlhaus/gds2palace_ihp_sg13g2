@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import os
 import sys
@@ -627,11 +627,32 @@ def create_palace (excite_ports, settings):
     margin = settings['margin']   # oversize of dielectric layers relative to drawing
     air_around = get_optional_setting (settings, "air_around", margin)  # airbox size to simulation boundary
 
-    fstart = settings['fstart'] 
-    fstop = settings['fstop']
-    fstep = get_optional_setting (settings, "fstep", (fstop-fstart)/100)
-    f_discrete_list = [] # extra frequencies in GHz outside sweep
-    
+    fstart = get_optional_setting (settings, 'fstart', None)
+    fstop  = get_optional_setting (settings, 'fstop', None)
+    if (fstart is not None) and (fstop is not None):
+        fstep  = get_optional_setting (settings, "fstep", (fstop-fstart)/100)
+
+    # we might have additional discrete frequencies specified, which can be number or list of numbers
+    f_discrete_list =  get_optional_setting (settings, "fpoint", []) # extra frequencies in GHz in addition to sweep
+    # make it a list always
+    if type(f_discrete_list)==float or type(f_discrete_list)==int:
+        f_discrete_list = [f_discrete_list]
+
+    if fstart==None and len(f_discrete_list)==0:
+        print('No frequencies defined, you must define fstart+fstop or fpoint!')
+        exit(1)
+
+    if fstart is not None:
+        if fstart > 1e5:
+            print('Frequencies must be specified in GHz. fstart =', fstart, ' looks wrong!')
+            exit(1)
+
+    # Discrete frequencies list values must be in GHz, divide by 1e9
+    if len(f_discrete_list) > 0:
+        GHz = [f / 1e9 for f in f_discrete_list]
+        f_discrete_list = GHz
+        
+
     adaptive_sweep = get_optional_setting (settings, "adaptive_sweep", True)
     
     order = int(get_optional_setting (settings, "order", 2))  # order of FEM basis functions, default 2
@@ -683,12 +704,13 @@ def create_palace (excite_ports, settings):
 
     # parameter check
     # DC simulation gives errors for now, so replace that
-    if fstart < 0.1e8:
-        fstart = fstep # start sweep from next step
-        # add low frequency to list of discrete frequencies, to replace 0 Hz from user input
-        f_DC = 0.1
-        f_discrete_list.append (f_DC)
-        print('WARNING: Start frequency changed from DC to ', f_DC, ' GHz!')
+    if fstart is not None:
+        if fstart < 0.1e8:
+            fstart = fstep # start sweep from next step
+            # add low frequency to list of discrete frequencies, to replace 0 Hz from user input
+            f_DC = 0.1
+            f_discrete_list.append (f_DC)
+            print('WARNING: Start frequency changed from DC to ', f_DC, ' GHz!')
 
 
     # AdaptiveTol value enables adaptive frequency sweep, 0 means regular sweep (not adaptive)
@@ -730,13 +752,18 @@ def create_palace (excite_ports, settings):
     config_data['Model'] = model
 
     # user defined sweep
-    sweep = [{
+    sweep = []
+    
+    if (fstart is not None) and (fstop is not None):
+        linear = {
                 "Type": "Linear",
                 "MinFreq": fstart/1e9,
                 "MaxFreq": fstop/1e9,
                 "FreqStep": fstep/1e9,
                 "SaveStep": 0                        
-            }]
+            }
+
+        sweep.append(linear)    
 
     # add f_discrete_list, this might have the value that replaces user input 0 GHz
     if len(f_discrete_list) > 0:
@@ -776,14 +803,19 @@ def create_palace (excite_ports, settings):
 
     print('Creating mesh file and config file')
 
+    fmax = 0
+    if fstop is not None: 
+        fmax = max(fmax, fstop)
+    if len(f_discrete_list) > 0: 
+        discrete_max_GHz = max(f_discrete_list) 
+        fmax = max(fmax, discrete_max_GHz*1e9)
 
-    wavelength_air = 3e8/fstop / unit
+    wavelength_air = 3e8/fmax / unit
     # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
     max_cellsize_air = wavelength_air/cells_per_wavelength
 
     print('Wavelength in air : ', wavelength_air, ' units')
     print('  meshsize_max    : ', meshsize_max, ' units')
-    print('  permittivty     : ', materials_list.eps_max)
     print('  max_cellsize_air: ', max_cellsize_air, ' units')
 
     kernel = gmsh.model.occ
