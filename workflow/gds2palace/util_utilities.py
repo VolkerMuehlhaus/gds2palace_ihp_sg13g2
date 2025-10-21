@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import os, tempfile, platform, sys
+import os, tempfile, platform, sys, importlib
 
+__version__ = "1.0.0"
 
 # ============================== filename and path  =================================
 
@@ -50,3 +51,11 @@ def create_run_script (destination_path):
     f.close()   
 
 
+def check_module_version(module_name, expected_version):
+    module = importlib.import_module(module_name)
+    version = getattr(module, "__version__", None)
+    if version is not None:
+        if getattr(module, "__version__", None) < expected_version:
+            raise RuntimeError(f"{module_name} version mismatch: expected {expected_version}, got {module.__version__}")
+    else:
+            raise RuntimeError(f"{module_name} does not provide version information, please update!")

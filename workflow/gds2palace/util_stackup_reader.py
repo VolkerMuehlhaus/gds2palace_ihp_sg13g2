@@ -23,7 +23,7 @@
 # Initial version 20 Nov 2024  Volker Muehlhaus 
 # Added support for sheet resistance 07 Oct 2025 Volker Muehlhaus 
 
-
+__version__ = "1.0.0"
 
 import os
 import xml.etree.ElementTree 
@@ -170,6 +170,10 @@ class metal_layer:
     # force to sheet if zero thickness
     if data.get("Zmin") == data.get("Zmax"):
       self.type = "SHEET"
+
+    if self.type == "SHEET" and not self.zmin==self.zmax:
+      print('ERROR: Layer ', self.name, ' is defined as sheet layer, but zmax is different from zmin. This is not valid!')
+      exit(1)
 
     self.thickness = self.zmax-self.zmin
     self.is_via = (self.type=="VIA")

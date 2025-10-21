@@ -16,8 +16,9 @@
 #
 ########################################################################
 
-
 # -*- coding: utf-8 -*-
+
+__version__ = "1.0.0"
 
 import os
 import sys
@@ -170,7 +171,6 @@ def add_metals (allpolygons, metals_list, meshseed=0):
         # not iterate over return values and check exact height
         surfaces_on_layer_list = []
         for surface in surfaces_in_bounding_box:
-            surface_tag = surface[1]
             surfaces_on_layer_list.append(surface)
             
         return  surfaces_on_layer_list
@@ -228,11 +228,7 @@ def add_metals (allpolygons, metals_list, meshseed=0):
     volumelist = gmsh.model.getEntities(3)
     volumecount = len(volumelist)
     if volumecount>0:
-        # print('Number of volumes before merging = ' + str(volumecount)) 
-
         # try to merge volumes on each layer
-        # print ("\nBegin Merging")
-
         for metal in metals_list.metals:
             if not (metal.is_via or metal.is_sheet):            
                 # try to merge planar metal volumes
@@ -347,11 +343,14 @@ def create_box_with_meshseed (kernel, xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
     return volumetag
 
 
-def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, meshseed, refined_cellsize):
+def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, refined_cellsize):
 # Add dielectric layers (these extend through simulation area and have no polygons in GDSII)
 
     # Store tags of created geometries, key is layer name
     tags_created_3D = {}
+
+    # meshseed is not relevant because we create a mesh later from distance to metal edges
+    meshseed = 0
 
     # largest dimensions of dielectrics, across all stackups in multi-chip models
     overall_xmin = math.inf
@@ -623,8 +622,7 @@ def create_palace (excite_ports, settings):
             is_vertical = False    
         return is_vertical
     
-
-    # calculate maximum cellsize from wavelength in dielectric
+    # get settings from simulation model
     unit = settings['unit']
     margin = settings['margin']   # oversize of dielectric layers relative to drawing
     air_around = get_optional_setting (settings, "air_around", margin)  # airbox size to simulation boundary
@@ -695,7 +693,7 @@ def create_palace (excite_ports, settings):
 
     # AdaptiveTol value enables adaptive frequency sweep, 0 means regular sweep (not adaptive)
     if adaptive_sweep:
-        AdaptiveTol = 1e-2
+        AdaptiveTol = 2e-2
     else:    
         AdaptiveTol = 0
 
@@ -780,8 +778,13 @@ def create_palace (excite_ports, settings):
 
 
     wavelength_air = 3e8/fstop / unit
-    max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
+    # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
+    max_cellsize_air = wavelength_air/cells_per_wavelength
 
+    print('Wavelength in air : ', wavelength_air, ' units')
+    print('  meshsize_max    : ', meshsize_max, ' units')
+    print('  permittivty     : ', materials_list.eps_max)
+    print('  max_cellsize_air: ', max_cellsize_air, ' units')
 
     kernel = gmsh.model.occ
     gmsh.initialize()
@@ -798,15 +801,15 @@ def create_palace (excite_ports, settings):
     # add drawn geometries to gmsh model
     # store metal tags for surfaces and volumes per layer 
     print('Adding metal tags ...')
-    metal_tags_created_3D, metal_perpolytags_2D, sheet_tags_created_2D = add_metals (allpolygons, metals_list, meshseed=refined_cellsize)
+    metal_tags_created_3D, metal_perpolytags_2D, sheet_tags_created_2D = add_metals (allpolygons, metals_list)
 
     # add ports
     print('Adding ports ...')
-    port_tags_created_2D = add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed=refined_cellsize)
+    port_tags_created_2D = add_ports (kernel, allpolygons, metals_list, simulation_ports)
 
     # add dielectric boxes (oxide, substrate, air etc) to gmsh model
     print('Adding dielectrics ...')
-    dielectric_tags_created_3D = add_dielectrics (kernel, materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, meshseed=min(meshsize_max,max_cellsize), refined_cellsize=refined_cellsize)
+    dielectric_tags_created_3D = add_dielectrics (kernel, materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, refined_cellsize=refined_cellsize)
 
     # Prepare for embedding/fragmenting, where tags will change
     # get all surfaces and volumes and store their original dimtags, we will fragment them to  align mesh where they touch or intersect
@@ -1195,6 +1198,8 @@ def create_palace (excite_ports, settings):
     gmsh.model.mesh.field.setNumbers(1, "CurvesList", boundary_line_tags) 
     gmsh.model.mesh.field.setNumber(1, "Sampling", 200)
 
+    fields_list = []
+
     # We then define a `Threshold' field, which uses the return value of the
     # `Distance' field 1 in order to define a simple change in element size
     # depending on the computed distances
@@ -1209,13 +1214,14 @@ def create_palace (excite_ports, settings):
     gmsh.model.mesh.field.add("Threshold", 2)
     gmsh.model.mesh.field.setNumber(2, "InField", 1)  # number of this field definition
     gmsh.model.mesh.field.setNumber(2, "SizeMin", refined_cellsize)
-    gmsh.model.mesh.field.setNumber(2, "SizeMax", max_cellsize)
+    gmsh.model.mesh.field.setNumber(2, "SizeMax", max_cellsize_air)
     gmsh.model.mesh.field.setNumber(2, "DistMin", 0)
-    gmsh.model.mesh.field.setNumber(2, "DistMax", max_cellsize)
+    gmsh.model.mesh.field.setNumber(2, "DistMax", max_cellsize_air)
 
-    fields_list = [2]
+    fields_list.append(2)
 
-    # We want to refine the mesh at the upper and of the semiconductor
+   
+    # Optional refinement of mesh at the upper end of the semiconductor
 
     if z_semi>0 and substrate_refinement:
         # xy dimensions of dielectric boxes from stackup
@@ -1227,9 +1233,12 @@ def create_palace (excite_ports, settings):
         refine_layer_thickness = max(30*refined_cellsize,z_semi/2)
         refine_value = min(10*refined_cellsize, 20)
 
+        # semiconductor with eps_r = 11.9
+        max_cellsize_local = min(max_cellsize_air/math.sqrt(11.9), meshsize_max)
+
         gmsh.model.mesh.field.add("Box", 6)
         gmsh.model.mesh.field.setNumber(6, "VIn",  refine_value)
-        gmsh.model.mesh.field.setNumber(6, "VOut", max_cellsize)
+        gmsh.model.mesh.field.setNumber(6, "VOut", max_cellsize_local)
         gmsh.model.mesh.field.setNumber(6, "XMin", x1)
         gmsh.model.mesh.field.setNumber(6, "XMax", x2)
         gmsh.model.mesh.field.setNumber(6, "YMin", y1)
@@ -1240,11 +1249,54 @@ def create_palace (excite_ports, settings):
         fields_list.append(6)
 
 
-    # Let's use the minimum of all the fields as the mesh size field:
-    gmsh.model.mesh.field.add("Min", 7)
-    gmsh.model.mesh.field.setNumbers(7, "FieldsList", fields_list)
+    # Iterate over dielectric and set max_cellsize in medium according to permittivity
+    i = 10
+    for dielectric in dielectrics_list.dielectrics:
+        # get CSX material object for this dielectric layers material name
+        materialname = dielectric.material
+        material = materials_list.get_by_name(materialname)
+        permittivity = material.eps
 
-    gmsh.model.mesh.field.setAsBackgroundMesh(7)
+        max_cellsize_local = min(max_cellsize_air/math.sqrt(permittivity), meshsize_max)
+        print('Dielectric ',materialname, ' with max_cellsize_local = ', max_cellsize_local, 'units' )
+
+        if dielectric.gdsboundary is None:
+            # size of dielectric is global size, no boundary defined for this layer
+            x1 = allpolygons.get_xmin() - margin
+            y1 = allpolygons.get_ymin() - margin
+            x2 = allpolygons.get_xmax() + margin
+            y2 = allpolygons.get_ymax() + margin
+        else:
+            # size of dielectric is defined for this layer by polygon from gds
+            bound_layernum = int(dielectric.gdsboundary) 
+            bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.bounding_box.get_layer_bounding_box(bound_layernum)
+       
+            x1 = bbox_xmin - margin
+            y1 = bbox_ymin - margin
+            x2 = bbox_xmax + margin
+            y2 = bbox_ymax + margin
+
+        # add local mesh size according to permittivity
+        gmsh.model.mesh.field.add("Box", i)
+        gmsh.model.mesh.field.setNumber(i, "VIn",  max_cellsize_local) # inside
+        gmsh.model.mesh.field.setNumber(i, "VOut", max_cellsize_air) # outside
+        gmsh.model.mesh.field.setNumber(i, "XMin", x1)
+        gmsh.model.mesh.field.setNumber(i, "XMax", x2)
+        gmsh.model.mesh.field.setNumber(i, "YMin", y1)
+        gmsh.model.mesh.field.setNumber(i, "YMax", y2)
+        gmsh.model.mesh.field.setNumber(i, "ZMin", dielectric.zmin)
+        gmsh.model.mesh.field.setNumber(i, "ZMax", dielectric.zmax)
+
+        fields_list.append(i)
+        i = i + 1
+
+
+    # Let's use the minimum of all the fields as the mesh size field:
+    gmsh.model.mesh.field.add("Min", i)
+    gmsh.model.mesh.field.setNumbers(i, "FieldsList", fields_list)
+
+    gmsh.model.mesh.field.setAsBackgroundMesh(i)
+
 
 
     # The API also allows to set a global mesh size callback, which is called each
@@ -1293,8 +1345,7 @@ def create_palace (excite_ports, settings):
 
 
 # Utility functions for hash file.
-# By creating and storing a hash of CSX file to the result folder when simulation is finished,
-# we can identify pre-existing data of the exact same model. In this case, we can skip simulation.
+# Not used by gds2palace yet
 
 def calculate_sha256_of_file(filename):
     import hashlib
