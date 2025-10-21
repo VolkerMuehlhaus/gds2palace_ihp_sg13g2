@@ -55,6 +55,11 @@ settings['fstart']  = 0e9
 settings['fstop']   = 100e9
 settings['fstep']   = 2.5e9
 
+# optional:  single frequency or list of frequencies[] -> "Point" frequency sample in Palace config
+# settings['fpoint']   = 51.5e9 
+# settings['fpoint']   = [51.5e9, 10e9] 
+
+
 settings['refined_cellsize'] = 2  # mesh cell size in conductor region
 settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, must be 10 or more
 
