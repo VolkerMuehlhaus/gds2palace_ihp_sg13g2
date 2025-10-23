@@ -635,23 +635,30 @@ def create_palace (excite_ports, settings):
     # we might have additional discrete frequencies specified, which can be number or list of numbers
     f_discrete_list =  get_optional_setting (settings, "fpoint", []) # extra frequencies in GHz in addition to sweep
     # make it a list always
-    if type(f_discrete_list)==float or type(f_discrete_list)==int:
+    if isinstance(f_discrete_list,float) or isinstance(f_discrete_list, int):
         f_discrete_list = [f_discrete_list]
 
-    if fstart==None and len(f_discrete_list)==0:
+    # we might have additional discrete frequencies specified for field dump, which can be number or list of numbers
+    f_dump_list =  get_optional_setting (settings, "fdump", []) # extra dump frequencies in GHz in addition to sweep
+    # make it a list always
+    if isinstance(f_dump_list, float) or isinstance(f_dump_list, int):
+        f_dump_list = [f_dump_list]
+
+
+    if fstart is None and len(f_discrete_list)==0 and len(f_dump_list)==0: 
         print('No frequencies defined, you must define fstart+fstop or fpoint!')
         exit(1)
-
-    if fstart is not None:
-        if fstart > 1e5:
-            print('Frequencies must be specified in GHz. fstart =', fstart, ' looks wrong!')
-            exit(1)
 
     # Discrete frequencies list values must be in GHz, divide by 1e9
     if len(f_discrete_list) > 0:
         GHz = [f / 1e9 for f in f_discrete_list]
         f_discrete_list = GHz
-        
+
+    # Discrete frequencies list values must be in GHz, divide by 1e9
+    if len(f_dump_list) > 0:
+        GHz = [f / 1e9 for f in f_dump_list]
+        f_dump_list = GHz
+
 
     adaptive_sweep = get_optional_setting (settings, "adaptive_sweep", True)
     
@@ -775,6 +782,19 @@ def create_palace (excite_ports, settings):
         }
 
         sweep.append(discrete)
+
+
+    # add f_dump_list for frequencies where we request dump file at every sample
+    if len(f_dump_list) > 0:
+
+        dump = {
+                    "Type": "Point",
+                    "Freq": f_dump_list,
+                    "SaveStep": 1,
+        }
+
+        sweep.append(dump)
+
 
 
     allsamples = {
