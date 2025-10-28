@@ -695,10 +695,10 @@ def create_palace (excite_ports, settings):
     z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
 
     # boundary conditions default to absorbing
-    boundary_condition = get_optional_setting (settings,'boundary',['PML','PML','PML','PML','PML','PML'])
+    boundary_condition = get_optional_setting (settings,'boundary',['ABC','ABC','ABC','ABC','ABC','ABC'])
     print ('Using boundary condition ', str(boundary_condition))
     if len(boundary_condition) != 6:
-        print('If specified, the boundary condition parameter must be a list with 6 string values, "PML" or "PEC"')
+        print('If specified, the boundary condition parameter must be a list with 6 string values, "PML", "ABC", "PEC" or "PMC')
         exit(1)
 
     # script control
@@ -1157,7 +1157,7 @@ def create_palace (excite_ports, settings):
             elif bc[idx] == 'PMC':    
                 PMC_boundaries.append(boundary)
             else:
-                print('Error: Boundary condition ', boundary_condition[idx],' is not supported. Use PML, PEC or PMC only.')    
+                print('Error: Boundary condition ', boundary_condition[idx],' is not supported. Use ABC, PML, PEC or PMC only.')    
                 exit(1)
     else:
         print('Invalid simulation boundary, the surrounding air margin must be > 0 on all six sides!')
