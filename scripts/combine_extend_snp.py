@@ -3,8 +3,9 @@
 
 # new version for new Palace output that creates multi excitations in one common output file
 # updated 19-Oct-2025 Mue: support more than 9 ports
+# updated 08-Nov-2025 Mue: added evaluation for optional port impedance file port_information.json that is created by new gds2palace code
 
-import os,re, pathlib 
+import os,re, json 
 import skrf as rf
 
 def parse_input (input_filename, freq, S_dB, S_arg):
@@ -132,8 +133,39 @@ found_datafiles = []
 traverse_directories(workdir)
 
 # evaluate the found data files
-for f in found_datafiles:
+for found_filename in found_datafiles:
     # print(str(f))
+
+    # Before we evaluate S-parameters, also check if we have a file port_information.json
+    port_info_available = False
+    # Get the directory two levels up
+    two_up_dir = os.path.abspath(os.path.join(os.path.dirname(found_filename), "..", ".."))
+    # Possible full filename for port_information.json
+    port_info_filename = os.path.join(two_up_dir, "port_information.json")
+    # Check if it exists
+    if os.path.isfile(port_info_filename):
+        print(f"Found extra file with port information: {port_info_filename}")
+
+        # Load the JSON data
+        with open(port_info_filename, "r") as f:
+            data = json.load(f)
+
+        # Extract all Z0 values
+        Z0_values = [port["Z0"] for port in data.get("ports", []) if "Z0" in port]
+        print("Port Z0 values found:", Z0_values)
+
+        Z0_string = str(Z0_values[0])
+        for Z in Z0_values:
+            if Z != Z0_values[0]:
+                Z0_string = Z0_string + ' ' + str(Z)
+        # If string is fillex, we have a Z0 parameter for Touchstone header line. 
+        # For mixed port impedance, we have multiple values there
+        port_info_available = True
+        print("Port impedance for Touchstone header: ", Z0_string)
+    
+    else:
+        Z0_string = "50"       # default 
+
 
     # data file items
     freq = []
@@ -142,7 +174,7 @@ for f in found_datafiles:
     freq_unit = ''
     num_ports = 0
 
-    num_ports, freq_unit = parse_input(f, freq, S_dB, S_arg)
+    num_ports, freq_unit = parse_input(found_filename, freq, S_dB, S_arg)
 
     data_lines = []
     
@@ -179,7 +211,7 @@ for f in found_datafiles:
     data_lines.sort(key=lambda x:float(x[0]))
 
     # get directory where port-S.csv file is stored
-    data_path = os.path.dirname(f)
+    data_path = os.path.dirname(found_filename)
     output_path = data_path
 
     # get name of parent diretory, so that we can use it as filename for output 
@@ -192,7 +224,7 @@ for f in found_datafiles:
 
     output_file = open(output_filename, "w") 
     # write Touchstone header line
-    output_file.write(f"#  {freq_unit.upper()} S DB R 50\n")
+    output_file.write(f"#  {freq_unit.upper()} S DB R {Z0_string}\n")
 
     for data_line in data_lines:
         line = ''
@@ -202,8 +234,10 @@ for f in found_datafiles:
 
     output_file.close() 
     print('Created combined S-parameter file for ', num_ports, 'ports, filename: ', output_filename)
-    print('NOTE: Port impedance not listed in Palace file, assuming 50 Ohm!')
-    print('      If required, you can change that value in Touchstone file header!\n')
+
+    if not port_info_available:
+        print('NOTE: Port impedance not listed in Palace file, assuming 50 Ohm!')
+        print('      If required, you can change that value in Touchstone file header!\n')
 
     # try DC extrapolation
     extrapolate_to_DC(output_filename)

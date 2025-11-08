@@ -473,6 +473,9 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
     '''
     tags_created_2D = {}
 
+    # data structure that we write to Palace output directory with information about port Z0 and port dimensions
+    all_port_information = []
+
     # add geometries on metal and via layers
     for poly in allpolygons.polygons:
         # each poly knows its layer number
@@ -488,6 +491,12 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
                 # find port definition for this GDSII source layer number
                 port = simulation_ports.get_port_by_layernumber(poly.layernum)
                 if port is not None:
+
+                    port_information_data = {}
+                    port_information_data['portnumber'] = port.portnumber
+                    port_information_data['Z0'] = port.port_Z0
+                    port_information_data['direction'] = port.direction.upper()
+
                     portnum = port.portnumber
                     xmin = poly.xmin
                     xmax = poly.xmax
@@ -506,6 +515,17 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
                         pt2 = kernel.addPoint(xmin, ymax, zmin, meshseed, -1)
                         pt3 = kernel.addPoint(xmax, ymax, zmin, meshseed, -1)
                         pt4 = kernel.addPoint(xmax, ymin, zmin, meshseed, -1)
+
+                        # port information that we write to Palace output directory
+                        if 'X' in port.direction:
+                            length = xmax-xmin
+                            width  = ymax-ymin
+                        else:    
+                            length = ymax-ymin
+                            width  = xmax-xmin
+                        port_information_data['length'] = length                           
+                        port_information_data['width']  = width      
+
                     else:
                        # via port 
                        from_metal = metals_list.getbylayername(port.from_layername)
@@ -527,6 +547,7 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
 
                        zmin = lower.zmax
                        zmax = upper.zmin
+                       length = zmax-zmin
 
                        # port is expected to be a line only (no area), we now create surface in z direction
                        # to make sure that we have a line only, we check size in x and y direction
@@ -539,13 +560,26 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
                             pt2 = kernel.addPoint(xmin, ymax, zmin, meshseed, -1)
                             pt3 = kernel.addPoint(xmin, ymax, zmax, meshseed, -1)
                             pt4 = kernel.addPoint(xmin, ymin, zmax, meshseed, -1)
+                            width = size_y
                        else: 
                             # ports are line in x direction
                             pt1 = kernel.addPoint(xmin, ymin, zmin, meshseed, -1)
                             pt2 = kernel.addPoint(xmin, ymin, zmax, meshseed, -1)
                             pt3 = kernel.addPoint(xmax, ymin, zmax, meshseed, -1)
                             pt4 = kernel.addPoint(xmax, ymin, zmin, meshseed, -1)
+                            width = size_x
 
+                       port_information_data['length'] = length                            
+                       port_information_data['width']  = width      
+
+                    port_information_data['xmin'] = xmin                           
+                    port_information_data['xmax'] = xmax      
+                    port_information_data['ymin'] = ymin                           
+                    port_information_data['ymax'] = ymax      
+                    port_information_data['zmin'] = zmin                           
+                    port_information_data['zmax'] = zmax      
+
+                    all_port_information.append(port_information_data)
 
                     # for both in-plane and vertical
                     line1 = kernel.addLine(pt1,pt2,-1) 
@@ -564,9 +598,10 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
 
     kernel.synchronize()
 
-    return tags_created_2D                    
+    all_port_information_struct = {}
+    all_port_information_struct['ports'] = all_port_information
 
-
+    return tags_created_2D, all_port_information_struct                    
 
 
 
@@ -621,6 +656,8 @@ def create_palace (excite_ports, settings):
         else:    
             is_vertical = False    
         return is_vertical
+    
+   
     
     # get settings from simulation model
     unit = settings['unit']
@@ -857,7 +894,11 @@ def create_palace (excite_ports, settings):
 
     # add ports
     print('Adding ports ...')
-    port_tags_created_2D = add_ports (kernel, allpolygons, metals_list, simulation_ports)
+    port_tags_created_2D, all_port_information_struct = add_ports (kernel, allpolygons, metals_list, simulation_ports)
+
+    # add units to port information
+    all_port_information_struct['unit'] = settings['unit']
+
 
     # add dielectric boxes (oxide, substrate, air etc) to gmsh model
     print('Adding dielectrics ...')
@@ -1207,6 +1248,12 @@ def create_palace (excite_ports, settings):
     # write JSON simulation config file now, so that we can verify it while geometry is open in gmsh GUI
     with open(config_name, 'w', encoding='utf-8') as f:
         json.dump(config_data, f, ensure_ascii=False, indent=4)
+    f.close()
+
+    # write JSON with port information to Palace outputmodel directory
+    port_information_file = os.path.join(sim_path, 'port_information' + config_suffix + '.json')
+    with open(port_information_file, 'w', encoding='utf-8') as f:
+        json.dump(all_port_information_struct, f, ensure_ascii=False, indent=4)
     f.close()
 
     
