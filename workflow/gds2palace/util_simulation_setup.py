@@ -740,6 +740,7 @@ def create_palace (excite_ports, settings):
 
     # script control
     no_gui = get_optional_setting (settings,'no_gui', False)
+    preview_only = get_optional_setting (settings,'preview_only', False)    
 
     geo_name = os.path.join(sim_path, model_basename + '.geo_unrolled')
     msh_name = os.path.join(sim_path, model_basename + '.msh')
@@ -1261,11 +1262,6 @@ def create_palace (excite_ports, settings):
         # write "raw" geometry with no mesh, so that we can open in gmsh
         gmsh.write(geo_name)
 
-    # open gmsh GUI with unmeshed geometry
-    if not no_gui:
-        gmsh.fltk.run()
-
-
 
     # -------------- MESH ------------------
 
@@ -1423,18 +1419,25 @@ def create_palace (excite_ports, settings):
     gmsh.option.setNumber("Mesh.Algorithm", 5)
 
 
-    gmsh.model.mesh.generate(3)
-
-    # Save mesh
-    gmsh.option.setNumber("Mesh.Binary", 0)
-    gmsh.option.setNumber("Mesh.SaveAll", 0)  # value 1 means: save everything, no matter if in physical group or not - DON'T USE WITH V2.2
-    gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)  # Palace requires mesh version 2.2!
-
-    # write meshed geometry
-    gmsh.write(msh_name)
-    # show meshed model in gmsh GUI
+        # open gmsh GUI with unmeshed geometry, but all mesh settings already applied
     if not no_gui:
         gmsh.fltk.run()
+
+    if not preview_only:
+        # now generate mesh
+        gmsh.model.mesh.generate(3)
+
+        # Save mesh
+        gmsh.option.setNumber("Mesh.Binary", 0)
+        gmsh.option.setNumber("Mesh.SaveAll", 0)  # value 1 means: save everything, no matter if in physical group or not - DON'T USE WITH V2.2
+        gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)  # Palace requires mesh version 2.2!
+
+        # write meshed geometry
+        gmsh.write(msh_name)
+        # show meshed model in gmsh GUI
+        if not no_gui:
+            gmsh.fltk.run()
+
     
     gmsh.clear()
     gmsh.finalize()
