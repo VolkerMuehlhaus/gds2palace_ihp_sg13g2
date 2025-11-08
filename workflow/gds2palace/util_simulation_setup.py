@@ -1122,7 +1122,7 @@ def create_palace (excite_ports, settings):
             excite_group = False
             for idx, group in enumerate(excite_ports):
                 if portnum in group:
-                    excite_group = idx + 1
+                    excite_group = portnum
 
             Palace_lumpedport['Index'] = portnum
             Palace_lumpedport['R'] = port.port_Z0
