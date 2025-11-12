@@ -17,14 +17,14 @@
 #
 ########################################################################
 
-import gds2palace.util_stackup_reader as stackup_reader
-import gds2palace.util_gds_reader as gds_reader
-import gds2palace.util_utilities as utilities
-import gds2palace.util_simulation_setup as simulation_setup
+from . import util_stackup_reader as stackup_reader
+from . import util_gds_reader as gds_reader
+from . import util_utilities as utilities
+from . import util_simulation_setup as simulation_setup
 
-__version__ = "1.0.0"   # version of gds2palace
+__version__ = "0.1.0"   # version of gds2palace
 
-utilities.check_module_version("util_stackup_reader", "1.0.0")
-utilities.check_module_version("util_gds_reader", "1.0.0")
-utilities.check_module_version("util_utilities", "1.0.0")
-utilities.check_module_version("util_simulation_setup", "1.0.0")
+#utilities.check_module_version("util_stackup_reader", "1.0.0")
+#utilities.check_module_version("util_gds_reader", "1.0.0")
+#utilities.check_module_version("util_utilities", "1.0.0")
+#utilities.check_module_version("util_simulation_setup", "1.0.0")

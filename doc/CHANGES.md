@@ -2,6 +2,16 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 12-Nov-2025
+Instead of always having the gds2palace directory in your working directory, 
+you can also install gds2palace module to your venv using pip install:
+
+```
+    pip install gds2palace
+```
+
+https://pypi.org/project/gds2palace/
+
 ## 23-Nov-2025
 - Added optional setting: options["fdump"] = [frequency] to create Palace points list with field dump enabled. 
 - New example file palace_butlermatrix_dump93.py shows usage of fdump option. 

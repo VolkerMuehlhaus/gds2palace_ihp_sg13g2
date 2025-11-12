@@ -5,7 +5,7 @@ import sys
 import subprocess
 
 # we expect gds2palace in the same directory as this model file
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'gds2palace')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname('d:/perforce/volker_OMEN15_7389/volker_OMEN15_7389/Palace_Python_OPDK/Palace'), 'gds2palace')))
 from gds2palace import *
 
 # Model comments

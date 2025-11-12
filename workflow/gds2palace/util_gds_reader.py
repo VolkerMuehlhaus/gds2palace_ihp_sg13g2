@@ -23,7 +23,6 @@ __version__ = "1.0.0"
 import gdspy
 import numpy as np
 import os
-import gds2palace.util_stackup_reader as stackup_reader
 
 # check that we have gdspy version 1.6.x or later
 # gdspy 1.4.2 is known for issues with our geometries

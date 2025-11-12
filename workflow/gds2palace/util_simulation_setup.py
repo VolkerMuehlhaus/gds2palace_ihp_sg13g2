@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.0.1"
+__version__ = "1.0.5"
 
 import os
 import sys
@@ -660,7 +660,7 @@ def create_palace (excite_ports, settings):
    
     
     # get settings from simulation model
-    unit = settings['unit']
+    unit = get_optional_setting (settings,'unit', 1e-6) # unit defaults to micron
     margin = settings['margin']   # oversize of dielectric layers relative to drawing
     air_around = get_optional_setting (settings, "air_around", margin)  # airbox size to simulation boundary
 
@@ -740,7 +740,8 @@ def create_palace (excite_ports, settings):
 
     # script control
     no_gui = get_optional_setting (settings,'no_gui', False)
-    preview_only = get_optional_setting (settings,'preview_only', False)    
+    preview_only = get_optional_setting (settings,'preview_only', False)   # show unmeshed geometry only  
+    no_preview   = get_optional_setting (settings,'no_preview', False)   # don't show unmeshed geometry, immediately show meshed model
 
     geo_name = os.path.join(sim_path, model_basename + '.geo_unrolled')
     msh_name = os.path.join(sim_path, model_basename + '.msh')
@@ -859,7 +860,7 @@ def create_palace (excite_ports, settings):
     config_data['Solver'] = solver
 
 
-    print('Creating mesh file and config file')
+    print('Starting to create mesh file and config file')
 
     fmax = 0
     if fstop is not None: 
@@ -872,13 +873,15 @@ def create_palace (excite_ports, settings):
     # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
     max_cellsize_air = wavelength_air/cells_per_wavelength
 
-    print('Wavelength in air : ', wavelength_air, ' units')
-    print('  meshsize_max    : ', meshsize_max, ' units')
-    print('  max_cellsize_air: ', max_cellsize_air, ' units')
-
+    print("---------------------------------------------------")
+    print(f"Wavelength in air: {wavelength_air:.1f} units")
+    print(f"  meshsize_max: {meshsize_max:.1f}  units")
+    print(f"  max_cellsize_air: {max_cellsize_air:.1f} units")
+    print("---------------------------------------------------")
+    
     kernel = gmsh.model.occ
     gmsh.initialize()
-    gmsh.option.setNumber("General.Verbosity", 4)
+    gmsh.option.setNumber("General.Verbosity", 5)
 
 
     # Add model, initialize
@@ -898,7 +901,7 @@ def create_palace (excite_ports, settings):
     port_tags_created_2D, all_port_information_struct = add_ports (kernel, allpolygons, metals_list, simulation_ports)
 
     # add units to port information
-    all_port_information_struct['unit'] = settings['unit']
+    all_port_information_struct['unit'] = unit
 
 
     # add dielectric boxes (oxide, substrate, air etc) to gmsh model
@@ -1419,9 +1422,10 @@ def create_palace (excite_ports, settings):
     gmsh.option.setNumber("Mesh.Algorithm", 5)
 
 
-        # open gmsh GUI with unmeshed geometry, but all mesh settings already applied
+    # open gmsh GUI with unmeshed geometry, but all mesh settings already applied
     if not no_gui:
-        gmsh.fltk.run()
+        if not no_preview: # display of unmeshed model can be skipped
+            gmsh.fltk.run()
 
     if not preview_only:
         # now generate mesh
