@@ -47,6 +47,7 @@ The screenshot below shows the workflow: user input is the GDSII layout file and
 For more details, please have a look at the detailed user's guide.
 [Palace FEM workflow for IHP gds2palace](./doc/Palace_workflow_October_2025.pdf) 
 
+If port geometry information is available, as created by the latest version of gds2palace, an additional file with de-embedded results is created. This is an experimental feature, it adds port de-embedding for lumped ports by cascading negative series L at each port.
 
 # Minimum configuration
 The screenshot below shows a minimum configuration, which consists of the XML technology stackup, the GDSII layout, one simulation model file (here named run_inductor_diffport.py)  and the gds2palace utility modules with all the “behind the scenes” code that you don’t need to modify.
