@@ -4,9 +4,11 @@
 # new version for new Palace output that creates multi excitations in one common output file
 # updated 19-Oct-2025 Mue: support more than 9 ports
 # updated 08-Nov-2025 Mue: added evaluation for optional port impedance file port_information.json that is created by new gds2palace code
+# updated 13-Nov-2025 Mue: added simple de-embedding of parasitic port inductance (flat ribbon calculation)
 
-import os,re, json 
+import os,re, json, math
 import skrf as rf
+import numpy as np
 
 def parse_input (input_filename, freq, S_dB, S_arg):
     params = []
@@ -120,10 +122,66 @@ def extrapolate_to_DC (snp_filename):
         else:
             print('No data at low frequency, skipping DC extrapolation')    
     else:
-        print('Skipping DC extrapolation, not enough freqency points')    
+        print('Skipping DC extrapolation, not enough frequency points')    
 
 
 # ----------------------
+
+# optional de-embdedding of port inductance 
+
+def flat_strip_inductance(length, width, thickness, unit):
+    """
+       Flat Wire Inductor Calculator
+       The original for this equation is by F.E. Terman and can be found in the Radio Engineers Handbook, McGraw-Hill, New York, 1945.
+    """
+    return 2e-7* length * unit * (math.log(2*length/(width+thickness)) + 0.5 + 0.2235*(width+thickness)/length)
+
+
+
+def port_deembedding (snp_filename, port_info_available, port_info_data):
+    if port_info_available:
+        print('Port de-embedding based on port geometry data')
+        unit = port_info_data.get("unit", 1e-6) # default dimension is micron 
+
+        # calculate parasitic port inductance for all ports
+        Lport = {}
+        portlist = port_info_data["ports"]
+        for port in portlist:
+            portnum = port.get("portnumber", None)    
+            length  = port.get("length", None)
+            width   = port.get("width", None)
+            if (length is not None) and (width is not None) and (portnum is not None):
+                thickness = 0 # Palace ports are 2D sheets with no thickness
+                L = flat_strip_inductance(length, width, thickness, unit)
+                # store into dict for this port number, just in case the port numbers in the file are in wrong sorting order
+                Lport[str(portnum)]=L
+
+        # convert the dict with port L into a list, to have the final values in correct order
+        L_values = []
+        for key in Lport.keys():
+            L_values.append(-Lport[key])
+
+        # load original data and apply negative series L at each port        
+        ntwk  = rf.Network(snp_filename)
+        freq = ntwk.frequency
+
+        # Create a Media object (needed for Media.inductor)
+        media = rf.media.DefinedGammaZ0(frequency=freq, z0=50)
+
+        for n,L in enumerate(L_values):
+            print(f'Cascading L= {L*1e12:.2f} pH at port {n+1}')
+            # 1-port inductor
+            inductor = media.inductor(L=L)
+            # cascade with the main network port number n
+            ntwk = rf.connect(inductor, 0, ntwk, n)
+
+        filename, file_extension = os.path.splitext(snp_filename)
+        out_filename = filename + '_deembedded' # without extension
+        ntwk.write_touchstone(out_filename, skrf_comment='De-embedded by adding negative series L at ports', form='db', write_noise=True)
+        print('Created file with de-embedding (cascaded negative port L): ', out_filename,'\n')
+    else:
+        print('Skipping port de-embedding, not port geometry information available')    
+
 
 
 workdir = os.getcwd()
@@ -148,10 +206,10 @@ for found_filename in found_datafiles:
 
         # Load the JSON data
         with open(port_info_filename, "r") as f:
-            data = json.load(f)
+            port_info_data = json.load(f)
 
         # Extract all Z0 values
-        Z0_values = [port["Z0"] for port in data.get("ports", []) if "Z0" in port]
+        Z0_values = [port["Z0"] for port in port_info_data.get("ports", []) if "Z0" in port]
         print("Port Z0 values found:", Z0_values)
 
         Z0_string = str(Z0_values[0])
@@ -162,7 +220,8 @@ for found_filename in found_datafiles:
         # For mixed port impedance, we have multiple values there
         port_info_available = True
         print("Port impedance for Touchstone header: ", Z0_string)
-    
+
+
     else:
         Z0_string = "50"       # default 
 
@@ -241,5 +300,8 @@ for found_filename in found_datafiles:
 
     # try DC extrapolation
     extrapolate_to_DC(output_filename)
+
+    # try port-deembedding of port geometry information is available
+    port_deembedding (output_filename, port_info_available, port_info_data)
 
        
