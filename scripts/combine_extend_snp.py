@@ -170,10 +170,13 @@ def port_deembedding (snp_filename, port_info_available, port_info_data):
 
         for n,L in enumerate(L_values):
             print(f'Cascading L= {L*1e12:.2f} pH at port {n+1}')
-            # 1-port inductor
+            # series inductor
             inductor = media.inductor(L=L)
-            # cascade with the main network port number n
-            ntwk = rf.connect(inductor, 0, ntwk, n)
+            # cascade with the main network 
+            # due to internal renumbering the new port always appears at the end
+            # after iterating over all ports we have the correct order again
+            ntwk = rf.connect(inductor, 0, ntwk, 0)
+
 
         filename, file_extension = os.path.splitext(snp_filename)
         out_filename = filename + '_deembedded' # without extension
