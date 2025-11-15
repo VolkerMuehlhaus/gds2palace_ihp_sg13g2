@@ -841,11 +841,12 @@ def create_palace (excite_ports, settings):
     # parameter check
     # DC simulation gives errors for now, so replace that
     if fstart is not None:
-        if fstart < 0.1e8:
+        if fstart < 0.1e6:
             fstart = fstep # start sweep from next step
             # add low frequency to list of discrete frequencies, to replace 0 Hz from user input
-            f_DC = 0.1
+            f_DC = 0.01
             f_discrete_list.append (f_DC)
+            f_discrete_list.append (2*f_DC)
             print('WARNING: Start frequency changed from DC to ', f_DC, ' GHz!')
 
 
