@@ -16,9 +16,9 @@
 #
 ########################################################################
 
-# Extract objects on IHP layers in GDSII file
+# Extract objects from layers in GDSII file
 
-__version__ = "1.0.0"
+__version__ = "1.0.2"
 
 import gdspy
 import numpy as np
@@ -45,15 +45,30 @@ if int(major) == 1:
 
 class layer_bounding_box:
   """
-    bounding box class is used to store xmin,xmax,ymin,ymax for one layer
+    bounding box class is used to store xmin, xmax, ymin, ymax for one layer.
+    All instances of this are then managed by using all_bounding_box_list.
   """
   def __init__ (self, xmin, xmax, ymin, ymax):
+    """Create layer_bounding_box instance for one layer from xmin, xmax, ymin, ymax
+    Args:
+        xmin (float): coordinate
+        xmax (float): coordinate
+        ymin (float): coordinate
+        ymax (float): coordinate
+    """
     self.xmin = xmin
     self.xmax = xmax
     self.ymin = ymin
     self.ymax = ymax
 
   def update (self, xmin, xmax, ymin, ymax):
+    """Update layer_bounding_box instance for one layer from additional polygon data, store new total bounding box
+    Args:
+        xmin (float): coordinate
+        xmax (float): coordinate
+        ymin (float): coordinate
+        ymax (float): coordinate
+    """
     self.xmin = min(xmin, self.xmin)
     self.xmax = max(xmax, self.xmax)
     self.ymin = min(ymin, self.ymin)
@@ -67,6 +82,8 @@ class all_bounding_box_list:
     and global bounding box across all layers
   """
   def __init__ (self):
+    """_summary_
+    """
     self.bounding_boxes = {}
     # initialize values for bounding box calculation
     self.xmin=float('inf')
@@ -74,7 +91,16 @@ class all_bounding_box_list:
     self.xmax=float('-inf')
     self.ymax=float('-inf')
 
-  def update (self, layer, xmin, xmax, ymin, ymax):  
+  def update (self, layer, xmin, xmax, ymin, ymax):
+    """Update all_bounding_box_list instance with additional polygon data
+    Args:
+        layer(int): GDSII layer number
+        xmin (float): coordinate
+        xmax (float): coordinate
+        ymin (float): coordinate
+        ymax (float): coordinate
+    """
+
     if self.bounding_boxes.get(layer) is not None:
       self.bounding_boxes[layer].update(xmin, xmax, ymin, ymax)
     else:
@@ -86,8 +112,13 @@ class all_bounding_box_list:
     self.ymax = max(self.ymax, ymax)   
 
   def get_layer_bounding_box (self, layer):
-    # return bounding box of one specific layer 
-    # if layer not found, return global bounding box
+    """Return bounding box of one specific layer.     If layer not found, return global bounding box.
+    Args:
+        layer (int): GDSII layer number
+    Returns:
+        xmin, xmax, ymin, ymax (float)
+    """
+
     xmin = self.xmin 
     xmax = self.xmax
     ymin = self.ymin
@@ -102,6 +133,11 @@ class all_bounding_box_list:
     return xmin, xmax, ymin, ymax  
   
   def merge (self, another_bounding_box_list):
+    """Combine this bounding box with another bounding box from another GDSII import.
+    Args:
+        another_bounding_box_list (all_bounding_box_list): data from other import, can be discarded after merge 
+    """
+
     # combine this bounding box with another bounding box from another GDSII import
     # combine the dictionaries with per-layer data
     self.bounding_boxes.update (another_bounding_box_list.bounding_boxes)
@@ -120,6 +156,10 @@ class gds_polygon:
   """
   
   def __init__ (self, layernum):
+    """Initialize  polygon with empty vertex list, store layer number
+    Args:
+        layernum (int): GDSII layer number
+    """
     self.pts_x = np.array([])
     self.pts_y = np.array([])
     self.pts   = np.array([])
@@ -129,10 +169,17 @@ class gds_polygon:
     self.CSXpoly = None
     
   def add_vertex (self, x,y):
+    """Add one point (vertex) to the polygon
+    Args:
+        x (float): point x
+        y (float): point y
+    """
     self.pts_x = np.append(self.pts_x, x)
     self.pts_y = np.append(self.pts_y, y)
 
   def process_pts (self):
+    """Process and update all points, update bounding box data fields
+    """
     self.pts = [self.pts_x, self.pts_y]
     self.xmin = np.min(self.pts_x)
     self.xmax = np.max(self.pts_x)
@@ -140,6 +187,10 @@ class gds_polygon:
     self.ymax = np.max(self.pts_y)
 
   def __str__ (self):
+    """Create string representation of polygon data, useful for debugging
+    Returns:
+        string: string representation of polygon data
+    """
     # string representation 
     mystr = 'Layer = ' + str(self.layernum) + ', Polygon = ' + str(self.pts) + ', Via = ' + str(self.is_via)
     return mystr
@@ -147,20 +198,37 @@ class gds_polygon:
 
 class all_polygons_list:
   """
-    list of gds polygon objects
+  Class instance holds all polygon data (all polygons with their layer data etc)
   """
 
   def __init__ (self):
+    """Initialize empty list of polygons and empty bounding box dictionary
+    """
     self.polygons = []
     self.bounding_box = all_bounding_box_list() # manages bounding box per layer and global
 
   def append (self, poly):
+    """Append one instance of gds_polygon
+    Args:
+        poly (gds_polygon): Data for one single polygon
+    """
     # before we append, combine points in polygon from pts_x and pts_y into pts
     poly.process_pts()
     # add polygon to list
     self.polygons.append (poly)
 
   def add_rectangle (self, x1,y1,x2,y2, layernum, is_port=False, is_via=False):
+    """This function adds a rectangle, it can be called in code created manually. Not used in GDSII import.
+
+    Args:
+        x1 (float): point 1 x
+        y1 (float): point 1 y
+        x2 (float): point 2 x
+        y2 (float): point 2 y
+        layernum (int): layer number assigned to this rectangle
+        is_port (bool, optional): Treat as port polygon. Defaults to False.
+        is_via (bool, optional): Treat as via polygon. Defaults to False.
+    """
     # append simple rectangle to list, this can also be done later, after reading GDSII file
     poly = gds_polygon(layernum)
     poly.add_vertex(x1,y1)
@@ -176,6 +244,15 @@ class all_polygons_list:
 
 
   def add_polygon (self, xy, layernum, is_port=False, is_via=False):
+    """This function adds a polygon, it can be called in code created manually. Not used in GDSII import.
+    Polygon data structure must be [[x1,y1],[x2,y2],...[xn,yn]]
+
+    Args:
+        xy (list of [x,y]): polygon points
+        layernum (int): layer number assigned to this polygon
+        is_port (bool, optional): Treat as port polygon. Defaults to False.
+        is_via (bool, optional): Treat as via polygon. Defaults to False.
+    """
     # append polygon array to list, this can also be done later, after reading GDSII file
     # polygon data structure must be [[x1,y1],[x2,y2],...[xn,yn]]
     xmin=float('inf')
@@ -201,20 +278,39 @@ class all_polygons_list:
 
 
   def set_bounding_box (self, xmin,xmax,ymin,ymax):
+    """Set the global bounding box, over all evaluated layers, to these values. No checks, force these values.
+
+    Args:
+        xmin (float): coordinate
+        xmax (float): coordinate
+        ymin (float): coordinate
+        ymax (float): coordinate
+    """
     # global bounding box, over all evaluated layers
     self.bounding_box.xmin = xmin
     self.bounding_box.xmax = xmax
     self.bounding_box.ymin = ymin
     self.bounding_box.ymax = ymax
 
+
   def get_layer_bounding_box (self, layer):
-    # return bounding box for specific layer, returns global if layer not found
+    """Return bounding box for specific layer, returns global if layer not found
+    Args:
+        layer (int): layer number assigned to this polygon
+    Returns:
+        xmin, xmax, ymin, ymax (float)
+    """
     return self.bounding_box.get_layer_bounding_box (layer)
 
+
   def get_bounding_box (self):
-    # return global bounding box
+    """return global bounding box
+    Returns:
+        xmin, xmax, ymin, ymax (float)
+    """
     return self.bounding_box.xmin, self.bounding_box.xmax, self.bounding_box.ymin, self.bounding_box.ymax 
  
+
   def get_xmin (self):
     # return global bounding box
     return self.bounding_box.xmin
@@ -231,8 +327,13 @@ class all_polygons_list:
     # return global bounding box
     return self.bounding_box.ymax
   
+
   def merge (self, another_polygons_list):
-    # merge with another polygon list from another GDSII import
+    """merge with another polygon list from another GDSII import
+    Args:
+        another_polygons_list (all_polygons_list): another polygon list, maybe from another GDSII import
+    """
+    
     for polygon in another_polygons_list.polygons:
       self.polygons.append(polygon)
     # also merge boundary information  
@@ -244,6 +345,16 @@ class all_polygons_list:
 
 
 def merge_via_array (polygons, maxspacing):
+  """Used internally in processing data from gdspy, does not work on our own all_polygons_list class!
+
+  Args:
+      polygons (_type_): LPPpolylist data
+      maxspacing (float): offset for oversize/undersize of polygons during via array merge
+
+  Returns:
+      _type_: LPPpolylist data
+  """
+
   # Via array merging consists of 3 steps: oversize, merge, undersize
   # Value for oversize depends on via layer
   # Oversized vias touch if each via is oversized by half spacing
@@ -262,11 +373,26 @@ def merge_via_array (polygons, maxspacing):
 # ----------- read GDSII file, return openEMS polygon list object -----------
 
 def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, merge_polygon_size=0, mirror=False, offset_x=0, offset_y=0, gds_boundary_layers=[], layernumber_offset=0):
+  """
+  Read GDSII file and return polygon list object.
 
+  Args:
+      filename (str): Input filename.
+      layerlist (list of int): List of layer numbers to be processed.
+      purposelist (list of int): List of GDSII data types to be processed.
+      metals_list (metal_layers_list): Instance of class `metal_layers_list` defined in `util_stackup_reader`.
+      preprocess (bool, optional): Enable GDSII geometry preprocessing. Defaults to False.
+      merge_polygon_size (float, optional): Enable via array merging when value is > 0.
+      mirror (bool, optional): Mirror the geometry about the y-axis. Defaults to False.
+      offset_x (float, optional): Geometry offset in x direction. Defaults to 0.
+      offset_y (float, optional): Geometry offset in y direction. Defaults to 0.
+      gds_boundary_layers (list of int, optional): List of extra layers to evaluate for finite dielectric size. Defaults to [].
+      layernumber_offset (int, optional): Optional offset applied to GDSII layer numbers to avoid duplicates when reading multiple files. Defaults to 0.
+
+  Returns:
+      all_polygons_list: All polygon information data.
   """
-  Read GDSII file and return polygon list object
-  input value: filename
-  """
+  
   if os.path.isfile(filename):
     print('Reading GDSII input file:', filename)
   
@@ -375,6 +501,7 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
         # iterate over layer-purpose pairs (by_spec=true)
         # do not descend into cell references (depth=0)
         LPPpolylist = cell.get_polygons(by_spec=True, depth=0)
+
         for LPP in LPPpolylist:
           layer = LPP[0]   
           purpose = LPP[1]
@@ -394,6 +521,12 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
             ymin=float('inf')
             xmax=float('-inf')
             ymax=float('-inf')
+
+            # Issue warning when very many polygons on layer
+            numpoly = len(layerpolygons)
+            if numpoly > 200:
+              print(f'Layer {layer_to_extract} has {numpoly} polygons')
+              print(' ==> Consider via array merging by setting merge_polygon_size > 0')
 
             # iterate over layer polygons
             for polypoints in layerpolygons:
@@ -484,16 +617,3 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
  
 
 
-# =======================================================================================
-# Test code when running as standalone script
-# =======================================================================================
-
-if __name__ == "__main__":
-
-  filename = "L_2n0_simplified.gds"
-  allpolygons = read_gds(filename,[134, 133, 126, 8],[0], None)  # read layers 134,133,126, 8 with purpose 0
-  for poly in allpolygons.polygons:
-    print(poly)
-
-  print("Bounding box: " + str(allpolygons.xmin) + " " + str(allpolygons.xmax) + " " + str(allpolygons.ymin) + " " + str(allpolygons.ymax))
-  

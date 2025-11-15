@@ -7,17 +7,41 @@ __version__ = "1.0.0"
 # ============================== filename and path  =================================
 
 def get_script_path(filename):
+    """Get path from full filename
+    Args:
+        filename (string): full filename inclduing path
+    Returns:
+        string: path only
+    """
+
     # Define paths and directories
     script_path = os.path.normcase(os.path.dirname(filename))
     return script_path
 
+
 def get_basename (filename):
+    """Remove suffix .py or .gds from filename
+    Args:
+        filename (string): filename including suffix
+    Returns:
+        string: filename without suffix
+    """
+
     # get file basename without .gds or .py extension
     basename = os.path.basename(filename).replace('.gds', '')
     basename = basename.replace('.py','')
     return basename
 
 def create_sim_path (script_path, model_basename):
+    """set directory for simulation output, create path if it does not exist. 
+
+    Args:
+        script_path (string): path where simulation script is located
+        model_basename (string): base name to be used for naming output directory
+
+    Returns:
+        _type_: _description_
+    """
     # set directory for simulation output, create path if it does not exist
     base_path = os.path.join(script_path, 'palace_model')
 
@@ -41,6 +65,10 @@ def create_sim_path (script_path, model_basename):
 
 
 def create_run_script (destination_path):
+    """Create run script that can be used to start Palace simulation and then run postprocessing
+    Args:
+        destination_path (string): target path for run script file
+    """
     txt = '#!/bin/bash\n'
     txt = txt + 'run_palace config.json\n'
     txt = txt + 'combine_snp\n'
@@ -52,6 +80,15 @@ def create_run_script (destination_path):
 
 
 def check_module_version(module_name, expected_version):
+    """Check version of a module
+    Args:
+        module_name (string): name of module
+        expected_version (_type_): expected module version
+
+    Raises:
+        RuntimeError: version mismatch
+        RuntimeError: does not provide version information
+    """
     module = importlib.import_module(module_name)
     version = getattr(module, "__version__", None)
     if version is not None:

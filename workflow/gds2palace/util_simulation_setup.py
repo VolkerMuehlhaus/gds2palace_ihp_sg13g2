@@ -63,6 +63,18 @@ class simulation_port:
   """
   
   def __init__ (self, portnumber, voltage, port_Z0, source_layernum, target_layername=None, from_layername=None, to_layername=None, direction='x'):
+    """create new simulation port
+
+    Args:
+        portnumber (int): port number
+        voltage (float): port voltage, 0 if not excited
+        port_Z0 (float): port impedance
+        source_layernum (int): layer number in layout with port shape
+        target_layername (string, optional): Target layer name for in-plane port. Defaults to None.
+        from_layername (string, optional): Start layer name for via port. Defaults to None.
+        to_layername (string, optional): End layer name for via port. Defaults to None.
+        direction (str, optional): port direction. Defaults to 'x'.
+    """
     self.portnumber = portnumber
     self.source_layernum = source_layernum        # source for port geometry is a GDSII layer, just one port per layer
     self.target_layername = target_layername      # target layer where we create the port, if specified we create in-plane port
@@ -75,30 +87,49 @@ class simulation_port:
     self.CSXport = None
 
   def set_CSXport (self, CSXport):
+    """Not used for Palace
+    """
     self.CSXport = CSXport  
 
   def __str__ (self):
-    # string representation 
+    """Create string representation of port, useful for debugging
+    Returns:
+        string: string representation of polygon data
+    """
     mystr = 'Port ' + str(self.portnumber) + ' voltage = ' + str(self.voltage) + ' GDS source layer = ' + str(self.source_layernum) + ' target layer = ' + str(self.target_layername) + ' direction = ' + str(self.direction)
     return mystr
   
 
 class all_simulation_ports:
   """
-  all simulation ports object
+  all simulation ports object, provides .ports (list), .portcount (int) and portlayers (list)
   """
   
   def __init__ (self):
+      """Initialize new data structure that holds all port data
+      """
       self.ports = []
       self.portcount = 0
       self.portlayers = []
 
+
   def add_port (self, port):
+      """Add ports
+      Args:
+          port (simulation_port): simulation_port instance to be added
+      """
       self.ports.append(port)
       self.portcount = len(self.ports)
       self.portlayers.append(port.source_layernum)
 
-  def get_port_by_layernumber (self, layernum):  # special GDSII layer for ports only, one port per layer, so we have 1:1 mapping
+
+  def get_port_by_layernumber (self, layernum):  # 
+      """Get port from layer number. Numbers are unique, one port per layer, so we have 1:1 mapping
+      Args:
+          layernum (int): layer number in layout
+      Returns:
+          simulation_port: port defined with that layer number
+      """
       found = None
       for port in self.ports:
           if port.source_layernum == layernum:
@@ -106,17 +137,35 @@ class all_simulation_ports:
               break
       return found       
   
+
   def get_port_by_number (self, portnum):
+      """Get simulation_port instance by port number
+      Args:
+          portnum (integer): port number used when creating port definition
+      Returns:
+          simulation_port: port to be found
+      """
       return self.ports[portnum-1] 
 
+
   def apply_layernumber_offset (self, offset):
+      """Apply layer number offset to all ports
+      Args:
+          offset (int): offset
+      """
       newportlayers = []    
       for port in self.ports:
           port.source_layernum = port.source_layernum + offset
           newportlayers.append(port.source_layernum)
       self.portlayers = newportlayers      
 
+
   def all_active_excitations (self):
+    """Get all active port excitations, i.e. ports with voltage other than zero
+    Returns:
+        list of simulation_port: active port instances
+    """
+
     numbers = []
     for port in self.ports:
         if abs(port.voltage) > 1E-6:
@@ -128,9 +177,16 @@ class all_simulation_ports:
 
 
 def add_metals (allpolygons, metals_list, meshseed=0):
-    '''
-    Add drawn geometries from layout layers to gmsh
-    '''
+    """Add drawn geometries from layout layers to gmsh
+
+    Args:
+        allpolygons (all_polygons_list): instance of all_polygons_list from reading GDSII
+        metals_list (_type_): instance of metals_list from reading stackup XML file
+        meshseed (float, optional): Mesh seed to apply at polygon vertices. Defaults to 0.
+
+    Returns:
+        list of created tags
+    """
 
     def get_layer_volumes (metals_list, layername):
         # return all volume tags for a given  layer name
@@ -344,7 +400,19 @@ def create_box_with_meshseed (kernel, xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
 
 
 def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, refined_cellsize):
-# Add dielectric layers (these extend through simulation area and have no polygons in GDSII)
+    """
+    Add dielectric layers (these extend through simulation area and have no polygons in GDSII)
+    
+    :param kernel: shortcut for gmsh.model.occ
+    :param materials_list: from stackup reader
+    :param dielectrics_list: from stackup reader
+    :param gds_layers_list: from gds reader
+    :param allpolygons: from gds reader
+    :param margin: spacing to add from metal bounding box to dielectric boundary
+    :param air_around: air margin between dielectric and simulation boundary. Can be float or a list of 6 float values.
+    :param refined_cellsize: refined_cellsize parameter set by user
+    """    
+# 
 
     # Store tags of created geometries, key is layer name
     tags_created_3D = {}
@@ -364,7 +432,7 @@ def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, 
         print('but instead we have this: ', str(margin))    
         exit(1)
 
-    # air_around can be specified as single value or array, check what we have header
+    # air_around can be specified as single value or array, check what we have here
     if isinstance(air_around, list):
         if len(air_around)==6:
             air_xmin = air_around[0]
@@ -468,9 +536,22 @@ def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, 
 
 
 def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0):
+    """Add ports from special port layers to gmsh
+
+    Args:
+        kernel (_type_): shortcut for gmsh.model.occ
+        allpolygons (all_polygons_list): from gds reader
+        metals_list (metal_layers_list): from XML stackup reader
+        simulation_ports (all_simulation_ports): all simulation ports object, provides .ports (list), .portcount (int) and portlayers (list)
+        meshseed (float, optional): Mesh see at polygon edges. Defaults to 0.
+
+    Returns:
+        _type_: _description_
+    """
     '''
     Add ports from special port layers  to gmsh
     '''
+
     tags_created_2D = {}
 
     # data structure that we write to Palace output directory with information about port Z0 and port dimensions
@@ -610,6 +691,15 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
 
 
 def create_palace (excite_ports, settings):
+    """Create output file for Palace
+
+    Args:
+        excite_ports (list of int): list of ports that are excited (active)
+        settings (dict): simulation settings
+
+    Returns:
+        config_name(string), data_dir (string): created config.json and Palace result dir specified there
+    """
 
     def get_optional_setting (settings, key, default):
         # get setting that might exist, but is not required

@@ -24,7 +24,3 @@ from . import util_simulation_setup as simulation_setup
 
 __version__ = "0.1.0"   # version of gds2palace
 
-#utilities.check_module_version("util_stackup_reader", "1.0.0")
-#utilities.check_module_version("util_gds_reader", "1.0.0")
-#utilities.check_module_version("util_utilities", "1.0.0")
-#utilities.check_module_version("util_simulation_setup", "1.0.0")
