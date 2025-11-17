@@ -305,6 +305,7 @@ for found_filename in found_datafiles:
     extrapolate_to_DC(output_filename)
 
     # try port-deembedding of port geometry information is available
-    port_deembedding (output_filename, port_info_available, port_info_data)
+    if port_info_available: 
+        port_deembedding (output_filename, port_info_available, port_info_data)
 
        
