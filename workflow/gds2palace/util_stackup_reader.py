@@ -23,8 +23,9 @@
 # Initial version 20 Nov 2024  Volker Muehlhaus 
 # Added support for sheet resistance 07 Oct 2025 Volker Muehlhaus 
 # Added docstrings 
+# 20 Nov 2025: added functionality to get relative positions between metals
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 import os
 import xml.etree.ElementTree 
@@ -135,12 +136,33 @@ class dielectric_layer:
     self.is_bottom = False
     self.gdsboundary = data.get("Boundary")  # optional entry in stackup file
 
+    self.metals_inside = [] # metals that are located inside this dielectric, set by function 
+
+  def get_planar_metals_inside (self):
+    """evaluates metals_inside list and returns only items that are conductor or sheet (no via, not dielectric via)
+    Returns:
+        list of metal_layer: metals that are conductor or sheet
+    """
+    planar_metals = []
+    for metal in self.metals_inside:
+      if metal.is_metal or metal.is_sheet:
+        planar_metals.append(metal)
+    return planar_metals
+
+
   def __str__ (self):
     """String representation of dielectric_layer, useful for debugging
     Returns:
         string: String representation of stackup_material
     """
-    mystr = '      Dielectric Name=' + self.name + ' Material=' + self.material +' Thickness=' + str(self.thickness) + ' Zmin=' +  str(self.zmin) + ' Zmax=' +  str(self.zmax)
+    enclosed_metal_names = []
+    for metal in self.metals_inside:
+      enclosed_metal_names.append(metal.name)
+
+    mystr = '      Dielectric Name=' + self.name + ' Material=' + self.material +' Thickness=' \
+            + str(self.thickness) + ' Zmin=' +  str(self.zmin) + ' Zmax=' +  str(self.zmax) \
+            + ' Metals inside: ' + str(enclosed_metal_names)
+            
     return mystr
 
 
@@ -208,6 +230,19 @@ class dielectric_layers_list:
     return boundary_layer_list
   
 
+  def register_metals_inside (self, metals_list):
+    """iterates over dielectrics and metals, sets metals_inside property for each dielectric with list of metals within that z range
+    Args:
+        metals_list (metal_layers_list): metals read from stackup
+    """
+    for dielectric in self.dielectrics:
+      enclosed = []
+      for metal in metals_list.metals:
+        # check if metal is enclosed in dielectric, excluding zmax exactly
+        if (metal.zmin >= dielectric.zmin) and (metal.zmax < dielectric.zmax):
+          enclosed.append(metal)          
+      dielectric.metals_inside = enclosed    
+
 
 # -------------------- conductor layers (metal and via) ---------------------------
 
@@ -244,12 +279,32 @@ class metal_layer:
     self.is_sheet = (self.type=="SHEET")
     self.is_used = False
 
+    # Metals directly above and below, this is set by metal_layers_list.sort_and_evaluate()
+    self.above = []
+    self.below = []
+
+
   def __str__ (self):
     """String representation of dielectric_layer, useful for debugging
     Returns:
         string: String representation of stackup_material
     """
-    mystr = '      Metal Name=' + self.name + ' Layer=' + self.layernum + ' Type=' + self.type + ' Material=' + self.material + ' Zmin=' +  str(self.zmin) + ' Zmax=' +  str(self.zmax)
+
+    # convert list of layers above and below to layer names
+    below_names = []
+    for layer in self.below:
+      below_names.append(layer.name)
+
+    above_names = []
+    for layer in self.above:
+      above_names.append(layer.name)
+
+
+    mystr = '      Metal Name=' + self.name + ' Layer=' + self.layernum  + \
+            ' Type=' + self.type + ' Material=' + self.material + \
+            ' Zmin=' +  str(self.zmin) + ' Zmax=' +  str(self.zmax) + \
+            ' below=' + str(below_names) + ' above=' + str(above_names)
+    
     return mystr
   
 
@@ -265,6 +320,8 @@ class metal_layers_list:
     """Initialize emptry list
     """
     self.metals = []      # list with conductor objects
+    self.lowest = None    # metal with smallest zmin value
+    self.orphan_layers = []  # list with layers that have no direct neighbor above or below
     
   def append (self, metal):
     """Append one metal layer (drawn layer)
@@ -307,6 +364,19 @@ class metal_layers_list:
     return found  
 
 
+  def getallplanarmetals (self):
+    """returns all metals (conductor or sheet) as list, skip vias and dielectric vias
+    Returns:
+        list: list of metal_layer 
+    """
+         
+    found = []
+    for metal in self.metals:
+      if metal.is_metal or metal.is_sheet:
+          found.append(metal)
+    return found  
+
+
   def getbylayername (self, name_to_find):
     """Find metal layer by layer number, returns first match
     Args:
@@ -343,6 +413,34 @@ class metal_layers_list:
     for metal in self.metals:
       metal.zmin = metal.zmin + offset
       metal.zmax = metal.zmax + offset
+
+
+  def sort_and_evaluate(self):
+    """After reading all metals, sort them by position and detect the neighbors above/below
+       This is set in each metal as .above and .below list
+    """
+    # sort the list by zmin of each metal
+    self.metals.sort(key=lambda metal: metal.zmin)
+    # metal with lowest zmin value
+    self.lowest = self.metals[0]
+
+    # delta for comparison, i.e. what is considered equal
+    delta = 1e-5
+
+    # Build above/below relationships efficiently
+    for i, layer in enumerate(self.metals):
+        # Layers above: all layers with zmin >= current zmax
+        for other in self.metals[i+1:]:
+            if abs(other.zmin - layer.zmax) < delta:
+                layer.above.append(other)
+        # Layers below: all layers with zmax <= current zmin
+        for other in self.metals[:i]:
+            if abs(other.zmax - layer.zmin) < delta:
+                layer.below.append(other)
+
+    # Identify orphan layers (no above or below)
+    self.orphan_layers = [layer for layer in self.metals if not layer.above and not layer.below]
+
 
 
 # ----------- parse substrate file, get materials from list created before -----------
@@ -384,7 +482,9 @@ def read_substrate (XML_filename):
     for data in  substrate_root.iter("Layer"):
         metals_list.append (metal_layer(data))
 
-
+    # sort metals by zmin and detect their neighbors above/below
+    metals_list.sort_and_evaluate()
+  
     # get substrate offset, required for v2 stackup file version
     offset = 0
     for data in substrate_root.iter("Substrate"):
@@ -392,6 +492,9 @@ def read_substrate (XML_filename):
         offset = float(data.get("Offset"))      
     if offset > 0:
       metals_list.add_offset(offset)
+
+    # register metals with the enclosing dielectrics
+    dielectrics_list.register_metals_inside (metals_list)
 
     return materials_list, dielectrics_list, metals_list
   
@@ -408,7 +511,7 @@ def read_substrate (XML_filename):
 
 if __name__ == "__main__":
 
-  XML_filename = "SG13.xml"
+  XML_filename = "SG13G2_200um.xml"
   materials_list, dielectrics_list, metals_list = read_substrate (XML_filename)
 
   for material in materials_list.materials:
@@ -433,6 +536,25 @@ if __name__ == "__main__":
   metal = metals_list.getbylayername ("TopMetal1")
   print('TopMetal1 layer number => ', metal.layernum)
 
+  # find orphaned layers that have no neighbor above or below
+  orphan_names = []
+  for layer in metals_list.orphan_layers:
+    orphan_names.append(layer.name)
+  print('Orphaned layers: ', orphan_names)  
 
+  # get all planar metals in stackup (no via, no dielectric via)
+  planar_metal_names = []
+  for metal in metals_list.getallplanarmetals():
+    planar_metal_names.append(metal.name)
+  print('Planar metals: ', planar_metal_names)  
+
+  # get all planar metals inside a dielectric
+  SiO2 = dielectrics_list.get_by_name('SiO2')
+  if SiO2 is not None:
+    names = []
+    metals = SiO2.get_planar_metals_inside()
+    for metal in metals:
+      names.append(metal.name)
+    print('Planar metals inside SiO2: ', names)  
  
 
