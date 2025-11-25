@@ -50,8 +50,8 @@
         <Layer Name="Via2" Type="via" Zmin="2.4900" Zmax="3.0300" Material="Via2" Layer="29" />
         <Layer Name="Via1" Type="via" Zmin="1.4600" Zmax="2.0000" Material="Via1" Layer="19" />
         <Layer Name="Cont" Type="via" Zmin="0.4000" Zmax="1.0400" Material="Cont" Layer="6" />
-        <Layer Name="SUBGND" Type="conductor" Zmin="-3.75" Zmax="0" Material="LOWLOSS" Layer="210" />
-        <Layer Name="BACKSIDEGND" Type="conductor" Zmin="-190" Zmax="-183.75" Material="LOWLOSS" Layer="211" />
+        <Layer Name="SUBGND" Type="conductor" Zmin="-3.75" Zmax="0" Material="LOWLOSS" Layer="250" />
+        <Layer Name="BACKSIDEGND" Type="conductor" Zmin="-190" Zmax="-183.75" Material="LOWLOSS" Layer="251" />
         <Layer Name="MIM" Type="conductor" Zmin="5.6043" Zmax="5.7540" Material="MIM" Layer="36" />
         <Layer Name="Vmim" Type="via" Zmin="5.7540" Zmax="6.4303" Material="Vmim" Layer="129" />
         <Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="Air" Layer="157" />
