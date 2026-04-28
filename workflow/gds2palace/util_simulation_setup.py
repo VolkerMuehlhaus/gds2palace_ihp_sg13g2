@@ -1230,9 +1230,20 @@ def create_model (excite_ports, settings):
 
     # 2D surfaces from shell of hollow conductors (top, bottom and side walls)
     # one physical group per polygon (shared by all polygon surfaces)
+    #
+    # Fix C: a fragmented surface tag can end up in MULTIPLE physical groups when:
+    #   (a) two polygons of the SAME layer share a fragment (touching pads), or
+    #   (b) two polygons of DIFFERENT layers touch directly (no dielectric gap
+    #       between them).
+    # MFEM v0.16 then aborts in STable3D::operator() because the boundary
+    # element appears twice with different attributes. We track the tags
+    # already claimed (globally across layers and polysurfaces) and skip
+    # subsequent claims so each surface ends up in exactly one physical
+    # group.
+    _claimed_surface_tags_global = set()  # introduced by Fix C
     for layername in metal_perpolytags_2D.keys():
         if len(metal_perpolytags_2D[layername]) > 0:
-            # surfaces used for planar metal 
+            # surfaces used for planar metal
 
             # gmsh
             all_phys_surfacetags_for_layer_xy = []
@@ -1250,12 +1261,19 @@ def create_model (excite_ports, settings):
 
                     new_tags_planar = []
                     new_tags_vertical = []
-                    
+
                     for tag in new_tags:
+                        if tag in _claimed_surface_tags_global:
+                            # Fix C: surface already claimed by another polysurface
+                            # (same layer different polygon, OR different layer that
+                            # touches this one). Skipping prevents the same boundary
+                            # element from being written under two physical groups.
+                            continue
+                        _claimed_surface_tags_global.add(tag)
                         if is_vertical_surface(tag):
                             new_tags_vertical.append(tag)
                         else:
-                            new_tags_planar.append(tag)     
+                            new_tags_planar.append(tag)
 
                     # xy in-plane
                     phys_group_xy = gmsh.model.addPhysicalGroup(2, new_tags_planar, tag=-1)
@@ -1723,6 +1741,15 @@ def create_model (excite_ports, settings):
     if not preview_only:
         # now generate mesh
         gmsh.model.mesh.generate(3)
+
+        # Post-mesh dedupe: PR #11 (removeAllDuplicates in add_metals)
+        # left the dielectric path uncovered (line ~553 commented because
+        # OCC-level dedupe broke oxide mappings). At mesh level the dedupe
+        # is safe (operates on mesh entities only) and removes the residual
+        # boundary duplicates that otherwise trigger MFEM STable3D abort
+        # in Palace v0.16.
+        gmsh.model.mesh.removeDuplicateNodes()
+        gmsh.model.mesh.removeDuplicateElements()
 
         # Save mesh
         gmsh.option.setNumber("Mesh.Binary", 0)
