@@ -54,7 +54,7 @@
         <Layer Name="BACKSIDEGND" Type="conductor" Zmin="-90" Zmax="-83.75" Material="LOWLOSS" Layer="251" />
         <Layer Name="MIM" Type="conductor" Zmin="5.6043" Zmax="5.7540" Material="MIM" Layer="36" />
         <Layer Name="Vmim" Type="via" Zmin="5.7540" Zmax="6.4303" Material="Vmim" Layer="129" />
-        <Layer Name="LBE" Type="dielectric" Zmin="-83.75" Zmax="0" Material="Air" Layer="157" />
+        <Layer Name="LBE" Type="dielectric" Zmin="-83.75" Zmax="0" Material="AIR" Layer="157" />
       </Layers>
     </ELayers>
   </Stackup>
