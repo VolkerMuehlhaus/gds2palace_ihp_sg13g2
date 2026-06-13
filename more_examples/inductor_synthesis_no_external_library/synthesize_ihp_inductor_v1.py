@@ -3,6 +3,7 @@
 # Changes:
 # 07-April-2026: New version with built-in geometry code, does not require external pclab library
 # This new version is not limited in number of turns
+# 13-June-2026: Fixed bug in output name of final model 
 
 # Specify the target frequency, target value and geometry limits in the parameters below.
 # Settings for gds2palace FEM simulation are defined in the script below.
@@ -1123,7 +1124,12 @@ if len(palace_config_files) > 0:
         w = geometry_data[0]['w']
         s = geometry_data[0]['s']
         d_outer = geometry_data[0]['d_outer']
-        geometry_name = f"indSym_{ind_geom}_N{nturns}_do{d_outer}_w{w}_s{s}"
+        
+        # Use same name here as defined when creating GDSII files!
+        if layout_with_centertap:
+            geometry_name = f'inductor3_N{nturns}_do{d_outer}_w{w}_s{s}'
+        else:
+            geometry_name = f'inductor2_N{nturns}_do{d_outer}_w{w}_s{s}'  
 
         log.append(f'Finished running wideband sweep for {geometry_name} (simulation time  {end - start:.1f} seconds)\n')
 
