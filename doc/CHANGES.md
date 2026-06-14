@@ -2,6 +2,10 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 14-June-2026
+Completely redesigned the core mesh algorithm, which previously had thrown Palace MFEM error message for certain stacked chip configurations. Now, metals are properly cut from dielectrics no matter if they cross dielectric boundaries. Handling of gmsh dimtags to material properties was completely redesigned. Some error check were added on invalid port configurations, and invalid stackup configurations where two conductor layers touch directly with no via metal between them.
+
+
 ## 15-Mar-2026
 A pre-generated apptainer container image for Palace version 0.16 is now available here:
 https://github.com/users/VolkerMuehlhaus/packages/container/package/palace_016
