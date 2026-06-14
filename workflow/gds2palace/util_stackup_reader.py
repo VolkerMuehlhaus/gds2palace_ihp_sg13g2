@@ -108,7 +108,7 @@ class stackup_materials_list:
     # find material object from materialname
     found = None
     for material in self.materials:
-      if material.name == materialname:
+      if material.name.upper() == materialname.upper():
         found = material
     return found    
 
@@ -210,7 +210,7 @@ class dielectric_layers_list:
 
     found = None
     for dielectric in self.dielectrics:
-      if dielectric.name ==  name_to_find:
+      if dielectric.name.upper() ==  name_to_find.upper():
         found = dielectric
     return found    
 
