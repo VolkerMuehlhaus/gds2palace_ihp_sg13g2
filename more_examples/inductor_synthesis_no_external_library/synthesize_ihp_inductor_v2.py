@@ -192,8 +192,17 @@ def get_min_outer_diameter (N,w,s):
     if crossover_size < min_crossover_size:
         crossover_size = min_crossover_size
 
+    if N < 3:   
+        inner_segment_size = crossover_size
+    else:    
+        
+        feedline_spacing = crossover_size + w + 2 * s
+        inner_segment_size = feedline_spacing
+
+
+
     if N>1:
-        Di_min = crossover_size * (1 + math.sqrt(2))
+        Di_min = inner_segment_size * (1 + math.sqrt(2))
     else:
         Di_min = 2*(w + s) *(1 + math.sqrt(2))  # for single turn inductor     
 
@@ -201,6 +210,7 @@ def get_min_outer_diameter (N,w,s):
     # round to 2 decimal digits
     Do_min = math.ceil(100*Do_min)/100
     return Do_min
+
 
 
 
