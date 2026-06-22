@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 
 import os
 import sys
@@ -1181,6 +1181,9 @@ def create_model (excite_ports, settings):
 
 
     # create physical group for metal surfaces
+
+    already_assigned_tags = [] # list to check duplicates from two metals overlapping
+    
     for key in metal_surface_dict.keys():
         surfaces_list = metal_surface_dict[key]
         if len(surfaces_list)>0:
@@ -1199,6 +1202,15 @@ def create_model (excite_ports, settings):
                         new_tags_vertical.append(tag)
                     else:
                         new_tags_planar.append(tag)     
+
+                    # we should not have this in list    
+                    if tag not in already_assigned_tags:    
+                        already_assigned_tags.append(tag)    
+                    else:
+                        print("ERROR in XML stackup definition:")
+                        print(f"   Polygon on conductor layer {key} touches another conductor layer (overlapping surface), this is invalid.")    
+                        print("   Make sure different 'conductor' layers never touch directly, use 'via' layer for connecting to metal layers!")
+                        exit(101)
 
                 # we now have separate lists for xy and z surfaces
 
