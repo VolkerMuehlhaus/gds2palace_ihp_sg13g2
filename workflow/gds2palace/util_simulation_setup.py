@@ -1,6 +1,6 @@
 ########################################################################
 #
-# Copyright 2025 Volker Muehlhaus and IHP PDK Authors
+# Copyright 2025-2026 Volker Muehlhaus and IHP PDK Authors
 #
 # Licensed under the GNU General Public License, Version 3.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.2.1"
+__version__ = "1.4.1"
 
 import os
 import sys
@@ -28,32 +28,6 @@ import numpy as np
 import json
 
 from . import util_elmer 
-
-
-def get_tag_after_fragment (tag_to_find_list, geom_dimtags, mapping, dimension=2):
-    '''    
-    Tags usually change after gmsh fragmenting, but fragmenting returns a table with mappings.
-    This function returns the new tags, if we know the original tags before fragmenting.
-      - tag_to_find_list: list of tags obtained when creating the geometry
-      - geom_dimtags: list of all original dimtags before fragmenting
-      - mapping: list of mapping between old and new tags, obtained as return value from fragment() function
-      - dimension: dimension for tags that we are looking for
-    '''
-
-    # make this algorithm safe for single tags also
-    if isinstance(tag_to_find_list, int):
-        tag_to_find_list = [tag_to_find_list]
-
-    indices = [
-        i for i, x in enumerate(geom_dimtags) 
-        if x[0] == dimension and (x[1] in tag_to_find_list)
-    ]
-    raw = [mapping[i] for i in indices]
-    flat = [item for sublist in raw for item in sublist]
-    newtags = [s[-1] for s in flat]
-
-    return newtags
-
 
 
 class simulation_port:
@@ -82,6 +56,17 @@ class simulation_port:
     self.from_layername  = from_layername         # layer on one end of via port, used if target_layername is None
     self.to_layername    = to_layername           # layer on other  end of via port
     self.direction  = direction
+
+    # check if layer assignment matches specified direction
+    via_port = ("Z" in direction.upper()) and (from_layername is not None) and (to_layername is not None)
+    in_plane_port = ("X" in direction.upper() or "Y" in direction.upper()) and (target_layername is not None)
+    if not (via_port or in_plane_port):
+        print(f'ERROR: Port {portnumber} definition is invalid, port direction does not match from/to/target layer!')
+        print('        Valid port configurations:')
+        print('        direction x, -x- y, -y with target_layername')
+        print('        direction z, -z with from_layername and to_layername')
+        exit(1)
+        
     
     self.port_Z0 = port_Z0
     self.voltage = voltage
@@ -119,12 +104,18 @@ class all_simulation_ports:
       Args:
           port (simulation_port): simulation_port instance to be added
       """
+      # check if we already have that port number in list
+      existing = self.get_port_by_number(port.portnumber)
+      if existing is not None:
+        print(f'ERROR: Port {port.portnumber} already exists, check for duplicate port definitions!')
+        exit(1)
+
       self.ports.append(port)
       self.portcount = len(self.ports)
       self.portlayers.append(port.source_layernum)
 
 
-  def get_port_by_layernumber (self, layernum):  # 
+  def get_port_by_layernumber (self, layernum):   
       """Get port from layer number. Numbers are unique, one port per layer, so we have 1:1 mapping
       Args:
           layernum (int): layer number in layout
@@ -146,7 +137,12 @@ class all_simulation_ports:
       Returns:
           simulation_port: port to be found
       """
-      return self.ports[portnum-1] 
+      found = None
+      for port in self.ports:
+          if port.portnumber == portnum:
+              found = port
+              break
+      return found       
 
 
   def apply_layernumber_offset (self, offset):
@@ -177,8 +173,119 @@ class all_simulation_ports:
 
 
 
-def add_metals (allpolygons, metals_list, meshseed=0):
-    """Add drawn geometries from layout layers to gmsh
+def get_layer_volumes (metals_list, layername):
+    """return all volume dimtags for a given  layer name, preselect by z position and z height, then check name of gmsh entity
+
+    Args:
+        metals_list: metals list from stackup reader
+        layername (string): layer name as used in XML stackup file
+
+    Returns:
+        list of dimtags: volumes for that layer name
+    """
+    # return all volume tags for a given  layer name, 
+    # preselect by z position and z height, then check name of gmsh entity
+
+    this_metal = metals_list.getbylayername(layername)
+    
+    # get volumes on this layer
+    delta = 0.001
+    layer_zmin = this_metal.zmin - delta/2
+    layer_zmax = this_metal.zmax + delta/2
+        
+    # This returns the list of volumes inside
+    volumes_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-math.inf,-math.inf,layer_zmin,math.inf,math.inf,layer_zmax,3)
+    volume_on_layer_list = []
+    for volume in volumes_in_bounding_box:
+        name_assigned = gmsh.model.getEntityName(dim=3,tag=volume[1])
+        if name_assigned == layername:
+            volume_on_layer_list.append(volume)
+    return  volume_on_layer_list
+
+
+
+def get_layer_sheets (metals_list, layername):
+    """return all 2D dimtags for a given  layer name, preselect by z position and z height, then check name of gmsh entity
+
+    Args:
+        metals_list: metals list from stackup reader
+        layername (string): layer name as used in XML stackup file
+
+    Returns:
+        list of dimtags: surfaces for that layer name
+    """
+
+    this_metal = metals_list.getbylayername(layername)
+    
+    # get volumes on this layer
+    delta = 0.001
+    layer_zmin = this_metal.zmin - delta/2
+    layer_zmax = this_metal.zmin + delta/2  # expect sheet resistors at zmin!
+        
+    # This returns the list of sheets inside
+    sheets_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-math.inf,-math.inf,layer_zmin,math.inf,math.inf,layer_zmax,2)
+    sheets_on_layer_list = []
+    for sheet in sheets_in_bounding_box:
+        name_assigned = gmsh.model.getEntityName(dim=2,tag=sheet[1])
+        if name_assigned == layername:
+            sheets_on_layer_list.append(sheet)
+    return  sheets_on_layer_list
+
+
+def create_surface_from_polygon (poly, zposition, meshseed):
+
+    """create surface from single polygon at the given z position
+
+    Returns:
+        dimtag of created surface
+    """
+
+    # add Polygon to gmsh using poly.pts
+    linetaglist = []
+    vertextaglist = []
+    numvertices = len(poly.pts_x)
+
+    # store vertex info for debugging
+    debug_vertices = False
+    if debug_vertices: 
+        vertex_info = {}
+    
+    for v in range(numvertices):
+        # addPoint parameters: x (double), y (double), z (double), meshSize = 0. (double), tag = -1 (integer)
+        vertextag = gmsh.model.occ.addPoint(poly.pts_x[v], poly.pts_y[v], zposition, meshseed, -1)
+        vertextaglist.append(vertextag)
+        if debug_vertices: 
+            vertex_info[vertextag] = f"x={poly.pts_x[v]} y={poly.pts_y[v]}"
+
+    # after writing the vertices, we combine them to boundary lines
+    for v in range(numvertices):
+        pt_start = vertextaglist[v]
+        if v==(numvertices-1):
+            pt_end = vertextaglist[0]
+        else:
+            pt_end = vertextaglist[v+1]
+
+        # addLine parameters: startTag (integer), endTag (integer), tag = -1 (integer)
+        try:
+            linetag = gmsh.model.occ.addLine(pt_start, pt_end, -1)
+            linetaglist.append(linetag)
+        except:
+            if debug_vertices: 
+                print(f"skipping invalid line on layer {poly.layernum} ")
+                print("  pt_start: ", str(pt_start), " -> ", vertex_info[pt_start])
+                print("  pt_end: ", str(pt_end), " -> ", vertex_info[pt_end])
+
+
+    # after creating the lines, we can create a curve loop and a surface 
+    # to do so, we need the line segment numbers again
+    curvetag   = gmsh.model.occ.addCurveLoop(linetaglist, tag=-1)
+    surfacetag = gmsh.model.occ.addPlaneSurface([curvetag], tag=-1)
+
+    return surfacetag
+
+
+def add_metal_volumes (allpolygons, metals_list, meshseed=0):
+    """Add drawn geometries from layout layers to gmsh as 3D volumes
 
     Args:
         allpolygons (all_polygons_list): instance of all_polygons_list from reading GDSII
@@ -189,54 +296,10 @@ def add_metals (allpolygons, metals_list, meshseed=0):
         list of created tags
     """
 
-    def get_layer_volumes (metals_list, layername):
-        # return all volume tags for a given  layer name
-        this_metal = metals_list.getbylayername(layername)
-        
-        # get volumes on this layer
-        delta = 0.001
-        layer_zmin = this_metal.zmin - delta/2
-        layer_zmax = this_metal.zmax + delta/2
-            
-        # This returns the list of volumes inside
-        # But unfortunately, it will trigger also for thinner layers enclosed inside that volume
-        volumes_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-math.inf,-math.inf,layer_zmin,math.inf,math.inf,layer_zmax,3)
-        # not iterate over return values and check exact height
-        volume_on_layer_list = []
-        for volume in volumes_in_bounding_box:
-            volume_tag = volume[1]
-            xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(3, volume_tag)
-            if (abs(zmin-layer_zmin) < delta) and (abs(zmax-layer_zmax) < delta):
-                volume_on_layer_list.append(volume)
-            
-        return  volume_on_layer_list
+    metal_dimtags_created_3D = []
+    metal_dimtags_created_sheetlayer = []
 
-
-    def get_sheet_surfaces (metals_list, layername):
-        # return all surface tags for a given  layer name
-        # NOTE: This is specialized for thin sheet and only evaluates at zmin, ignoring zmax value
-        this_metal = metals_list.getbylayername(layername)
-        
-        # get volumes on this layer
-        delta = 0.001
-        sheet_zmin = this_metal.zmin - delta/2
-        sheet_zmax = this_metal.zmin + delta/2  # evaluate zmin, ignore zmax, because we look at thin sheet layers
-            
-        # This returns the list of volumes inside
-        # But unfortunately, it will trigger also for thinner layers enclosed inside that volume
-        surfaces_in_bounding_box = gmsh.model.getEntitiesInBoundingBox(-math.inf,-math.inf,sheet_zmin,math.inf,math.inf,sheet_zmax,2)
-        # not iterate over return values and check exact height
-        surfaces_on_layer_list = []
-        for surface in surfaces_in_bounding_box:
-            surfaces_on_layer_list.append(surface)
-            
-        return  surfaces_on_layer_list
-
-
-
-    kernel = gmsh.model.occ
-
-    # add geometries on metal and via layers
+    # add geometries on metal and via layers (volume only, excluding thin sheets)
     for poly in allpolygons.polygons:
         # each poly knows its layer number
 
@@ -245,185 +308,114 @@ def add_metals (allpolygons, metals_list, meshseed=0):
         # For that special case, get ALL metals from technology file for that same polygon
         all_assigned = metals_list.getallbylayernumber (poly.layernum) 
         if all_assigned is not None:
-            for metal in all_assigned:
+            for metal_layer in all_assigned:  
+                layername = metal_layer.name
 
-                # add Polygon to gmsh using poly.pts
-                linetaglist = []
-                vertextaglist = []
-                numvertices = len(poly.pts_x)
-
-                # store vertex info for debugging
-                debug_vertices = False
-                if debug_vertices: 
-                    vertex_info = {}
+                surfacetag = create_surface_from_polygon (poly, metal_layer.zmin, meshseed)
                 
-                for v in range(numvertices):
-                    # addPoint parameters: x (double), y (double), z (double), meshSize = 0. (double), tag = -1 (integer)
-                    vertextag = kernel.addPoint(poly.pts_x[v], poly.pts_y[v], metal.zmin, meshseed, -1)
-                    vertextaglist.append(vertextag)
-                    if debug_vertices: 
-                        vertex_info[vertextag] = f"x={poly.pts_x[v]} y={poly.pts_y[v]}"
-
-                # after writing the vertices, we combine them to boundary lines
-                for v in range(numvertices):
-                    pt_start = vertextaglist[v]
-                    if v==(numvertices-1):
-                        pt_end = vertextaglist[0]
-                    else:
-                        pt_end = vertextaglist[v+1]
-
-                    # addLine parameters: startTag (integer), endTag (integer), tag = -1 (integer)
-                    try:
-                        linetag = kernel.addLine(pt_start, pt_end, -1)
-                        linetaglist.append(linetag)
-                    except:
-                        pass
-                        if debug_vertices: 
-                            print(f"skipping invalid line on layer {poly.layernum} ")
-                            print("  pt_start: ", str(pt_start), " -> ", vertex_info[pt_start])
-                            print("  pt_end: ", str(pt_end), " -> ", vertex_info[pt_end])
-
-
-                # after creating the lines, we can create a curve loop and a surface 
-                # to do so, we need the line segment numbers again
-                curvetag   = kernel.addCurveLoop(linetaglist, tag=-1)
-                surfacetag = kernel.addPlaneSurface([curvetag], tag=-1)
-
-                if not (metal.is_sheet):
-                    if metal.thickness > 0:
-                        kernel.extrude([(2,surfacetag)],0,0,metal.thickness)
-
+                if not (metal_layer.is_sheet):
+                    if metal_layer.thickness > 0:
+                        out = gmsh.model.occ.extrude([(2,surfacetag)],0,0,metal_layer.thickness)
+                        tag = out[1][1]
+                        # set name of metal layer to extruded volume
+                        # we also use that to identify the volumes later
+                        gmsh.model.setEntityName(dim=3,tag=tag, name=layername)
+                else:
+                    # sheet metal
+                    gmsh.model.setEntityName(dim=2,tag=surfacetag, name=layername)
     
+
     # Try removing duplicates at this stage
-    gmsh.model.occ.removeAllDuplicates()
-
-    kernel.synchronize()
-
+    # gmsh.model.occ.removeAllDuplicates()  # <<<<<< This also splits overlapping polygons into separare items that loose their EntityName, don't do this!!!!
+    gmsh.model.occ.synchronize()
+        
 
     # We have created initial 3D volumes from GDSII, now iterate over 3D entities to merge them
     volumelist = gmsh.model.getEntities(3)
     volumecount = len(volumelist)
     if volumecount>0:
         # try to merge volumes on each layer
-        for metal in metals_list.metals:
-            if not (metal.is_via or metal.is_sheet):            
+        for metal_layer in metals_list.metals:
+            if not metal_layer.is_sheet:            
                 # try to merge planar metal volumes
-                layername = metal.name
+                layername = metal_layer.name
                 volume_on_layer_list = get_layer_volumes(metals_list, layername)
 
-                # try boolean union of volumes on this layer
-                if len(volume_on_layer_list)>1:
-                    # get first element and delete from list
-                    first = volume_on_layer_list.pop(0)
-                    # print('  Layer = ' + layername)
-                    # print('  FUSE, object = ' + str(first)) 
-                    # print('  FUSE, tool   = ' + str(volume_on_layer_list)) 
-                    
-                    gmsh.model.occ.fuse([first],volume_on_layer_list, -1)
-                    gmsh.model.occ.synchronize()
+                if metal_layer.is_via:
+                    # no merge 
+                    metal_dimtags_created_3D.extend(volume_on_layer_list)
+                else:
 
+                    # try boolean union of volumes on this layer
+                    if len(volume_on_layer_list)>1:
+                        # get first element and delete from list
+                        first = volume_on_layer_list.pop(0)
+                        # print('  Layer = ' + layername)
+                        # print('  FUSE, object = ' + str(first)) 
+                        # print('  FUSE, tool   = ' + str(volume_on_layer_list)) 
 
-    tags_created_3D = {} # each layer has a flat list
-    taglist_created_2D = {} # each layer has nested list, one list per polygon, these are surfaces of 3D volumes
-    tags_created_sheet2D = {} # each layer has a flat list of tags for thin sheet surfaces
+                        out = gmsh.model.occ.fuse(volume_on_layer_list,[first], -1)
+                        gmsh.model.occ.synchronize()
 
-    # Remove volume of planar metals, keep surface only
-    # Store tags of created geometries, one list per layer, key is layer name
+                        # set name for fused volumes
+                        volume_dimtags = out[0] # TODO: check for complex cases
 
-    volumelist = gmsh.model.getEntities(3)
-    volumecount = len(volumelist)
-    if volumecount>0:
-        # print('Number of volumes after merging = ' + str(volumecount)) 
+                        for volume_dimtag in volume_dimtags:
+                            gmsh.model.setEntityName(dim=3,tag=volume_dimtag[1], name=layername)
+                        metal_dimtags_created_3D.extend(volume_dimtags)
+                        gmsh.model.occ.synchronize()
 
-        for metal in metals_list.metals:
-            layername = metal.name
-
-            # prepare the lists that hold the tags
-            if layername in taglist_created_2D.keys():
-                layer_perpolytags_2D = taglist_created_2D[layername]
-            else:
-                layer_perpolytags_2D = []
-                taglist_created_2D[layername] = layer_perpolytags_2D
-
-
-            if layername in tags_created_3D.keys():
-                layer_tags_3D = tags_created_3D[layername]                   
-            else:
-                layer_tags_3D = []
-                tags_created_3D[layername] = layer_tags_3D 
-
-
-            if layername in tags_created_sheet2D.keys():
-                layer_tags_sheets = tags_created_sheet2D[layername]                   
-            else:
-                layer_tags_sheets = []
-                tags_created_sheet2D[layername] = layer_tags_sheets 
-
-
-
-            # get layer volumes, all metals and vias are volumes at this processing step
-            # the only exception are sheet layers, handled below
-            volume_on_layer_list = get_layer_volumes(metals_list, layername)
-
-            # check if we have planar metal or via, process differently
-            if metal.is_via or metal.is_dielectric:
-                # vias and dielectric bricks are kept as 3D volumes
-                for dimtag in volume_on_layer_list:
-                    volumetag = dimtag[1]
-                    tags_created_3D[layername].append(volumetag)
-
-            elif metal.is_metal:
-                # planar metal is shelved, we keep the surfaces and remove the volume  
-                for dimtag in volume_on_layer_list:
-                    volumetag = dimtag[1]
+                    elif len(volume_on_layer_list)==1:
+                        # single volume on layer
+                        dim, tag = volume_on_layer_list[0]
+                        gmsh.model.setEntityName(dim=3,tag=tag, name=layername)
+                        metal_dimtags_created_3D.extend(volume_on_layer_list)
+                        gmsh.model.occ.synchronize()
                    
-                    # get all surfaces of 3d body
-                    _, surfaceloops = kernel.getSurfaceLoops(volumetag)
-                    layer_perpolytags_2D.append(surfaceloops)
 
-                    # remove volume, for simulation we only keep surfaces
-                    kernel.remove([(3,volumetag)])
-
-            elif metal.is_sheet:
-                surfaces_on_layer_list = get_sheet_surfaces (metals_list, layername)
-                tags_created_sheet2D[layername] = surfaces_on_layer_list 
-
-            else:
-                print('Unknown "Type" assigned to layer ', metal.name)
-                exit(1)
+    # Get tags of sheet metals (resistors)
+    for metal_layer in metals_list.metals:
+        if metal_layer.is_sheet:            
+            layername = metal_layer.name
+            sheet_on_layer_list = get_layer_sheets(metals_list, layername)
+            metal_dimtags_created_sheetlayer.extend(sheet_on_layer_list)
 
 
-        kernel.synchronize()
-    return tags_created_3D, taglist_created_2D, tags_created_sheet2D            
-
-
-def create_box_with_meshseed (kernel, xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
-    pt1 = kernel.addPoint(xmin, ymin, zmin, meshseed, -1)
-    pt2 = kernel.addPoint(xmin, ymax, zmin, meshseed, -1)
-    pt3 = kernel.addPoint(xmax, ymax, zmin, meshseed, -1)
-    pt4 = kernel.addPoint(xmax, ymin, zmin, meshseed, -1)
     
-    line1 = kernel.addLine(pt1,pt2,-1) 
-    line2 = kernel.addLine(pt2,pt3,-1) 
-    line3 = kernel.addLine(pt3,pt4,-1) 
-    line4 = kernel.addLine(pt4,pt1,-1) 
+    return metal_dimtags_created_3D, metal_dimtags_created_sheetlayer
+    
+
+
+def create_box_with_meshseed (xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
+    """Create a box with given value for mesh seed
+    Returns:
+        tag of created volume (integer)
+    """
+    pt1 = gmsh.model.occ.addPoint(xmin, ymin, zmin, meshseed, -1)
+    pt2 = gmsh.model.occ.addPoint(xmin, ymax, zmin, meshseed, -1)
+    pt3 = gmsh.model.occ.addPoint(xmax, ymax, zmin, meshseed, -1)
+    pt4 = gmsh.model.occ.addPoint(xmax, ymin, zmin, meshseed, -1)
+    
+    line1 = gmsh.model.occ.addLine(pt1,pt2,-1) 
+    line2 = gmsh.model.occ.addLine(pt2,pt3,-1) 
+    line3 = gmsh.model.occ.addLine(pt3,pt4,-1) 
+    line4 = gmsh.model.occ.addLine(pt4,pt1,-1) 
     linetaglist = [line1, line2, line3, line4]
 
     # after creating the lines, we can create a curve loop and a surface 
     # to do so, we need the line segment numbers again
-    curvetag   = kernel.addCurveLoop(linetaglist, tag=-1)
-    surfacetag = kernel.addPlaneSurface([curvetag], tag=-1)    
-    returnval  = kernel.extrude([(2,surfacetag)],0,0,zmax-zmin)
+    curvetag   = gmsh.model.occ.addCurveLoop(linetaglist, tag=-1)
+    surfacetag = gmsh.model.occ.addPlaneSurface([curvetag], tag=-1)    
+    returnval  = gmsh.model.occ.extrude([(2,surfacetag)],0,0,zmax-zmin)
     volumetag = returnval[1][1]
 
     return volumetag
 
 
-def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, refined_cellsize):
+def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, refined_cellsize):
     """
     Add dielectric layers (these extend through simulation area and have no polygons in GDSII)
     
-    :param kernel: shortcut for gmsh.model.occ
     :param materials_list: from stackup reader
     :param dielectrics_list: from stackup reader
     :param gds_layers_list: from gds reader
@@ -471,31 +463,35 @@ def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, 
         air_xmin = air_xmax = air_ymin = air_ymax = air_zmin = air_zmax = air_around
 
 
+    # check if we have at least one dielectric layer in stackup
+    if len(dielectrics_list.dielectrics) == 0:
+        print('ERROR: There are no dielectric layers defined in "ELayers > Dielectrics" section of XML stackup file. Aborting now.')
+        exit(1)
+
 
     # dielectrics from stackup
-    offset = 0 
     for dielectric in dielectrics_list.dielectrics:
-        offset_delta = margin/20 # some relevant offset for alternating dielectric dimensions (workaround for mesh error)
 
-        # get CSX material object for this dielectric layers material name
-        materialname = dielectric.material
+        # get CSX material object for this dielectric layer
+        dielectricname = dielectric.name
         
         # tag managment: get list of tags for this materialname
-        if materialname in tags_created_3D.keys():
-            layer_tags_3D = tags_created_3D[materialname]                   
+        if dielectricname in tags_created_3D.keys():
+            layer_tags_3D = tags_created_3D[dielectricname]                   
         else:
             layer_tags_3D = []
-            tags_created_3D[materialname] = layer_tags_3D 
+            tags_created_3D[dielectricname] = layer_tags_3D 
 
 
         # xy dimensions of dielectric boxes from stackup
         if dielectric.gdsboundary is None:
-            bound_layernum = None
+            # dielectric with bounding box from all polygons
+            bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.get_bounding_box()
         else:
-            bound_layernum = int(dielectric.gdsboundary) 
+            bound_layernum = int(dielectric.gdsboundary)
+            bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.bounding_box.get_layer_bounding_box(bound_layernum)
 
-        bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.bounding_box.get_layer_bounding_box(bound_layernum)
-        
+            
         x1 = bbox_xmin - margin
         y1 = bbox_ymin - margin
         x2 = bbox_xmax + margin
@@ -507,21 +503,27 @@ def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, 
         overall_ymax = max(overall_ymax, y2)
 
         # now that we have a material, add the dielectric body (substrate, oxide etc)
-        z1 = dielectric.zmin
-        z2 = dielectric.zmax
-       
-        box_tag = create_box_with_meshseed (kernel, x1-offset, y1-offset, z1, x2+offset, y2+offset, z2, meshseed)
-        tags_created_3D[materialname].append(box_tag)
+    
+        box_tag = create_box_with_meshseed (x1, y1, dielectric.zmin, x2, y2, dielectric.zmax, meshseed)
+        gmsh.model.setEntityName(dim=3,tag=box_tag, name= dielectricname)
+        tags_created_3D[dielectricname].append(box_tag)
 
-        # workaround to avoid gsmh meshing error: alternating size of stacked dielectric blocks
-        if offset == 0:
-            offset = offset_delta
-        else:
-            offset = 0    
 
+
+    # identify airbox
+    tool_tags = []
+    for key in tags_created_3D.keys():
+        if key != 'airbox':
+            tags = tags_created_3D[key]
+            for tag in tags:
+                tool_tags.append((3,tag))
+    
+
+    # Fragment dielectrics to clean up touching surfaces, tags will not change here
+    _, geom_map = gmsh.model.occ.fragment(tool_tags, [])   
+    gmsh.model.occ.synchronize()
 
     # add surrounding air box
-
     x1 = overall_xmin - air_xmin
     y1 = overall_ymin - air_ymin
     x2 = overall_xmax + air_xmax
@@ -546,34 +548,32 @@ def add_dielectrics (kernel, materials_list, dielectrics_list, gds_layers_list, 
         x2 = allpolygons.get_xmax() + air_xmax
         y2 = allpolygons.get_ymax() + air_ymax
 
-    box_tag = kernel.addBox(x1,y1,z1,x2-x1,y2-y1,z2-z1)
+    box_tag = gmsh.model.occ.addBox(x1,y1,z1,x2-x1,y2-y1,z2-z1)
+    
+    # apply a boolean difference to create the "airbox minus others" shape:
+    out = gmsh.model.occ.cut([(3, box_tag)], tool_tags, -1, removeTool=False)
+    box_tag = out[0][0][1]
+    gmsh.model.setEntityName(dim=3,tag=box_tag, name= 'airbox')
+    gmsh.model.occ.synchronize()
+
     tags_created_3D['airbox'] = [box_tag]
-
-    # Try removing duplicates at this stage
-    # gmsh.model.occ.removeAllDuplicates()  # messed up some dielectrics mappings, we have lost oxide -> messed up with simulation boundary
-
-    kernel.synchronize()
-
-    return tags_created_3D  
+ 
+    return tags_created_3D
 
 
 
-def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0):
+def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
     """Add ports from special port layers to gmsh
 
     Args:
-        kernel (_type_): shortcut for gmsh.model.occ
         allpolygons (all_polygons_list): from gds reader
         metals_list (metal_layers_list): from XML stackup reader
         simulation_ports (all_simulation_ports): all simulation ports object, provides .ports (list), .portcount (int) and portlayers (list)
         meshseed (float, optional): Mesh see at polygon edges. Defaults to 0.
 
     Returns:
-        _type_: _description_
+       list of port dimtags, struct with port details
     """
-    '''
-    Add ports from special port layers  to gmsh
-    '''
 
     tags_created_2D = {}
 
@@ -615,10 +615,10 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
                         zmax = port_metal.zmin # port has zero thickness
 
                         # rectangle in xy plane
-                        pt1 = kernel.addPoint(xmin, ymin, zmin, meshseed, -1)
-                        pt2 = kernel.addPoint(xmin, ymax, zmin, meshseed, -1)
-                        pt3 = kernel.addPoint(xmax, ymax, zmin, meshseed, -1)
-                        pt4 = kernel.addPoint(xmax, ymin, zmin, meshseed, -1)
+                        pt1 = gmsh.model.occ.addPoint(xmin, ymin, zmin, meshseed, -1)
+                        pt2 = gmsh.model.occ.addPoint(xmin, ymax, zmin, meshseed, -1)
+                        pt3 = gmsh.model.occ.addPoint(xmax, ymax, zmin, meshseed, -1)
+                        pt4 = gmsh.model.occ.addPoint(xmax, ymin, zmin, meshseed, -1)
 
                         # port information that we write to Palace output directory
                         if 'X' in port.direction.upper():
@@ -660,17 +660,17 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
                        
                        if size_y > size_x:
                             # ports are line in y direction
-                            pt1 = kernel.addPoint(xmin, ymin, zmin, meshseed, -1)
-                            pt2 = kernel.addPoint(xmin, ymax, zmin, meshseed, -1)
-                            pt3 = kernel.addPoint(xmin, ymax, zmax, meshseed, -1)
-                            pt4 = kernel.addPoint(xmin, ymin, zmax, meshseed, -1)
+                            pt1 = gmsh.model.occ.addPoint(xmin, ymin, zmin, meshseed, -1)
+                            pt2 = gmsh.model.occ.addPoint(xmin, ymax, zmin, meshseed, -1)
+                            pt3 = gmsh.model.occ.addPoint(xmin, ymax, zmax, meshseed, -1)
+                            pt4 = gmsh.model.occ.addPoint(xmin, ymin, zmax, meshseed, -1)
                             width = size_y
                        else: 
                             # ports are line in x direction
-                            pt1 = kernel.addPoint(xmin, ymin, zmin, meshseed, -1)
-                            pt2 = kernel.addPoint(xmin, ymin, zmax, meshseed, -1)
-                            pt3 = kernel.addPoint(xmax, ymin, zmax, meshseed, -1)
-                            pt4 = kernel.addPoint(xmax, ymin, zmin, meshseed, -1)
+                            pt1 = gmsh.model.occ.addPoint(xmin, ymin, zmin, meshseed, -1)
+                            pt2 = gmsh.model.occ.addPoint(xmin, ymin, zmax, meshseed, -1)
+                            pt3 = gmsh.model.occ.addPoint(xmax, ymin, zmax, meshseed, -1)
+                            pt4 = gmsh.model.occ.addPoint(xmax, ymin, zmin, meshseed, -1)
                             width = size_x
 
                        port_information_data['length'] = length                            
@@ -686,21 +686,21 @@ def add_ports (kernel, allpolygons, metals_list, simulation_ports, meshseed = 0)
                     all_port_information.append(port_information_data)
 
                     # for both in-plane and vertical
-                    line1 = kernel.addLine(pt1,pt2,-1) 
-                    line2 = kernel.addLine(pt2,pt3,-1) 
-                    line3 = kernel.addLine(pt3,pt4,-1) 
-                    line4 = kernel.addLine(pt4,pt1,-1) 
+                    line1 = gmsh.model.occ.addLine(pt1,pt2,-1) 
+                    line2 = gmsh.model.occ.addLine(pt2,pt3,-1) 
+                    line3 = gmsh.model.occ.addLine(pt3,pt4,-1) 
+                    line4 = gmsh.model.occ.addLine(pt4,pt1,-1) 
                     linetaglist = [line1, line2, line3, line4]
 
                     # after creating the lines, we can create a curve loop and a surface 
                     # to do so, we need the line segment numbers again
-                    curvetag   = kernel.addCurveLoop(linetaglist, tag=-1)
-                    surfacetag = kernel.addPlaneSurface([curvetag], tag=-1)
+                    curvetag   = gmsh.model.occ.addCurveLoop(linetaglist, tag=-1)
+                    surfacetag = gmsh.model.occ.addPlaneSurface([curvetag], tag=-1)
 
                     port_dimtag.append(surfacetag)
                     tags_created_2D['P'+str(portnum)]=port_dimtag
 
-    kernel.synchronize()
+    gmsh.model.occ.synchronize()
 
     all_port_information_struct = {}
     all_port_information_struct['ports'] = all_port_information
@@ -837,7 +837,7 @@ def create_model (excite_ports, settings):
         print('WARNING: Order of basis function must 1, 2 or 3.\nValue changed to default value order=2.')
         order = 2
 
-    # iterative solver setting for Elmer
+    # optional iterative solver setting for Elmer
     iterative = get_optional_setting (settings, "iterative", False)
    
     simulation_ports = settings['simulation_ports'] 
@@ -864,8 +864,18 @@ def create_model (excite_ports, settings):
     save_gmsh_geometry =  get_optional_setting (settings, "save_gmsh_unrolled", False)
     substrate_refinement = get_optional_setting (settings, "substrate_refinement", False)
 
+    # optional refined cellsize override per layer
+    refined_cellsize_override = get_optional_setting (settings, "refined_cellsize_override", [])
+    refined_cellsize_override_dict = {}
+    # dictionary of override with key=layername, value = refined cellsize override for that layer
+    for item in refined_cellsize_override:
+        layername = item[0]
+        value = item[1]
+        refined_cellsize_override_dict[layername]=value
+
     # separate_z_group_for_metals setting 
     z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
+
 
     # boundary conditions default to absorbing
     boundary_condition = get_optional_setting (settings,'boundary',['ABC','ABC','ABC','ABC','ABC','ABC'])
@@ -886,6 +896,13 @@ def create_model (excite_ports, settings):
 
     # optional output for Elmer FEM
     elmer = get_optional_setting(settings, 'elmer', False)
+    
+    # option model for Elmer thermal solver
+    elmer_thermal = get_optional_setting (settings, "elmer_thermal", False)
+    if elmer_thermal:
+        elmer = True
+    filled_metals = elmer_thermal # solid metals for thermal
+    
 
     # optional multithreading for Elmer FEM because it requires modifies settings in case.sif file
     # (not used for Palace where multithreading is fully defined in external runs script)
@@ -902,7 +919,7 @@ def create_model (excite_ports, settings):
             f_DC = 10e6
             f_discrete_list.append (f_DC)
             f_discrete_list.append (2*f_DC)
-            print('WARNING: Start frequency changed from DC to ', f_DC, ' GHz!')
+            print('WARNING: Start frequency changed from DC to ', f_DC/1e9, ' GHz!')
 
 
     # AdaptiveTol value enables adaptive frequency sweep, 0 means regular sweep (not adaptive)
@@ -910,6 +927,403 @@ def create_model (excite_ports, settings):
         AdaptiveTol = 2e-2
     else:    
         AdaptiveTol = 0
+
+    print('Starting to create mesh file and config file')
+
+    fmax = 0
+    if fstop is not None: 
+        fmax = max(fmax, fstop)
+    if len(f_discrete_list) > 0: 
+        discrete_max = max(f_discrete_list) 
+        fmax = max(fmax, discrete_max)
+
+    wavelength_air = 3e8/fmax / unit
+    # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
+    max_cellsize_air = wavelength_air/cells_per_wavelength
+
+    print("---------------------------------------------------")
+    print(f"Wavelength in air: {wavelength_air:.1f} units")
+    print(f"  meshsize_max: {meshsize_max:.1f}  units")
+    print(f"  max_cellsize_air: {max_cellsize_air:.1f} units")
+    print("---------------------------------------------------")
+    
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 5)
+
+    # Define tolerance so that we don't tun into numerical precision issue
+    # Our unit is in microns and the smallest real structure seems to be MIM dielectric thickness at 40 nm
+    gmsh.option.setNumber("Geometry.Tolerance", 1e-3) # this should be 1nm
+
+
+    # Add model, initialize
+    if "from_gds" in gmsh.model.list():
+        gmsh.model.setCurrent("from_gds")
+        gmsh.model.remove()
+    gmsh.model.add("from_gds")
+
+
+    # create lookup dict to quickly check if we have a metal or a dielectric, and store tags
+    # create lookup dict to quickly check if we have a dielectric stackup volume (not drawn in GDSII), and store tags
+    metal_volume_dict = {}
+    metal_surface_dict = {}
+    metal_sheet_dict = {}
+    dielectric_volume_dict = {}
+
+    for metal in metals_list.metals:
+        if metal.is_via:
+            metal_volume_dict[metal.name] = []
+        elif metal.is_dielectric: # drawn dielectric brick    
+            dielectric_volume_dict[metal.name] = []
+        elif metal.is_sheet: # sheet layer for resistor etc
+            metal_sheet_dict[metal.name] = []
+        else: 
+            if not filled_metals:
+                # regular case, planar metal will be represented at surfaces of hollow volumes
+                metal_surface_dict[metal.name]=[] 
+            else:
+                # special case for thermal etc: make planar metals as volumes, not surface 
+                metal_volume_dict[metal.name] = []
+                     
+
+    for dielectric in dielectrics_list.dielectrics:
+        dielectric_volume_dict[dielectric.name]=[]
+
+    # for the airbox surface, we use a list
+    airbox_surface_taglist = []    
+
+
+    # add drawn geometries to gmsh model
+
+    print('Adding metal tags ...')
+    # add as volume
+    metal_dimtags_created_3D, sheetlayer_dimtags = add_metal_volumes (allpolygons, metals_list)
+
+    # add dielectric boxes (oxide, substrate, air etc) to gmsh model
+    print('Adding dielectrics ...')
+    dielectric_tags_created_3D = add_dielectrics (materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, refined_cellsize=refined_cellsize)
+    
+    # separate metal and dielectric volumes
+    dielectric_volume_dimtags = []
+    for key in dielectric_tags_created_3D.keys():
+        tags = dielectric_tags_created_3D[key]
+        for tag in tags:
+            dielectric_volume_dimtags.append((3, tag))
+
+    # 3D volumes that are not a dielectric must be a drawn metal
+    metal_volume_dimtags = []
+    all_volume_dimtags = gmsh.model.getEntities(3)
+    for volume_dimtag in all_volume_dimtags:
+        if volume_dimtag not in dielectric_volume_dimtags:
+            metal_volume_dimtags.append(volume_dimtag)
+
+
+    # debugging
+    '''
+    missing_debug_log = "missing_tags.txt"
+    if len(metal_volume_dimtags) != len(metal_dimtags_created_3D):
+        print(f"We have a mismatch in metal volume count, {len(metal_volume_dimtags)} vs. {len(metal_dimtags_created_3D)} !")
+
+        with open(missing_debug_log, "w") as file:
+            for dimtag in metal_volume_dimtags:
+                if dimtag not in metal_dimtags_created_3D:
+                    file.write(f"{dimtag}\n")
+        print(f"Missing dimtags written to file: missing_tags.txt")
+        exit(2)
+    else:
+        if os.path.exists(missing_debug_log):
+            os.remove(missing_debug_log)        
+    '''        
+
+    # cut metal volumes from dielectric volumes
+    outDimTags, outDimTagsMap = gmsh.model.occ.cut(dielectric_volume_dimtags, metal_volume_dimtags, -1, removeTool=False)
+    dielectric_tags_unchanged = (outDimTags==dielectric_volume_dimtags)
+    assert dielectric_tags_unchanged
+
+    gmsh.model.occ.synchronize()
+    
+    # Now embed/fragment metal and dielectric volumes, return value geom_map keeps mapping between original tags and new tags after fragmenting
+
+    geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]
+    # create dict with names for each original volume
+    original_volume_names_dict ={}
+    for dim, tag in geom_dimtags:
+        name = gmsh.model.getEntityName(dim=3,tag=tag)
+        original_volume_names_dict[tag] = name
+
+
+    _, geom_map = gmsh.model.occ.fragment(geom_dimtags, [])   
+    gmsh.model.occ.synchronize()
+
+
+    # restore names with possibly new tag numbers
+    for n, new_dimtag_list in enumerate(geom_map):
+        # we get a list with one or more new dimtags for each the original dimtag
+        _, original_tag = geom_dimtags[n]
+        name = original_volume_names_dict[original_tag]
+        for _, newdimtag in new_dimtag_list:
+            gmsh.model.setEntityName(dim=3,tag=newdimtag, name=name)
+
+    gmsh.model.occ.synchronize()
+
+    # dielectric volume dim tags have not changed, so all other volumes after fragmenting must be metal
+    metal_volume_dimtags = []
+    all_volume_dimtags = gmsh.model.getEntities(3)
+    for volume_dimtag in all_volume_dimtags:
+        if volume_dimtag not in dielectric_volume_dimtags:
+            metal_volume_dimtags.append(volume_dimtag)    
+
+    # add ports
+    print('Adding ports ...')
+    port_dimtags_created_2D, all_port_information_struct = add_ports (allpolygons, metals_list, simulation_ports)
+    # create flat list of port dimtags
+    port_tags = []
+    for key in port_dimtags_created_2D.keys():
+        for tag in port_dimtags_created_2D[key]:
+            port_tags.append((2,tag))
+
+
+    #  sheet metal tags, this is a flat list of dimtags, information on layer/material is only in sheet itself (getEntityName)
+    geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]
+    geom_dimtags.extend(port_tags)
+    geom_dimtags.extend(sheetlayer_dimtags)
+
+
+    # fragment to insert 2D sheets into 3D volumes
+    _, geom_map = gmsh.model.occ.fragment(geom_dimtags, [])   
+    gmsh.model.occ.synchronize()
+
+
+    # Restore port and sheet tags
+    # restore names with possibly new tag numbers
+
+    # Sheet tags
+    restored_sheetlayer_dimtags = []
+    for n, new_dimtag_list in enumerate(geom_map):
+        # we get a list with one or more new dimtags for each the original dimtag
+        original_tag = geom_dimtags[n]
+        if original_tag in sheetlayer_dimtags:
+            #  sheetlayer_dimtags is flat list, this is all we have for now, information on layer/material is only in sheet itself (getEntityName)
+            restored_sheetlayer_dimtags.append(new_dimtag_list[0])
+    sheetlayer_dimtags = restored_sheetlayer_dimtags
+
+
+    # Port tags
+    # The port might span across multiple dielectrics, then it will fall into multiple surfaces and we need all of them,
+    for key in port_dimtags_created_2D.keys():
+        for tag in port_dimtags_created_2D[key]:    
+            for n, new_dimtag_list in enumerate(geom_map):
+                original_dimtag = geom_dimtags[n]
+                if tag==original_dimtag[1]:
+                    newtags = []
+                    # the port might span across multiple dielectrics, then it will fall into multiple surfaces and we need all of them
+                    for dimtag in new_dimtag_list:
+                        tag = dimtag[1]
+                        newtags.append(tag)
+                    port_dimtags_created_2D[key]=newtags
+                    break
+
+
+
+    # create dict for lookup of sheet metal layers and dimtags
+    for dimtag in sheetlayer_dimtags:
+        dim, tag = dimtag
+        layername = gmsh.model.getEntityName(dim=2,tag=tag)
+        metal_sheet_dict[layername].append(tag)
+
+
+
+    # ----------------  ITERATE OVER VOLUMES AND PORTS TO CREATE PHYSICAL GROUPS -----------------
+
+    # MESHING: Get list of boundary line tags of all metals, used to refine mesh along the edges
+
+    # dictionary of boundary tags (for refinement) per layer, also used for port. Key is layername or port name.
+    boundary_line_tags_dict = {}
+    
+    geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]     
+    for dim, tag in geom_dimtags:
+        name = gmsh.model.getEntityName(dim=3,tag=tag)
+        if name in metal_volume_dict.keys():
+            metal_volume_dict[name].append(tag)
+        elif name in metal_surface_dict.keys():
+            # get all surfaces of 3d body
+            _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+            metal_surface_dict[name].append(surfaceloops)    
+        elif name in dielectric_volume_dict.keys():
+            dielectric_volume_dict[name].append(tag)
+        elif name == "airbox":
+            dielectric_volume_dict['airbox']=[tag]
+            # get all surfaces 
+            _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+            for surfaceloop in surfaceloops:
+                airbox_surface_taglist.append(surfaceloop) 
+        else:
+            # this should not happen
+            print(f"Found volume tag {tag} with name '{name}' which can't be assigned, abort")
+            if 'unknown' not in metal_volume_dict:
+                metal_volume_dict['unknown'] = []
+            metal_volume_dict['unknown'].append(tag)
+            # exit(2)            
+
+
+    # create lists where we store dictionaries with material name, physical group tag and physical group name
+    physical_groups_3D = []
+    physical_groups_2D = [] 
+    physical_groups_ports = [] 
+
+    # create physical group for metal volumes
+    for key in metal_volume_dict.keys():
+        volume_list = metal_volume_dict[key]
+        if len(volume_list)>0:
+            phys_group = gmsh.model.addPhysicalGroup(3, volume_list, tag=-1)
+            gmsh.model.setPhysicalName(3, phys_group, key)    
+            # store, used when creating solver config file
+            physical_groups_3D.append({"layername":key, "groupname":key, "grouptag":phys_group })
+
+
+    # create physical group for metal surfaces
+
+    already_assigned_tags = [] # list to check duplicates from two metals overlapping
+    
+    for key in metal_surface_dict.keys():
+        surfaces_list = metal_surface_dict[key]
+        if len(surfaces_list)>0:
+
+            i=0
+            for surfaces in surfaces_list:
+                i=i+1
+
+                # we want to separate surfaces into planar (xy) and vertical (z) 
+                new_tags_planar = []
+                new_tags_vertical = []
+
+                all_tags = surfaces[0]
+                for tag in all_tags:
+                    if is_vertical_surface(tag):
+                        new_tags_vertical.append(tag)
+                    else:
+                        new_tags_planar.append(tag)     
+
+                    # we should not have this in list    
+                    if tag not in already_assigned_tags:    
+                        already_assigned_tags.append(tag)    
+                    else:
+                        print("ERROR in XML stackup definition:")
+                        print(f"   Polygon on conductor layer {key} touches another conductor layer (overlapping surface), this is invalid.")    
+                        print("   Make sure different 'conductor' layers never touch directly, use 'via' layer for connecting to metal layers!")
+                        exit(101)
+
+                # we now have separate lists for xy and z surfaces
+
+                # xy in-plane
+                if len(new_tags_planar)>0:
+                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags_planar, tag=-1)
+                    group_name = f"{key}_{i}_xy"
+                    gmsh.model.setPhysicalName(2, phys_group, group_name)            
+                    # store, used when creating solver config file
+                    physical_groups_2D.append({"layername":key+"_xy", "groupname":group_name, "grouptag":phys_group })
+
+                # z vertical
+                if len(new_tags_vertical)>0:
+                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags_vertical, tag=-1)
+                    group_name = f"{key}_{i}_z"
+                    gmsh.model.setPhysicalName(2, phys_group, group_name)            
+                    # store, used when creating solver config file
+                    physical_groups_2D.append({"layername":key+"_z", "groupname":group_name, "grouptag":phys_group })
+
+                # add for edge mesh refinement also
+                if key not in boundary_line_tags_dict.keys():
+                    boundary_line_tags_dict[key]=[]
+                for tag in all_tags:
+                    clt, ct = gmsh.model.occ.getCurveLoops(tag)
+                    for curvetag in ct:
+                        boundary_line_tags_dict[key].extend(curvetag)     
+
+
+    # create physical group for dielectric stackup volumes
+    for key in dielectric_volume_dict.keys():
+        volume_list = dielectric_volume_dict[key]
+        if len(volume_list)>0:
+            phys_group = gmsh.model.addPhysicalGroup(3, volume_list, tag=-1)
+            gmsh.model.setPhysicalName(3, phys_group, key)            
+            # store, used when creating solver config file
+            physical_groups_3D.append({"layername":key, "groupname":key, "grouptag":phys_group })
+
+
+    # create physical groups for metal sheet layers (resistors)
+    for key in metal_sheet_dict.keys():
+        surface_list = metal_sheet_dict[key]
+        if len(surface_list)>0:
+            phys_group = gmsh.model.addPhysicalGroup(2, surface_list, tag=-1)
+            gmsh.model.setPhysicalName(2, phys_group, key)            
+            # store, used when creating solver config file
+            physical_groups_2D.append({"layername":key, "groupname":key, "grouptag":phys_group })            
+
+
+    # create physical group for port surfaces
+    for key in port_dimtags_created_2D.keys():
+        porttag_list = port_dimtags_created_2D[key]
+        phys_group = gmsh.model.addPhysicalGroup(2, porttag_list, tag=-1)
+        gmsh.model.setPhysicalName(2, phys_group, key)               
+        # store, used when creating solver config file
+        physical_groups_ports.append({"layername":"Port", "groupname":key, "grouptag":phys_group })
+        
+        # add for edge mesh refinement also
+        if key not in boundary_line_tags_dict.keys():
+            boundary_line_tags_dict[key]=[]
+        for tag in porttag_list:
+            try:
+                clt, ct = gmsh.model.occ.getCurveLoops(tag)
+                for curvetag in ct:
+                    boundary_line_tags_dict[key].extend(curvetag)     
+            except:
+                print(f"Exception when assigning surface for port {key}, possible overlap of port and metal.\nCheck if port from/to/target layers are correct!")        
+                exit(1)
+
+
+
+    gmsh.model.occ.synchronize()
+    # gmsh.fltk.run()
+
+    # ----------------  PORT CONFIG METADATA JSON FILE -----------------
+
+    # we start from all_port_information_struct metadata that was created by add_ports() above
+
+    # add units to port information
+    all_port_information_struct['unit'] = unit
+    # add model name
+    all_port_information_struct['name'] = model_basename
+
+    # write JSON with port information to Palace outputmodel directory
+    port_information_file = os.path.join(sim_path, 'port_information' + config_suffix + '.json')
+    with open(port_information_file, 'w', encoding='utf-8') as f:
+        json.dump(all_port_information_struct, f, ensure_ascii=False, indent=4)
+    f.close()
+
+   
+
+    def get_material_from_layer_or_dielectric_name (layername):
+        material = None
+        layer = metals_list.getbylayername(layername)
+        if layer is not None:
+            material = materials_list.get_by_name(layer.material)
+        if material is None:
+                dielectric = dielectrics_list.get_by_name(layername)
+                if dielectric is not None:
+                    material = materials_list.get_by_name(dielectric.material)
+        return material                    
+
+
+    # ----------------  PALACE CONFIG  -----------------
+
+    # --------- config header ----------------
+    config_data = {}    # data structure to hold the config file data
+ 
+    problem =  {
+            "Type": "Driven",
+            "Verbose": 3,
+            "Output": data_dir
+        }
+    config_data['Problem'] = problem
 
     # refinement value controls adaptive mesh refinement
     # always write this control block, even when 0 iterations specified, because user can then edit json himself
@@ -922,19 +1336,6 @@ def create_model (excite_ports, settings):
         "UpdateFraction": 0.7,
         "SaveAdaptMesh": save_adaptive_mesh        	
     }
-
-
-
-    # --------- config header ----------------
-    config_data = {}    # data structure to hold the config file data
- 
-    problem =  {
-            "Type": "Driven",
-            "Verbose": 3,
-            "Output": data_dir
-        }
-    config_data['Problem'] = problem
-
 
     model =  {
             "Mesh": model_basename + '.msh',
@@ -956,7 +1357,7 @@ def create_model (excite_ports, settings):
             }
 
         sweep.append(linear)    
-
+    
     # add f_discrete_list, this might have the value that replaces user input 0 GHz
     if len(f_discrete_list) > 0:
         # Discrete frequencies list values for Palace must be in GHz, divide by 1e9
@@ -983,7 +1384,6 @@ def create_model (excite_ports, settings):
         sweep.append(dump)
 
 
-
     allsamples = {
                   "Samples":sweep,
                   "AdaptiveTol": AdaptiveTol
@@ -1008,199 +1408,45 @@ def create_model (excite_ports, settings):
     config_data['Solver'] = solver
 
 
-    print('Starting to create mesh file and config file')
+    # DOMAINS: iterate over physical_groups_3D 
+    # keys: "layername", "groupname", "grouptag"
 
-    fmax = 0
-    if fstop is not None: 
-        fmax = max(fmax, fstop)
-    if len(f_discrete_list) > 0: 
-        discrete_max = max(f_discrete_list) 
-        fmax = max(fmax, discrete_max)
-
-    wavelength_air = 3e8/fmax / unit
-    # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
-    max_cellsize_air = wavelength_air/cells_per_wavelength
-
-    print("---------------------------------------------------")
-    print(f"Wavelength in air: {wavelength_air:.1f} units")
-    print(f"  meshsize_max: {meshsize_max:.1f}  units")
-    print(f"  max_cellsize_air: {max_cellsize_air:.1f} units")
-    print("---------------------------------------------------")
-    
-    kernel = gmsh.model.occ
-    gmsh.initialize()
-    gmsh.option.setNumber("General.Verbosity", 5)
-
-
-    # Add model, initialize
-    if "from_gds" in gmsh.model.list():
-        gmsh.model.setCurrent("from_gds")
-        gmsh.model.remove()
-    gmsh.model.add("from_gds")
-
-       
-    # add drawn geometries to gmsh model
-    # store metal tags for surfaces and volumes per layer 
-    print('Adding metal tags ...')
-    metal_tags_created_3D, metal_perpolytags_2D, sheet_tags_created_2D = add_metals (allpolygons, metals_list)
-
-    # add ports
-    print('Adding ports ...')
-    port_tags_created_2D, all_port_information_struct = add_ports (kernel, allpolygons, metals_list, simulation_ports)
-
-    # add units to port information
-    all_port_information_struct['unit'] = unit
-
-    # add model name
-    all_port_information_struct['name'] = model_basename
-
-
-    # add dielectric boxes (oxide, substrate, air etc) to gmsh model
-    print('Adding dielectrics ...')
-    dielectric_tags_created_3D = add_dielectrics (kernel, materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, refined_cellsize=refined_cellsize)
-
-    # Prepare for embedding/fragmenting, where tags will change
-    # get all surfaces and volumes and store their original dimtags, we will fragment them to  align mesh where they touch or intersect
-    geom_dimtags = [x for x in kernel.getEntities() if x[0] in (2, 3)]
-
-    # Now embed/fragment them, return value geom_map keeps mapping between original tags and new tags after fragmenting
-    _, geom_map = kernel.fragment(geom_dimtags, [])   
-    kernel.synchronize()
-
-
-    # ---------------- VOLUMES -----------------
-
-    # for Palace config file 
     Palace_materials = []
 
-    # for Elmer config file
-    Elmer_materials = []
-    Elmer_bodies    = []
-    Elmer_boundaries = []
-    Elmer_ports = []
+    for item in physical_groups_3D:
+        # items can be from via layer or from dielectric stackup
 
+        layername, groupname, grouptag = item.values()
+        material = get_material_from_layer_or_dielectric_name(layername)
 
-    # Next, we use our mapping between original tags and new tags, and assign physical names
-    # Outer iteration is over the layer names
-    for layername in metal_tags_created_3D.keys():   # drawn volumes, for GDS metals that is vias and dielectric bricks only
-        # gmsh
-        volumes_of_layer = metal_tags_created_3D[layername]
-        new_tags = get_tag_after_fragment (volumes_of_layer, geom_dimtags, geom_map, dimension=3)
-        phys_group = gmsh.model.addPhysicalGroup(3, new_tags, tag=-1)
-        gmsh.model.setPhysicalName(3, phys_group, layername)
-
-        # Palace config file
-        if len(new_tags) > 0:
+        if material is not None:
             Palace_material = {}
+            Palace_material['Attributes'] = [grouptag]
+            Palace_material['Permittivity'] = material.eps
+
             metal = metals_list.getbylayername(layername)
-            if metal is not None:
-                stackup_material = materials_list.get_by_name(metal.material)
-                if stackup_material is not None:
-                    Palace_material['Attributes']=[phys_group]
-                    Palace_material['Permittivity']=stackup_material.eps
-                    if metal.is_via:
-                        # anisotropic conductivity so that merged via array don't carry (much) xy current
-                        xy_sigma = stackup_material.sigma/10
-                        Palace_material['Conductivity']=[xy_sigma, xy_sigma, stackup_material.sigma]
-                    else:    
-                        Palace_material['Conductivity']=stackup_material.sigma
-
-                    Palace_materials.append(Palace_material)
-
-        # Elmer config
-        if len(new_tags) > 0:
-            Elmer_material = {}
-            metal = metals_list.getbylayername(layername)
-            if metal is not None:
-                stackup_material = materials_list.get_by_name(metal.material)
-                if stackup_material is not None:
-                    Elmer_material['name']=stackup_material.name
-                    Elmer_material['permittivity']=stackup_material.eps
-                    Elmer_material['conductivity']=stackup_material.sigma
-                    
-                    Elmer_materials.append(Elmer_material)
-                    material_index = len(Elmer_materials)
-
-                    #physical group name was already set above, use that value
-                    Elmerbody = {}
-                    Elmerbody['name']=layername
-                    Elmerbody['material']=material_index
-                    Elmer_bodies.append(Elmerbody)
-
-
-    kernel.synchronize()
-
-    for dielectricname in dielectric_tags_created_3D.keys():
-        print('Dielectric = ', dielectricname)
-        volumes_of_layer = dielectric_tags_created_3D[dielectricname]
-        new_tags = get_tag_after_fragment (volumes_of_layer, geom_dimtags, geom_map, dimension=3)
-        max_index = len(volumes_of_layer)
-        phys_group = gmsh.model.addPhysicalGroup(3, new_tags[0:max_index], tag=-1)  
-        gmsh.model.setPhysicalName(3, phys_group, dielectricname)
-
-
-        # Palace config file
-        if len(new_tags) > 0:
-            Palace_material = {}
-            dielectric = dielectrics_list.get_by_name(dielectricname)
-            if dielectric is not None:
-                stackup_material = materials_list.get_by_name(dielectric.material)
-                if stackup_material is not None:
-                    Palace_material['Attributes']=[phys_group]
-                    Palace_material['Permittivity']=stackup_material.eps
-                    if stackup_material.sigma>0:
-                        Palace_material['Conductivity']=stackup_material.sigma  # for conducting silicon
-                    else:
-                        Palace_material['LossTan']=stackup_material.tand  # for regular substrate 
-                    Palace_materials.append(Palace_material)
+            if metal is not None:        
+                if metal.is_via:
+                    # anisotropic conductivity so that merged via array don't carry (much) xy current
+                    xy_sigma = material.sigma/10
+                    Palace_material['Conductivity']=[xy_sigma, xy_sigma, material.sigma]
+                else:    
+                    Palace_material['Conductivity']=material.sigma
             else:
-                # special case airbox
-                if dielectricname=='airbox':
-                    Palace_material['Attributes']=[phys_group]
-                    Palace_material['Permittivity']=1.0
-                    Palace_material['LossTan']=0.0
-                    Palace_materials.append(Palace_material)
+                # not a metal, but we also have conductivity in stackup substrate
+                Palace_material['Conductivity']=material.sigma
 
-
-
-        # Elmer config
-        if len(new_tags) > 0:
-            Elmer_material = {}
-            metal = metals_list.getbylayername(layername)
-            dielectric = dielectrics_list.get_by_name(dielectricname)
-            if dielectric is not None:
-                stackup_material = materials_list.get_by_name(dielectric.material)
-                if stackup_material is not None:
-                    Elmer_material['name']=stackup_material.name
-                    Elmer_material['permittivity']=stackup_material.eps
-                    Elmer_material['conductivity']=stackup_material.sigma
-                    
-                    Elmer_materials.append(Elmer_material)
-                    material_index = len(Elmer_materials)
-
-                    #physical group name was already set above, use that value
-                    Elmerbody = {}
-                    Elmerbody['name']=dielectricname
-                    Elmerbody['material']=material_index
-                    Elmer_bodies.append(Elmerbody)
+            Palace_materials.append(Palace_material)
+        else:    
+            # nothing found in XML stackup materials
+            if layername == 'airbox':
+                Palace_material = {}
+                Palace_material['Attributes'] = [grouptag]
+                Palace_material['Permittivity'] = 1.0
+                Palace_materials.append(Palace_material)
             else:
-                # special case airbox
-                if dielectricname=='airbox':
-                    Elmer_material['name']='airbox'
-                    Elmer_material['permittivity']=1.0
-                    Elmer_material['conductivity']=0.0
-                    
-                    Elmer_materials.append(Elmer_material)
-                    material_index = len(Elmer_materials)
-
-                    #physical group name was already set above, use that value
-                    Elmerbody = {}
-                    Elmerbody['name']='airbox'
-                    Elmerbody['material']=material_index
-                    Elmer_bodies.append(Elmerbody)
-
-
-    kernel.synchronize()
+                # this should not happen!
+                print(f'No material found for this volume: {layername} {group_name}')
 
 
 
@@ -1215,239 +1461,106 @@ def create_model (excite_ports, settings):
     config_data['Domains'] = domains
 
 
-    # ---------------- SURFACES -----------------
+    # CONDUCTORS: iterate over physical_groups_2D 
 
-    # MESHING: Get list of boundary line tags of all metals, used to refine mesh along the edges
-    boundary_line_tags = []    
-
-    # PALACE CONFIG: config_data for surfaces in Palace config file
     boundaries = {}
     Palace_conductors = []
-    Palace_lumpedports = []
     Palace_impedances = []
 
+    for item in physical_groups_2D:
+        # items can be from surface of metal conductor
+        internal_layername, groupname, grouptag = item.values()
+        is_vertical = '_z' in internal_layername
 
+        # strip suffix _xy and _z 
+        layername = internal_layername.replace('_xy','')
+        layername = layername.replace('_z','')
 
-    # 2D surfaces from shell of hollow conductors (top, bottom and side walls)
-    # one physical group per polygon (shared by all polygon surfaces)
-    for layername in metal_perpolytags_2D.keys():
-        if len(metal_perpolytags_2D[layername]) > 0:
-            # surfaces used for planar metal 
+        material = get_material_from_layer_or_dielectric_name(layername)
 
-            # gmsh
-            all_phys_surfacetags_for_layer_xy = []
-            all_phys_surfacetags_for_layer_z = []
-
-            i = 0
-            for polysurface in metal_perpolytags_2D[layername]:
-                if len(polysurface)>0:
-                    i = i+1
-
-                    new_tags = get_tag_after_fragment (polysurface[0], geom_dimtags, geom_map, dimension=2)
-
-                    # new_tags includes ALL surfaces of this one polygon
-                    # we now loop over all surfaces to check normal (get surface orientation)
-
-                    new_tags_planar = []
-                    new_tags_vertical = []
-                    
-                    for tag in new_tags:
-                        if is_vertical_surface(tag):
-                            new_tags_vertical.append(tag)
-                        else:
-                            new_tags_planar.append(tag)     
-
-                    # xy in-plane
-                    phys_group_xy = gmsh.model.addPhysicalGroup(2, new_tags_planar, tag=-1)
-                    gmsh.model.setPhysicalName(2, phys_group_xy, layername + '_' + str(i) +'_xy')
-                    all_phys_surfacetags_for_layer_xy.append(phys_group_xy)
-
-                    # vertical
-                    phys_group_z = gmsh.model.addPhysicalGroup(2, new_tags_vertical, tag=-1)
-                    gmsh.model.setPhysicalName(2, phys_group_z, layername + '_' + str(i) + '_z')
-                    all_phys_surfacetags_for_layer_z.append(phys_group_z)
-
-
-            # Palace config file
-
-            if len(all_phys_surfacetags_for_layer_xy) > 0:
-                Palace_conductor = {}
-                metal = metals_list.getbylayername(layername)
-                if metal is not None:
-                    stackup_material = materials_list.get_by_name(metal.material)
-                    # check that use of conductor or sheet matches material definition
-                    if stackup_material.type == "CONDUCTOR" and metal.is_sheet:
-                        print('Invalid material assignment: sheet layer ', metal.name, ' must use a resistor material!')
-                        exit(1)
-
-                    if stackup_material.type == "RESISTOR" and not metal.is_sheet:
-                        print('Invalid material assignment: resistor material mapping only valid for sheet layers, not for ', metal.name)
-                        exit(1)
-
-
-                    if stackup_material is not None:
-                        Palace_conductor['Attributes']=all_phys_surfacetags_for_layer_xy
-                        Palace_conductor['Conductivity']=stackup_material.sigma
-                        Palace_conductor['Thickness']=metal.thickness
-                        Palace_conductors.append(Palace_conductor)
-
-            if len(all_phys_surfacetags_for_layer_z) > 0:
-                Palace_conductor = {}
-                metal = metals_list.getbylayername(layername)
-                if metal is not None:
-                    stackup_material = materials_list.get_by_name(metal.material)
-                    if stackup_material is not None:
-                        Palace_conductor['Attributes']=all_phys_surfacetags_for_layer_z
-                        Palace_conductor['Conductivity']=stackup_material.sigma
-                        Palace_conductor['Thickness']=metal.thickness * z_thickness_factor
-                        Palace_conductors.append(Palace_conductor)
-
-            # Elmer config
-            # Present implementation with skin surface impedance does not care about thickness,
-            # so we can simplify things and treat xy and z surfaces the same for Palace
-            all_phys_surfacetags_for_layer = [] # combined xy and z
-            all_phys_surfacetags_for_layer.extend(all_phys_surfacetags_for_layer_xy)
-            all_phys_surfacetags_for_layer.extend(all_phys_surfacetags_for_layer_z)
-
-            if len(all_phys_surfacetags_for_layer)>0:
-                Elmer_boundary = {}
-                for tag in all_phys_surfacetags_for_layer:
-                    # get physical group name of surface
-                    Elmer_boundary = {}
-                    Elmer_boundary['name'] = gmsh.model.getPhysicalName(2,tag)
-                    Elmer_boundary['conductivity'] = stackup_material.sigma
-                    Elmer_boundary['thickness'] = metal.thickness * z_thickness_factor
-                    Elmer_boundaries.append(Elmer_boundary)
-
-
-
-            # Meshing: get all boundary lines of metals, store the tags for local refinement
-            for polysurface in metal_perpolytags_2D[layername]:
-                if len(polysurface)>0:
-                    new_tags = get_tag_after_fragment (polysurface[0], geom_dimtags, geom_map, dimension=2)
-
-                    for tag in new_tags:
-                        clt, ct = kernel.getCurveLoops(tag)
-                        for curvetag in ct:
-                            boundary_line_tags.extend(curvetag)             
-
-
-    kernel.synchronize()
-
-    
-    # 2D surfaces from lumped port
-    # One physical group for each port
-    port_surface_tags = []  # flat list of all port surfaces
-    for porttag in port_tags_created_2D.keys():
-
-        # gmsh
-        port_surface = port_tags_created_2D[porttag]
-        new_tag = get_tag_after_fragment (port_surface, geom_dimtags, geom_map, dimension=2)
-        phys_group = gmsh.model.addPhysicalGroup(2, new_tag, tag=-1)
-        gmsh.model.setPhysicalName(2, phys_group, porttag)
-        port_surface_tags.extend(new_tag)
-
-        # add ports to boundary for fine meshing also 
-        for tag in new_tag:
-            clt, ct = kernel.getCurveLoops(tag)
-            for curvetag in ct:
-                boundary_line_tags.extend(curvetag)     
-
-        # Palace config file
-        if len(new_tag) > 0:
-            Palace_lumpedport = {}
-            portnum = int(porttag.replace('P',''))
-            port = simulation_ports.get_port_by_number(portnum)
-
-            # find in which excitation group the port is, defaults to boolean false
-            excite_group = False
-            for idx, group in enumerate(excite_ports):
-                if portnum in group:
-                    excite_group = portnum
-
-            Palace_lumpedport['Index'] = portnum
-            Palace_lumpedport['R'] = port.port_Z0
-            Palace_lumpedport['Direction'] = port.direction.upper()
-            Palace_lumpedport['Excitation'] = excite_group
-            Palace_lumpedport['Attributes']=[phys_group]
-            Palace_lumpedports.append(Palace_lumpedport)
-
-
-            # Elmer config
-            Elmer_port_boundary = {}
-            Elmer_port_boundary['name'] = porttag
-            Elmer_port_boundary['portnum'] = portnum
-            Elmer_port_boundary['Z0'] = port.port_Z0
+        if material is not None:
            
-            # convert direction to number for Elmer
-            if 'X' in port.direction.upper():
-                direction = 1
-            elif 'Y' in port.direction.upper():
-                direction = 2
-            else:
-                direction = 3
-            # polarity
-            if '-' in port.direction:
-                direction = - direction
-            Elmer_port_boundary['direction'] = direction
-            Elmer_ports.append(Elmer_port_boundary)
-
-
-
-    # 2D surfaces from 2D thin sheets in metals section 
-    # One physical group for each sheet (resistor) polygon
-    all_sheet_surface_tags = [] # global list across all sheet layer surfaces
-    for layername in sheet_tags_created_2D.keys():
-        sheet_surface_tags_for_layer = []  # list for this layer only
-        sheettag_list = sheet_tags_created_2D[layername]
-        if len(sheettag_list) > 0:
-            i = 0
-            for surface in sheettag_list:
-                i = i +1
-                surfacetag = surface[1]
-                new_tags = get_tag_after_fragment (surfacetag, geom_dimtags, geom_map, dimension=2)
-
-                # add sheet tags for boundary meshing also
-                for tag in new_tags:
-                    clt, ct = kernel.getCurveLoops(tag)
-                    for curvetag in ct:
-                        boundary_line_tags.extend(curvetag)     
-
-                phys_group = gmsh.model.addPhysicalGroup(2, new_tags, tag=-1)
-                gmsh.model.setPhysicalName(2, phys_group, layername + '_' + str(i))
-                sheet_surface_tags_for_layer.append(phys_group)
-
-            all_sheet_surface_tags.extend(sheet_surface_tags_for_layer)
-
-        # Palace config file
-
-        if len(sheet_surface_tags_for_layer) > 0:
-            Palace_impedance = {}
+            # we also need to check metal definition
             metal = metals_list.getbylayername(layername)
-            if metal is not None:
-                stackup_material = materials_list.get_by_name(metal.material)
-                if stackup_material is not None:
-                    Palace_impedance['Attributes']=sheet_surface_tags_for_layer
-                    Palace_impedance['Rs']=stackup_material.Rs
+            if metal is not None:   
+
+                # check that use of conductor or sheet matches material definition
+                if material.type == "CONDUCTOR" and metal.is_sheet:
+                    print('Invalid material assignment: sheet layer ', metal.name, ' must use a resistor material!')
+                    exit(1)
+
+                if material.type == "RESISTOR" and not metal.is_sheet:
+                    print('Invalid material assignment: resistor material mapping only valid for sheet layers, not for ', metal.name)
+                    exit(1)
+
+                if metal.is_metal:
+                    # regular metal
+                    Palace_conductor = {}
+                    Palace_conductor['Attributes'] = [grouptag]
+
+                    # regular conductor
+                    Palace_conductor['Conductivity'] = material.sigma
+                    # for regular metal, we apply an optional thickness factor to the vertical sheets
+                    if is_vertical:
+                        Palace_conductor['Thickness'] = metal.thickness * z_thickness_factor
+                    else:
+                        Palace_conductor['Thickness'] = metal.thickness 
+                    Palace_conductors.append(Palace_conductor)
+
+                elif metal.is_sheet:
+                    # sheet metal for resistors etc
+                    Palace_impedance = {}
+                    Palace_impedance['Attributes'] = [grouptag]
+                    Palace_impedance['Rs'] = material.Rs
                     Palace_impedances.append(Palace_impedance) # append to global list
+                else:
+                    # we should never get here
+                    print(f'Invalid surface found, layer {metal}, physical group {grouptag}')
+        else:    
+            # this should not happen!
+            print(f'No material found for this conductor: {layername} {group_name}')
 
 
 
-    kernel.synchronize()
+    boundaries['Conductivity']= Palace_conductors
+    config_data['Boundaries'] = boundaries
+
+
+    # PORTS
+    Palace_lumpedports = []
+
+    for item in physical_groups_ports:
+        layername, portname, grouptag = item.values()
+
+        Palace_lumpedport = {}
+        portnum = int(portname.replace('P',''))
+        port = simulation_ports.get_port_by_number(portnum)
+
+        # find in which excitation group the port is, defaults to boolean false
+        excite_group = False
+        for idx, group in enumerate(excite_ports):
+            if portnum in group:
+                excite_group = portnum
+
+        Palace_lumpedport['Index'] = portnum
+        Palace_lumpedport['R'] = port.port_Z0
+        Palace_lumpedport['Direction'] = port.direction.upper()
+        Palace_lumpedport['Excitation'] = excite_group
+        Palace_lumpedport['Attributes']=[grouptag]
+        Palace_lumpedports.append(Palace_lumpedport)
+
+    boundaries['LumpedPort'] = Palace_lumpedports
+
+
+    # AIRBOX
 
     # get surface tags of airbox 
-    airbox_volume_tag = dielectric_tags_created_3D['airbox'] 
-    airbox_volume_tag = get_tag_after_fragment (airbox_volume_tag, geom_dimtags, geom_map, dimension=3)
-    airbox_volume_tag = airbox_volume_tag[0]
-
-    _, simulation_boundary = kernel.getSurfaceLoops(airbox_volume_tag)
-    simulation_boundary = next(iter(simulation_boundary))
+    simulation_boundary = airbox_surface_taglist[0]  # assume we have air margin all around
 
     PEC_boundaries = []
     PML_boundaries = []
     PMC_boundaries = []
-    # re-order boundary condition after fragmenting
-
+ 
     if len(simulation_boundary)==6:
         bc = [boundary_condition[0],boundary_condition[2],boundary_condition[5],boundary_condition[3],boundary_condition[4],boundary_condition[1]]
         for idx, boundary in enumerate (simulation_boundary):
@@ -1501,16 +1614,9 @@ def create_model (excite_ports, settings):
         boundaries['PMC']   = Palace_PMC_boundaries
 
 
-    config_data['Boundaries'] = boundaries
+    config_data['Boundaries'] = boundaries    
 
 
-    # write JSON with port information to Palace outputmodel directory
-    port_information_file = os.path.join(sim_path, 'port_information' + config_suffix + '.json')
-    with open(port_information_file, 'w', encoding='utf-8') as f:
-        json.dump(all_port_information_struct, f, ensure_ascii=False, indent=4)
-    f.close()
-
-    
     # write Palace JSON simulation config file now, so that we can verify it while geometry is open in gmsh GUI
     if not elmer: # create Palace when not Elmer solver requested
         with open(config_name, 'w', encoding='utf-8') as f:
@@ -1518,8 +1624,118 @@ def create_model (excite_ports, settings):
         f.close()
 
 
+
+    # ----------------  ELMER CONFIG  -----------------
+
     # Optional output for Elmer FEM solver
     if elmer:
+
+        # bodies
+
+        Elmer_materials = []
+        Elmer_bodies    = []
+
+        for item in physical_groups_3D:
+            # items can be from via layer or from dielectric stackup
+
+            layername, groupname, grouptag = item.values()
+            material = get_material_from_layer_or_dielectric_name(layername)
+
+            if (material is not None) or (layername == 'airbox'):
+                Elmer_material = {}
+
+                if layername == 'airbox':
+                    Elmer_material['name']='airbox'
+                    Elmer_material['permittivity']=1.0
+                    Elmer_material['conductivity']=0.0
+                else:
+                    Elmer_material['name']=material.name
+                    Elmer_material['permittivity']=material.eps
+                    Elmer_material['conductivity']=material.sigma
+                
+                if Elmer_material != {}:
+                    if Elmer_material not in Elmer_materials:
+                        Elmer_materials.append(Elmer_material)
+
+                    material_index = Elmer_materials.index(Elmer_material)
+                
+                    # volumes are identified by physical group name (=layername), which was already set above
+                    Elmerbody = {}
+                    Elmerbody['name']=layername
+                    Elmerbody['material']=material_index+1
+                    Elmer_bodies.append(Elmerbody)
+
+
+        # surfaces
+        Elmer_boundaries = []
+        for item in physical_groups_2D:
+            # items can be from surface of metal conductor
+            internal_layername, groupname, grouptag = item.values()
+            is_vertical = '_z' in internal_layername
+
+            # strip suffix _xy and _z 
+            layername = internal_layername.replace('_xy','')
+            layername = layername.replace('_z','')
+
+            material = get_material_from_layer_or_dielectric_name(layername)
+
+            if material is not None:
+            
+                # we also need to check metal definition
+                metal = metals_list.getbylayername(layername)
+                if metal is not None:   
+
+                    if metal.is_metal:
+                        # regular metal
+                        Elmer_boundary = {}
+                        Elmer_boundary['name'] = gmsh.model.getPhysicalName(2,grouptag)
+                        Elmer_boundary['conductivity'] = material.sigma
+                        if '_z' in internal_layername:                        
+                            Elmer_boundary['thickness'] = metal.thickness * z_thickness_factor
+                        else:    
+                            Elmer_boundary['thickness'] = metal.thickness 
+                        Elmer_boundaries.append(Elmer_boundary)
+
+                    elif metal.is_sheet:
+                        # sheet metal for resistors etc
+                        print('Sheet resistors not supported yet for Elmer model output!')
+                        exit(1)
+                    else:
+                        # we should never get here
+                        print(f'Invalid surface found, layer {metal}, physical group {grouptag}')
+            else:    
+                # this should not happen!
+                print(f'No material found for this conductor: {layername} {group_name}')
+
+
+
+
+        # PORTS
+        Elmer_ports = []
+        for item in physical_groups_ports:
+            layername, portname, grouptag = item.values()
+
+            portnum = int(portname.replace('P',''))           
+            Elmer_port_boundary = {}
+            Elmer_port_boundary['name'] = portname
+            Elmer_port_boundary['portnum'] = portnum
+            Elmer_port_boundary['Z0'] = port.port_Z0
+
+
+            # convert direction to number for Elmer
+            if 'X' in port.direction.upper():
+                direction = 1
+            elif 'Y' in port.direction.upper():
+                direction = 2
+            else:
+                direction = 3
+            # polarity
+            if '-' in port.direction:
+                direction = - direction
+            Elmer_port_boundary['direction'] = direction
+            Elmer_ports.append(Elmer_port_boundary)
+
+
 
         # write simulation frequencies for Elmer
         elmer_freq_file = os.path.join(sim_path, 'frequencies.dat')
@@ -1553,158 +1769,211 @@ def create_model (excite_ports, settings):
         # write_case_and_solver_files (targetdir, order, iterative) 
         util_elmer.write_case_and_solver_files (sim_path, order, iterative, ELMER_MPI_THREADS=ELMER_MPI_THREADS)
 
+
+
     
     if save_gmsh_geometry:
         # write "raw" geometry with no mesh, so that we can open in gmsh
         gmsh.write(geo_name)
 
 
-    # -------------- MESH ------------------
+    # -------------- MESH REFINEMENT ------------------
+    if True:
 
-    # MESH IN SILICON
-    # 
-    # We want to add some higher mesh density at the upper end of silicon
-    # To do so, we need to get the z position of the topmost semiconductor
+        # OPTIONAL: MESH IN SILICON
+        # 
+        # We can add some higher mesh density at the upper end of silicon
+        # To do so, we need to get the z position of the topmost semiconductor
 
-    z_semi = -math.inf  # maximum z position for semiconductors in stackup, default at minus infinity
+        z_semi = -math.inf  # maximum z position for semiconductors in stackup, default at minus infinity
 
-    # dielectrics from stackup
-    for dielectric in dielectrics_list.dielectrics:
-        # get CSX material object for this dielectric layers material name
-        materialname = dielectric.material
-        material = materials_list.get_by_name(materialname)
+        # dielectrics from stackup
+        for dielectric in dielectrics_list.dielectrics:
+            # get CSX material object for this dielectric layers material name
+            materialname = dielectric.material
+            material = materials_list.get_by_name(materialname)
+            
+            if material.sigma > 0:
+                z_semi = max(z_semi, dielectric.zmax)
+
+
+
+        # REFINE MESH AT CONDUCTORS (SURFACES)
+
+        def refine_along_boundary (boundary_line_tags, refined_cellsize_value, i):
+            """Create mesh field for given boundary line tags, with specified cellsize value, place extra vertices and save mesh field 
+
+
+            Args:
+                boundary_line_tags (list of int): line tags where to place refined cellsize
+                refined_cellsize_value (float): refined cellsize in micron
+                i (int): index of mesh size field for gmsh (couting upwards, returns the next index)
+
+            Returns:
+                int: next index
+            """
+            # resample along boundaries, i.e. place points along the boundaries
+            gmsh.model.mesh.field.add("Distance", i)
+            gmsh.model.mesh.field.setNumbers(i, "CurvesList", boundary_line_tags) 
+            gmsh.model.mesh.field.setNumber(i, "Sampling", 200)
+
+            i = i + 1
+            # We then define a `Threshold' field, which uses the return value of the
+            # `Distance' field 1 in order to define a simple change in element size
+            # depending on the computed distances
+            #
+            # SizeMax -                     /------------------
+            #                              /
+            #                             /
+            #                            /
+            # SizeMin -o----------------/
+            #          |                |    |
+            #        Point         DistMin  DistMax
+            gmsh.model.mesh.field.add("Threshold", i)
+            gmsh.model.mesh.field.setNumber(i, "InField", i-1)  # number of this field definition
+            gmsh.model.mesh.field.setNumber(i, "SizeMin", refined_cellsize_value)
+            gmsh.model.mesh.field.setNumber(i, "SizeMax", max_cellsize_air)
+            gmsh.model.mesh.field.setNumber(i, "DistMin", 0)
+            gmsh.model.mesh.field.setNumber(i, "DistMax", max_cellsize_air)
+
+            fields_list.append(i)
+            i = i + 1
+            return i
+
+
+        # We create multiple fields and then tell gmsh to use the minimum value of all
+        fields_list = []  # global edge refinement
+        override_dict = {}  # used to store fields for edge refinement override, key is refined cellsize (micron), value is list of boundary linetags 
+
+        # iterate over all entries and choose between global refined_cellsize and per-layer value
+        boundary_line_tags_using_refined_cellsize = []   
+
+        for key in boundary_line_tags_dict.keys():  # boundary_line_tags_dict is organized by layername, value is list of dimtags
+            # key is layername
+            if key in refined_cellsize_override_dict.keys():
+                # this layer uses special override refinement
+                refined_cellsize_value = refined_cellsize_override_dict[key]
+                tags = boundary_line_tags_dict[key]
+                
+                # create if entry does not exits, otherwise add to list
+                if refined_cellsize_value not in override_dict.keys():
+                    override_dict[refined_cellsize_value]=tags
+                else:    
+                    override_dict[refined_cellsize_value].extend(tags)
+            else:
+                # this layer uses default refined_cellsize value
+                boundary_line_tags_using_refined_cellsize.extend(boundary_line_tags_dict[key])
+
+
+        # apply default refined_cellsize for all layers that have no override
+        i=1
+        i = refine_along_boundary (boundary_line_tags_using_refined_cellsize, refined_cellsize, i) # return next value of i
+
+        # apply other value if layername and value was provided in override_dict
+        for key in override_dict.keys():
+            refined_cellsize_value=key
+            tags = override_dict[key]
+            i = refine_along_boundary (tags, refined_cellsize_value, i)            
+
+    
+        # Optional refinement of mesh at the upper end of the semiconductor
+
+        if z_semi>0 and substrate_refinement:
+            # xy dimensions of dielectric boxes from stackup
+            x1 = allpolygons.get_xmin() 
+            y1 = allpolygons.get_ymin()
+            x2 = allpolygons.get_xmax()
+            y2 = allpolygons.get_ymax()
+
+            refine_layer_thickness = max(30*refined_cellsize,z_semi/2)
+            refine_value = min(10*refined_cellsize, 20)
+
+            # semiconductor with eps_r = 11.9
+            max_cellsize_local = min(max_cellsize_air/math.sqrt(11.9), meshsize_max)
+
+            gmsh.model.mesh.field.add("Box", i)
+            gmsh.model.mesh.field.setNumber(i, "VIn",  refine_value)
+            gmsh.model.mesh.field.setNumber(i, "VOut", max_cellsize_local)
+            gmsh.model.mesh.field.setNumber(i, "XMin", x1)
+            gmsh.model.mesh.field.setNumber(i, "XMax", x2)
+            gmsh.model.mesh.field.setNumber(i, "YMin", y1)
+            gmsh.model.mesh.field.setNumber(i, "YMax", y2)
+            gmsh.model.mesh.field.setNumber(i, "ZMin", z_semi-refine_layer_thickness)
+            gmsh.model.mesh.field.setNumber(i, "ZMax", z_semi)
+
+            fields_list.append(i)
+            i = i + 1
+
+
+        # Iterate over dielectric and set max_cellsize in medium according to permittivity
+        for dielectric in dielectrics_list.dielectrics:
+            # get CSX material object for this dielectric layers material name
+            materialname = dielectric.material
+            material = materials_list.get_by_name(materialname)
+            permittivity = material.eps
+
+            max_cellsize_local = min(max_cellsize_air/math.sqrt(permittivity), meshsize_max)
+            print('Dielectric ',materialname, ' with max_cellsize_local = ', max_cellsize_local, 'units' )
+
+            if dielectric.gdsboundary is None:
+                # size of dielectric is global size, no boundary defined for this layer
+                x1 = allpolygons.get_xmin() - margin
+                y1 = allpolygons.get_ymin() - margin
+                x2 = allpolygons.get_xmax() + margin
+                y2 = allpolygons.get_ymax() + margin
+            else:
+                # size of dielectric is defined for this layer by polygon from gds
+                bound_layernum = int(dielectric.gdsboundary) 
+                bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.bounding_box.get_layer_bounding_box(bound_layernum)
         
-        if material.sigma > 0:
-            z_semi = max(z_semi, dielectric.zmax)
+                x1 = bbox_xmin - margin
+                y1 = bbox_ymin - margin
+                x2 = bbox_xmax + margin
+                y2 = bbox_ymax + margin
 
+            # add local mesh size according to permittivity
+            gmsh.model.mesh.field.add("Box", i)
+            gmsh.model.mesh.field.setNumber(i, "VIn",  max_cellsize_local) # inside
+            gmsh.model.mesh.field.setNumber(i, "VOut", max_cellsize_air) # outside
+            gmsh.model.mesh.field.setNumber(i, "XMin", x1)
+            gmsh.model.mesh.field.setNumber(i, "XMax", x2)
+            gmsh.model.mesh.field.setNumber(i, "YMin", y1)
+            gmsh.model.mesh.field.setNumber(i, "YMax", y2)
+            gmsh.model.mesh.field.setNumber(i, "ZMin", dielectric.zmin)
+            gmsh.model.mesh.field.setNumber(i, "ZMax", dielectric.zmax)
 
-    # MESH AT CONDUCTORS (SURFACES)
-    # 
-    # Say we would like to obtain mesh elements with size lc/30 near curve 2 and
-    # point 5, and size lc elsewhere. To achieve this, we can use two fields:
-    # "Distance", and "Threshold". We first define a Distance field (`Field[1]') on
-    # points 5 and on curve 2. This field returns the distance to point 5 and to
-    # (100 equidistant points on) curve 2.
-    gmsh.model.mesh.field.add("Distance", 1)
-    gmsh.model.mesh.field.setNumbers(1, "CurvesList", boundary_line_tags) 
-    gmsh.model.mesh.field.setNumber(1, "Sampling", 200)
+            fields_list.append(i)
+            i = i + 1
 
-    fields_list = []
-
-    # We then define a `Threshold' field, which uses the return value of the
-    # `Distance' field 1 in order to define a simple change in element size
-    # depending on the computed distances
-    #
-    # SizeMax -                     /------------------
-    #                              /
-    #                             /
-    #                            /
-    # SizeMin -o----------------/
-    #          |                |    |
-    #        Point         DistMin  DistMax
-    gmsh.model.mesh.field.add("Threshold", 2)
-    gmsh.model.mesh.field.setNumber(2, "InField", 1)  # number of this field definition
-    gmsh.model.mesh.field.setNumber(2, "SizeMin", refined_cellsize)
-    gmsh.model.mesh.field.setNumber(2, "SizeMax", max_cellsize_air)
-    gmsh.model.mesh.field.setNumber(2, "DistMin", 0)
-    gmsh.model.mesh.field.setNumber(2, "DistMax", max_cellsize_air)
-
-    fields_list.append(2)
-
-   
-    # Optional refinement of mesh at the upper end of the semiconductor
-
-    if z_semi>0 and substrate_refinement:
-        # xy dimensions of dielectric boxes from stackup
-        x1 = allpolygons.get_xmin() 
-        y1 = allpolygons.get_ymin()
-        x2 = allpolygons.get_xmax()
-        y2 = allpolygons.get_ymax()
-
-        refine_layer_thickness = max(30*refined_cellsize,z_semi/2)
-        refine_value = min(10*refined_cellsize, 20)
-
-        # semiconductor with eps_r = 11.9
-        max_cellsize_local = min(max_cellsize_air/math.sqrt(11.9), meshsize_max)
-
-        gmsh.model.mesh.field.add("Box", 6)
-        gmsh.model.mesh.field.setNumber(6, "VIn",  refine_value)
-        gmsh.model.mesh.field.setNumber(6, "VOut", max_cellsize_local)
-        gmsh.model.mesh.field.setNumber(6, "XMin", x1)
-        gmsh.model.mesh.field.setNumber(6, "XMax", x2)
-        gmsh.model.mesh.field.setNumber(6, "YMin", y1)
-        gmsh.model.mesh.field.setNumber(6, "YMax", y2)
-        gmsh.model.mesh.field.setNumber(6, "ZMin", z_semi-refine_layer_thickness)
-        gmsh.model.mesh.field.setNumber(6, "ZMax", z_semi)
-
-        fields_list.append(6)
-
-
-    # Iterate over dielectric and set max_cellsize in medium according to permittivity
-    i = 10
-    for dielectric in dielectrics_list.dielectrics:
-        # get CSX material object for this dielectric layers material name
-        materialname = dielectric.material
-        material = materials_list.get_by_name(materialname)
-        permittivity = material.eps
-
-        max_cellsize_local = min(max_cellsize_air/math.sqrt(permittivity), meshsize_max)
-        print('Dielectric ',materialname, ' with max_cellsize_local = ', max_cellsize_local, 'units' )
-
-        if dielectric.gdsboundary is None:
-            # size of dielectric is global size, no boundary defined for this layer
-            x1 = allpolygons.get_xmin() - margin
-            y1 = allpolygons.get_ymin() - margin
-            x2 = allpolygons.get_xmax() + margin
-            y2 = allpolygons.get_ymax() + margin
-        else:
-            # size of dielectric is defined for this layer by polygon from gds
-            bound_layernum = int(dielectric.gdsboundary) 
-            bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.bounding_box.get_layer_bounding_box(bound_layernum)
-       
-            x1 = bbox_xmin - margin
-            y1 = bbox_ymin - margin
-            x2 = bbox_xmax + margin
-            y2 = bbox_ymax + margin
-
-        # add local mesh size according to permittivity
+        # Set maximum cellsize for surrounding airbox also
+        xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(-1, -1) 
+        max_cellsize_local = min(max_cellsize_air, 2*meshsize_max)   # factor 2 compared to meshsize_max
         gmsh.model.mesh.field.add("Box", i)
         gmsh.model.mesh.field.setNumber(i, "VIn",  max_cellsize_local) # inside
         gmsh.model.mesh.field.setNumber(i, "VOut", max_cellsize_air) # outside
-        gmsh.model.mesh.field.setNumber(i, "XMin", x1)
-        gmsh.model.mesh.field.setNumber(i, "XMax", x2)
-        gmsh.model.mesh.field.setNumber(i, "YMin", y1)
-        gmsh.model.mesh.field.setNumber(i, "YMax", y2)
-        gmsh.model.mesh.field.setNumber(i, "ZMin", dielectric.zmin)
-        gmsh.model.mesh.field.setNumber(i, "ZMax", dielectric.zmax)
+        gmsh.model.mesh.field.setNumber(i, "XMin", xmin)
+        gmsh.model.mesh.field.setNumber(i, "XMax", xmax)
+        gmsh.model.mesh.field.setNumber(i, "YMin", ymin)
+        gmsh.model.mesh.field.setNumber(i, "YMax", ymax)
+        gmsh.model.mesh.field.setNumber(i, "ZMin", zmin)
+        gmsh.model.mesh.field.setNumber(i, "ZMax", zmax)
 
         fields_list.append(i)
         i = i + 1
 
+        # Let's use the minimum of all the fields as the mesh size field:
+        gmsh.model.mesh.field.add("Min", i)
+        gmsh.model.mesh.field.setNumbers(i, "FieldsList", fields_list)
 
-    # Let's use the minimum of all the fields as the mesh size field:
-    gmsh.model.mesh.field.add("Min", i)
-    gmsh.model.mesh.field.setNumbers(i, "FieldsList", fields_list)
+        gmsh.model.mesh.field.setAsBackgroundMesh(i)
 
-    gmsh.model.mesh.field.setAsBackgroundMesh(i)
+        # When the element size is fully specified by a mesh size field, 
+        # it is thus often desirable to set
+        gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+        gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+        gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+        # This will prevent over-refinement due to small mesh sizes on the boundary.
 
-
-
-    # The API also allows to set a global mesh size callback, which is called each
-    # time the mesh size is queried
-    def meshSizeCallback(dim, tag, x, y, z, lc):
-        return min(max(lc/refined_cellsize, (lc/refined_cellsize)**1.5), max_cellsize)
-
-    # gmsh.model.mesh.setSizeCallback(meshSizeCallback)
-
-    # When the element size is fully specified by a mesh size field (as it is in
-    # this example), it is thus often desirable to set
-
-    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
-
-    # This will prevent over-refinement due to small mesh sizes on the boundary.
 
     # Finally, while the default "Frontal-Delaunay" 2D meshing algorithm
     # (Mesh.Algorithm = 6) usually leads to the highest quality meshes, the
@@ -1713,7 +1982,9 @@ def create_model (excite_ports, settings):
 
 
     gmsh.option.setNumber("Mesh.Algorithm", 5)
-
+    gmsh.option.setNumber("Mesh.Optimize", 1)
+    gmsh.option.setNumber("Mesh.Smoothing", 10)
+    
 
     # open gmsh GUI with unmeshed geometry, but all mesh settings already applied
     if not no_gui:
@@ -1761,38 +2032,9 @@ def create_model (excite_ports, settings):
     gmsh.clear()
     gmsh.finalize()
 
-    # Optional convert mesh to Elmer format
+    # Optional convert mesh file to Elmer format
     if elmer:
         util_elmer.convert_mesh_to_elmer (msh_name, ELMER_MPI_THREADS)
 
     return config_name, data_dir
-
-
-
-# Utility functions for hash file.
-# Not used by gds2palace yet
-
-def calculate_sha256_of_file(filename):
-    import hashlib
-    sha256_hash = hashlib.sha256()
-    with open(filename, 'rb') as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-
-    return sha256_hash.hexdigest()
-
-def write_hash_to_data_folder (excitation_path, hash_value):
-    filename = os.path.join(excitation_path, 'simulation_model.hash')
-    hashfile = open(filename, 'w')
-    hashfile.write(str(hash_value))
-    hashfile.close() 
-
-def get_hash_from_data_folder (excitation_path):
-    filename = os.path.join(excitation_path, 'simulation_model.hash')
-    hashvalue = ''
-    if os.path.isfile(filename):
-        hashfile = open(filename, "r")
-        hashvalue = hashfile.read()
-        hashfile.close()
-    return hashvalue
 
