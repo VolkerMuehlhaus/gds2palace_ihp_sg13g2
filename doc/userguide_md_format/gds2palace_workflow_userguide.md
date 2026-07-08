@@ -303,34 +303,34 @@ settings for meshing and simulation control are implemented as a Python dictiona
 
 These settings are always required:  
 
-**settings[''unit']:** Unit of values in mesh, typically 1E-6  
-**settings[''margin']:** Oversize of dielectrics from bounding box of drawing in xy plane  
-**settings[''fstart']:** Start frequency in Hz  
-**settings[''fstop']:** Stop frequency in Hz  
-**settings[''fstep']:** Frequency step in Hz for output, not all of them need to be EM simulated due to adaptive frequency sweep  
-**settings[''refined_cellsize']:** Target mesh size at polygon edges  
+**settings['unit']:** Unit of values in mesh, typically 1E-6  
+**settings['margin']:** Oversize of dielectrics from bounding box of drawing in xy plane  
+**settings['fstart']:** Start frequency in Hz  
+**settings['fstop']:** Stop frequency in Hz  
+**settings['fstep']:** Frequency step in Hz for output, not all of them need to be EM simulated due to adaptive frequency sweep  
+**settings['refined_cellsize']:** Target mesh size at polygon edges  
 
 There are additional **optional** settings to specify fixed discrete frequencies, which you can use in addition to fstart/fstop and fstep, or instead of fstart/fstop and fstep:  
 
-**settings[''fpoint']:** Discrete frequency/frequencies, values enclosed in [ ]. Example: **settings['"fpoint"]=[10e9, 15e9]  
-**settings[''fdump']:** Same as fpoint, but Palace is configured to write a field dump for Paraview at this frequency/these frequencies. Example: **settings['"fdump"]=[10e9]  
+**settings['fpoint']:** Discrete frequency/frequencies, values enclosed in [ ]. Example: settings['fpoint']=[10e9, 15e9]  
+**settings['fdump']:** Same as fpoint, but Palace is configured to write a field dump for Paraview at this frequency/these frequencies. Example: settings['fdump']=[10e9]  
 
 These other settings are optional:  
 
-**settings[''cells_per_wavelength']:** Calculated at highest frequency,value must be 10 or more, default is 10  
-**settings[''meshsize_max']:** Maximum mesh size limit, in addition to cells, default is 70  
-**settings['‘refined_cellsize_override’]:** Optional per-layer override of refined_cellsize, for example: **settings[''refined_cellsize_override']=[['Metal3',10],['Metal2',2]]  
-**settings[''boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  
-**settings[''air_around']:** Other spacing of air around dielectrics, default is same as margin  
-**settings[''order']:** Order of basis function for FEM solver (order 2 is more accurate,order 1 is only for quick & dirty results). Default is 2  
-**settings[''substrate_refinement']:** Extra mesh refinement into substrate, usually not required, default is False  
-**settings[''adaptive_sweep']:** Enable adaptive frequency sweep, default is True  
-**settings[''adaptive_mesh_iterations']:** Iterations for adaptive mesh refinement, often not required when using fine initial mesh, default is 0  
-**settings[''save_adaptive_mesh']:** Save mesh file from adaptive iteration for possible re-use, default is False  
-**settings[''save_gmsh_unrolled']:** Also save gmsh geometry file without meshing, for later inspection, default is False  
-**settings[''z_thickness_factor']:** Factor for metal thickness value on conductor side walls (see footnote), default is 1  
-**settings[''no_gui']:** Run script without showing gmsh user interface, useful for automated processing, default is False  
-**settings['no_preview']:**don't show unmeshed geometry, immediately show meshed model, default is False  
+**settings['cells_per_wavelength']:** Calculated at highest frequency,value must be 10 or more, default is 10  
+**settings['meshsize_max']:** Maximum mesh size limit, in addition to cells, default is 70  
+**settings['refined_cellsize_override']:** Optional per-layer override of refined_cellsize,example: settings['refined_cellsize_override']=[['Metal3',10],['Metal2',2]]  
+**settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  
+**settings['air_around']:** Other spacing of air around dielectrics, default is same as margin  
+**settings['order']:** Order of basis function for FEM solver (order 2 is more accurate,order 1 is only for quick & dirty results). Default is 2  
+**settings['substrate_refinement']:** Extra mesh refinement into substrate, usually not required, default is False  
+**settings['adaptive_sweep']:** Enable adaptive frequency sweep, default is True  
+**settings['adaptive_mesh_iterations']:** Iterations for adaptive mesh refinement, often not required when using fine initial mesh, default is 0  
+**settings['save_adaptive_mesh']:** Save mesh file from adaptive iteration for possible re-use, default is False  
+**settings['save_gmsh_unrolled']:** Also save gmsh geometry file without meshing, for later inspection, default is False  
+**settings['z_thickness_factor']:** Factor for metal thickness value on conductor side walls (see footnote), default is 1  
+**settings['no_gui']:** Run script without showing gmsh user interface, useful for automated processing, default is False  
+**settings['no_preview']:** don't show unmeshed geometry, immediately show meshed model, default is False  
 
 footnote on z_thickness_factor: See chapter on metal loss at low frequency, where skin depth is larger than metal thickness   
 
