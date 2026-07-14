@@ -1,9 +1,9 @@
 # Inductor synthesis for SG13G2 technology with IHP inductor2/3 shapes, EM simulated using gds2palace workflow
 
 # Changes:
-# 07-April-2026: New version with built-in geometry code, does not require external pclab library
-# This new version is not limited in number of turns
+# 07-April-2026: New version with built-in geometry code, does not require external pclab library. This new version is not limited in number of turns
 # 13-June-2026: Fixed bug in output name of final model 
+# 14-July-2026: Fixed bug with port 3 at center tap going to wrong layer (open circuit)
 
 # Specify the target frequency, target value and geometry limits in the parameters below.
 # Settings for gds2palace FEM simulation are defined in the script below.
@@ -12,7 +12,10 @@
 import os, math, sys, time, shutil
 import subprocess
 import gdspy
+
+# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'gds2palace')))
 from gds2palace import *
+
 import skrf as rf
 from matplotlib import pyplot as plt
 
@@ -32,12 +35,12 @@ Ltarget = 0.5e-9 # target inductance in H
 ftarget = 30e9  # design frequency in Hz
 faked_dc = 0.1e9  # do not change, this is the "DC-like" low frequency for data extraction
 
-w_range = [2.01,3,4,6,8,10,12,15] # sweep over these width values 
-s_range = [2.01,3,4,6]
-nturns_range = [2,3]
+w_range = [2.01, 3, 4, 6, 8, 10, 12, 15] # sweep over these width values 
+s_range = [2.01, 3, 4, 6]
+nturns_range = [2, 3]
 dout_max = 300 # maximum outer diameter in microns
 
-layout_with_centertap = False # layout with or without center tap
+layout_with_centertap = True # layout with or without center tap
 
 # TECHNOLOGY
 XML_filename = "SG13G2_200um.xml"   #  EM simulation stackup data       
@@ -713,7 +716,7 @@ def get_num_ports():
 
 
 
-def create_simulation_model (gds_filename, settings, geometry_name, port_layer_name, ground_layer_name, force2port):
+def create_simulation_model (gds_filename, settings, geometry_name, port_layer_name, ground_layer_name, centertap_layername, force2port):
     """Creates a Palace FEM simulation model from GDSII file using gds2palace
 
     Args:
@@ -743,13 +746,23 @@ def create_simulation_model (gds_filename, settings, geometry_name, port_layer_n
 
     for portnumber in range(1,portcount+1):
         port_source_layer = 200+portnumber # port 1 is layer 201
+        # center tap at port 3 has different to_layername
+        if portnumber==3: 
+            this_port_layer_name = centertap_layername
+            print('centertap_layername = ', centertap_layername)
+        else:
+            this_port_layer_name = port_layer_name  
+
+
         simulation_ports.add_port(simulation_setup.simulation_port(portnumber=portnumber, 
                                                                 voltage=1, 
                                                                 port_Z0=50, 
                                                                 source_layernum=port_source_layer, 
                                                                 from_layername=ground_layer_name,
-                                                                to_layername=port_layer_name, 
+                                                                to_layername=this_port_layer_name, 
                                                                 direction='z'))
+
+ 
 
     # ======================== read material stackup and geometry ================================
 
@@ -845,8 +858,9 @@ def create_gds_and_model (nturns, w, s, d_outer, layout_with_centertap, force2po
     else:    
         port_layer_name = metals_list.getbylayernumber(CROSSOVER_LAYER_NUM).name
     ground_layer_name = metals_list.getbylayernumber(FRAME_LAYER_NUM).name
+    centertap_layername = metals_list.getbylayernumber(SPIRAL_LAYER_NUM).name
 
-    config_name, data_dir = create_simulation_model (gds_filename, settings, geometry_name, port_layer_name, ground_layer_name, force2port)
+    config_name, data_dir = create_simulation_model (gds_filename, settings, geometry_name, port_layer_name, ground_layer_name, centertap_layername, force2port)
     return config_name, data_dir, geometry_name
 
 
