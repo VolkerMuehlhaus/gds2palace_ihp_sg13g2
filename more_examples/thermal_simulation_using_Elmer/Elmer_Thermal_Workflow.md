@@ -1,7 +1,7 @@
 # Elmer Thermal Simulation Workflow
 
 This describes how to go from a GDSII layout + stackup XML to a steady-state
-thermal (heat conduction) simulation solved by **Elmer FEM**, using
+thermal (heat conduction) simulation solved by [Elmer FEM](https://www.elmerfem.org/blog/), using
 gds2palace. It's a two-step process:
 
 1. **Build the model** — run a Python script that reads your layout and
