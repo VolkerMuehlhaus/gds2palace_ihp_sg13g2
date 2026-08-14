@@ -18,7 +18,7 @@
 
 # Extract objects from layers in GDSII file
 
-__version__ = "1.0.2"
+__version__ = "1.1.0"
 
 import gdspy
 import numpy as np
@@ -344,6 +344,123 @@ class all_polygons_list:
 
 
 
+def _store_layer_polygons (all_polygons, layerpolygons, target_layer):
+  """Convert raw gdspy polygon point arrays for one layer into gds_polygon objects,
+  append them to all_polygons and update its per-layer bounding box.
+
+  Args:
+      all_polygons (all_polygons_list): running result, updated in place
+      layerpolygons (list of ndarray): raw gdspy polygon point arrays for this layer
+      target_layer (int): layer number (offset already applied) to tag these polygons with
+  """
+
+  xmin=float('inf')
+  ymin=float('inf')
+  xmax=float('-inf')
+  ymax=float('-inf')
+
+  # Issue warning when very many polygons on layer
+  numpoly = len(layerpolygons)
+  if numpoly > 200:
+    print(f'Layer {target_layer} has {numpoly} polygons')
+    print(' ==> Consider via array merging by setting merge_polygon_size > 0')
+
+  # iterate over layer polygons
+  for polypoints in layerpolygons:
+
+    numvertices = int(polypoints.size/polypoints.ndim)
+
+    # new polygon, store layer number information
+    new_poly = gds_polygon(target_layer)
+
+    # get vertices
+    for vertex in range(numvertices):
+      x = polypoints[vertex,0]
+      y = polypoints[vertex,1]
+
+      new_poly.add_vertex(x,y)
+
+      # update bounding box information
+      xmin = min(x,xmin)
+      xmax = max(x,xmax)
+      ymin = min(y,ymin)
+      ymax = max(y,ymax)
+
+    # polygon is complete, process and add to list
+    all_polygons.append(new_poly)
+
+  # done with this layer, store bounding box for this layer
+  if numpoly > 0:
+    all_polygons.bounding_box.update(target_layer, xmin, xmax, ymin, ymax)
+
+
+def resolve_derived_layers (cell, derived_layers, layerlist, purposelist, layer_polygons_gds, layernumber_offset, all_polygons):
+  """Compute derived layers (boolean operations on other layers) and add requested ones to all_polygons.
+
+  Derived layers are processed in dependency order (a derived layer that uses another derived
+  layer as operand is computed after that operand). Operand layers that were not already
+  extracted as part of the requested layerlist are pulled from the GDSII cell on demand, so
+  operands do not need to be requested individually. If a derived layer has a non-zero
+  Oversize, the boolean result (or, with a single operand, that operand as-is) is grown
+  (positive) or shrunk (negative) by that distance before being cached/stored.
+
+  Args:
+      cell (gdspy.Cell): flattened top level cell being processed
+      derived_layers (derived_layers_list): derived layer definitions from util_stackup_reader
+      layerlist (list of int): layer numbers explicitly requested for output
+      purposelist (list of int): GDSII data types (purposes) to be processed
+      layer_polygons_gds (dict): {layer_num: list of ndarray} cache of raw gdspy polygons per
+          layer, already populated for natively-extracted layers, updated in place with results
+      layernumber_offset (int): offset applied to GDSII layer numbers, same as in read_gds
+      all_polygons (all_polygons_list): running result, updated in place for requested derived layers
+  """
+
+  # by_spec polygon lookup, used to pull operand layers that were not part of layerlist
+  LPPpolylist = cell.get_polygons(by_spec=True, depth=0)
+
+  def get_layer_polygons (layernum):
+    # already extracted (native layer from main loop, or previously computed derived layer)
+    if layernum in layer_polygons_gds:
+      return layer_polygons_gds[layernum]
+
+    # not yet extracted: treat as native GDSII layer and pull it on demand
+    layer_gds = layernum - layernumber_offset
+    found_polygons = []
+    for LPP in LPPpolylist:
+      layer = LPP[0]
+      purpose = LPP[1]
+      if (layer == layer_gds) and (purpose in purposelist):
+        found_polygons.extend(LPPpolylist[(layer, purpose)])
+
+    layer_polygons_gds[layernum] = found_polygons
+    return found_polygons
+
+  for derived in derived_layers.get_ordered():
+
+    target_layer = int(derived.layernum)
+    operation = 'not' if derived.operation == 'NOT' else derived.operation.lower()
+
+    operand_polygons = [get_layer_polygons(int(op)) for op in derived.operands]
+
+    # fold operands pairwise: (op1 <operation> op2) <operation> op3 ...
+    result = operand_polygons[0]
+    for next_operand in operand_polygons[1:]:
+      boolean_result = gdspy.boolean(result, next_operand, operation, max_points=199)
+      result = boolean_result.polygons if boolean_result is not None else []
+
+    # optionally grow (positive) or shrink (negative) the outline of the result
+    if derived.oversize != 0 and len(result) > 0:
+      offset_result = gdspy.offset(result, derived.oversize, join='miter', tolerance=2, precision=0.001, join_first=False, max_points=199)
+      result = offset_result.polygons
+
+    # cache result so later derived layers can use this derived layer as an operand
+    layer_polygons_gds[target_layer] = result
+
+    # only add to output if this derived layer was actually requested
+    if target_layer in layerlist:
+      _store_layer_polygons(all_polygons, result, target_layer)
+
+
 def merge_via_array (polygons, maxspacing):
   """Used internally in processing data from gdspy, does not work on our own all_polygons_list class!
 
@@ -372,7 +489,7 @@ def merge_via_array (polygons, maxspacing):
 
 # ----------- read GDSII file, return openEMS polygon list object -----------
 
-def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, merge_polygon_size=0, mirror=False, offset_x=0, offset_y=0, gds_boundary_layers=[], layernumber_offset=0, cellname=""):
+def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, merge_polygon_size=0, mirror=False, offset_x=0, offset_y=0, gds_boundary_layers=[], layernumber_offset=0, cellname="", derived_layers=None):
   """
   Read GDSII file and return polygon list object.
 
@@ -388,77 +505,25 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
       offset_y (float, optional): Geometry offset in y direction. Defaults to 0.
       gds_boundary_layers (list of int, optional): List of extra layers to evaluate for finite dielectric size. Defaults to [].
       layernumber_offset (int, optional): Optional offset applied to GDSII layer numbers to avoid duplicates when reading multiple files. Defaults to 0.
+      derived_layers (derived_layers_list, optional): Derived layer definitions (boolean operations on
+          other layers) from `util_stackup_reader`. Defaults to None, in which case metals_list.derived_layers
+          is used if present (set automatically by read_substrate() when the XML has a DerivedLayers section).
 
   Returns:
       all_polygons_list: All polygon information data.
   """
-  
+
+  if derived_layers is None:
+    derived_layers = getattr(metals_list, 'derived_layers', None)
+
   if os.path.isfile(filename):
     print('Reading GDSII input file:', filename)
   
     input_library = gdspy.GdsLibrary(infile=filename)
 
     if preprocess: 
-      print('Pre-processing GDSII to handle cutouts and self-intersecting polygons')
-      # iterate over cells
-      for cell in input_library:
-        
-        # iterate over polygons
-        for poly in cell.polygons:
-          
-          # points of this polygon
-          polypoints = poly.polygons[0]
-
-          poly_layer = poly.layers[0]
-          poly_purpose = poly.datatypes[0]
-
-          if ((poly_layer in layerlist) and (poly_purpose in purposelist)):
-          
-            # get number of vertices
-            numvertices = len(polypoints) 
-            
-            seen   = set()    # already seen vertex values
-            dupefound = False
-
-            # iterate over vertices to find duplicates
-            for i_vertex in range(numvertices):
-              
-              # print('polypoints  = ' + str(polypoints))
-              x = polypoints[i_vertex][0]
-              y = polypoints[i_vertex][1]
-              
-              # create string representation so that we can check for duplicates
-              vertex_string = str(x)+','+str(y)
-              if vertex_string in seen:
-                dupefound = True
-                # print('      found duplicate at vertex ' + str(i_vertex) + ': ' + vertex_string)
-              else:
-                seen.add(vertex_string)  
-
-            if dupefound:
-                          
-              # do the slicing
-              
-              # convert polygon to format required for slicing
-              basepoly_points = []
-
-              for i_vertex in range(numvertices):
-                basepoly_points.append((polypoints[i_vertex,0], polypoints[i_vertex,1]))
-
-              # create new polygon
-              basepoly = gdspy.Polygon(basepoly_points, layer=poly_layer, datatype=poly_purpose)  
-              fractured = basepoly.fracture(max_points=6)
-
-              # add fractured polygon to cell
-              cell.add(fractured)
-
-              # invalidate original polygon
-              poly.layers=[0]
-              # remove original polygon
-              cell.remove_polygons(lambda pts, layer, datatype:
-                layer == 0)
-    
-    # end preprocessing
+      # obsolete, cutouts are handles safely downstream after flattening
+      print('Ignoring obsolete pre-processing setting, no longer required')
 
     # evaluate only first top level cell
     toplevel_cell_list = input_library.top_level()
@@ -467,6 +532,9 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
     cell = input_library.cells.get(cellname, toplevel_cell_list[0])
     
     all_polygons = all_polygons_list()
+
+    # cache of raw gdspy polygon arrays per layer number (offset applied), used to compute derived layers
+    layer_polygons_gds = {}
 
     # flatten hierarchy below this cell
     cell.flatten(single_layer=None, single_datatype=None, single_texttype=None)
@@ -518,44 +586,14 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
               if (merge_polygon_size>0) and metal.is_via:
                 layerpolygons = merge_via_array (layerpolygons, merge_polygon_size)
 
-            # bounding box for this layer
-            xmin=float('inf')
-            ymin=float('inf')
-            xmax=float('-inf')
-            ymax=float('-inf')
+            # cache raw polygons for this layer, so derived layers can use it as an operand
+            layer_polygons_gds[layer + layernumber_offset] = layerpolygons
 
-            # Issue warning when very many polygons on layer
-            numpoly = len(layerpolygons)
-            if numpoly > 200:
-              print(f'Layer {layer_to_extract} has {numpoly} polygons')
-              print(' ==> Consider via array merging by setting merge_polygon_size > 0')
+            _store_layer_polygons(all_polygons, layerpolygons, layer + layernumber_offset)
 
-            # iterate over layer polygons
-            for polypoints in layerpolygons:
-
-              numvertices = int(polypoints.size/polypoints.ndim)
-
-              # new polygon, store layer number information
-              new_poly = gds_polygon(layer + layernumber_offset)
-
-              # get vertices
-              for vertex in range(numvertices):
-                x = polypoints[vertex,0]
-                y = polypoints[vertex,1]
-
-                new_poly.add_vertex(x,y)
-                
-                # update bounding box information
-                xmin = min(x,xmin)
-                xmax = max(x,xmax)
-                ymin = min(y,ymin)
-                ymax = max(y,ymax)
-              
-              # polygon is complete, process and add to list
-              all_polygons.append(new_poly)
-
-              # done with this layer, store bounding box for this layer    
-              all_polygons.bounding_box.update(layer + layernumber_offset, xmin, xmax, ymin, ymax)
+    # ----------- derived layers: boolean operations on other layers -----------
+    if derived_layers is not None and len(derived_layers.derived_layers) > 0:
+      resolve_derived_layers(cell, derived_layers, layerlist, purposelist, layer_polygons_gds, layernumber_offset, all_polygons)
 
     '''
     # Re-evaluate bounding box if we have a bounding box specified in GDS file and evaluation is requested

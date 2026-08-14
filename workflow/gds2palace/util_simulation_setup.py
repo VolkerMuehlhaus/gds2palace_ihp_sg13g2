@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.4.1"
+__version__ = "1.5.0"
 
 import os
 import sys
@@ -171,7 +171,112 @@ class all_simulation_ports:
             numbers.append([port.portnumber])
     return numbers
 
+# ------------------------------------------------------------------------------------
 
+class heatsource:
+  """
+    heat source object (volume in xy plane)
+  """
+  
+  def __init__ (self, power , source_layernum, target_layername=None):
+    """create new heat source
+
+    Args:
+        power (float): source power in Watt
+        source_layernum (int): layer number in layout with port shape
+        target_layername (string, optional): Target layer name for in-plane port. Defaults to None.
+    """
+    self.type = 'source'
+    self.power = power
+    self.source_layernum = source_layernum        # source for port geometry is a GDSII layer, just one port per layer
+    self.target_layername = target_layername        
+
+  def __str__ (self):
+    """Create string representation of heat source, useful for debugging
+    Returns:
+        string: string representation of heat source
+    """
+    mystr = f"Heatsource power = {self.power} W  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
+    return mystr
+
+
+class constanttemp:
+  """
+    constant temperature boundary (volume in xy plane)
+  """
+  
+  def __init__ (self, temp , source_layernum, target_layername=None):
+    """create new heat source
+
+    Args:
+        temp (float): constant temperature of boundary
+        source_layernum (int): layer number in layout with port shape
+        target_layername (string, optional): Target layer name for in-plane port. Defaults to None.
+    """
+    self.type = 'constanttemp'
+    self.temp = temp
+    self.source_layernum = source_layernum        # source for port geometry is a GDSII layer, just one port per layer
+    self.target_layername = target_layername      # target layer where we create the port, if specified we create in-plane port
+
+  def __str__ (self):
+    """Create string representation, useful for debugging
+    Returns:
+        string: string representation 
+    """
+    mystr = f"constant temperature boundary T= {self.temperature} K  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
+    return mystr
+
+
+  
+
+class all_thermal_objects:
+  """
+  all heat sources and constant temperature boundaries
+  """
+  
+  def __init__ (self):
+      """Initialize new data structure that holds all port data
+      """
+      self.objects = []
+      self.layers = []
+
+  def add_heatsource (self, heatsource):
+      """Add heatsource
+      Args:
+          heatsource instance to be added
+      """
+
+      self.objects.append(heatsource)
+      self.layers.append(heatsource.source_layernum)
+
+
+  def add_consttemp (self, constanttemp):
+      """Add heatsource
+      Args:
+          heatsource instance to be added
+      """
+
+      self.objects.append(constanttemp)
+      self.layers.append(constanttemp.source_layernum)
+
+
+
+  def get_object_by_layernumber (self, layernum):   
+      """Get thermal object from layer number. Numbers are unique, one port per layer, so we have 1:1 mapping
+      Args:
+          layernum (int): layer number in layout
+      Returns:
+          thermal object defined with that layer number
+      """
+      found = None
+      for object in self.objects:
+          if object.source_layernum == layernum:
+              found = object
+              break
+      return found       
+  
+
+# ------------------------------------------------------------------------------------
 
 def get_layer_volumes (metals_list, layername):
     """return all volume dimtags for a given  layer name, preselect by z position and z height, then check name of gmsh entity
@@ -232,56 +337,124 @@ def get_layer_sheets (metals_list, layername):
     return  sheets_on_layer_list
 
 
-def create_surface_from_polygon (poly, zposition, meshseed):
+def _polygon_signed_area (points):
+    """Signed area of a closed polygon (shoelace formula). Sign indicates winding
+    direction; loops that wind opposite to their enclosing loop are holes.
+    """
+    area = 0.0
+    n = len(points)
+    for i in range(n):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % n]
+        area += x1 * y2 - x2 * y1
+    return area / 2.0
 
-    """create surface from single polygon at the given z position
+
+def _split_selftouching_polygon (points, precision=6):
+    """Split a possibly self-touching "keyhole" polygon into simple loops.
+
+    A polygon boolean result that is not simply-connected (has holes, or consists of
+    several disjoint pieces) is commonly encoded as a single closed point sequence
+    that revisits an existing vertex, using a zero-width bridge to connect the
+    separate boundaries. This cuts the sequence apart at every revisited vertex,
+    recursively, until every resulting loop has no repeated points.
+
+    Args:
+        points (list of (float,float)): polygon vertices, implicitly closed
+        precision (int, optional): decimal digits used to compare vertex coordinates
 
     Returns:
-        dimtag of created surface
+        list of list of (float,float): simple loops, each with at least 3 points
     """
 
-    # add Polygon to gmsh using poly.pts
+    def split (pts):
+        seen = {}
+        for i, p in enumerate(pts):
+            key = (round(p[0], precision), round(p[1], precision))
+            if key in seen:
+                j = seen[key]
+                loop = pts[j:i]
+                remainder = pts[:j] + pts[i:]
+                result = []
+                if len(loop) >= 3:
+                    result.extend(split(loop))
+                if len(remainder) >= 3:
+                    result.extend(split(remainder))
+                return result
+            seen[key] = i
+        return [pts] if len(pts) >= 3 else []
+
+    return split(list(points))
+
+
+def _build_plane_surface (loop_points, zposition, meshseed):
+    """Build a single simple (non-self-touching) gmsh plane surface from a point loop.
+
+    Returns:
+        (int,int): dimtag (2, surfacetag) of the created surface
+    """
+    vertextaglist = [gmsh.model.occ.addPoint(x, y, zposition, meshseed, -1) for (x, y) in loop_points]
+
     linetaglist = []
-    vertextaglist = []
-    numvertices = len(poly.pts_x)
-
-    # store vertex info for debugging
-    debug_vertices = False
-    if debug_vertices: 
-        vertex_info = {}
-    
-    for v in range(numvertices):
-        # addPoint parameters: x (double), y (double), z (double), meshSize = 0. (double), tag = -1 (integer)
-        vertextag = gmsh.model.occ.addPoint(poly.pts_x[v], poly.pts_y[v], zposition, meshseed, -1)
-        vertextaglist.append(vertextag)
-        if debug_vertices: 
-            vertex_info[vertextag] = f"x={poly.pts_x[v]} y={poly.pts_y[v]}"
-
-    # after writing the vertices, we combine them to boundary lines
+    numvertices = len(vertextaglist)
     for v in range(numvertices):
         pt_start = vertextaglist[v]
-        if v==(numvertices-1):
-            pt_end = vertextaglist[0]
-        else:
-            pt_end = vertextaglist[v+1]
+        pt_end = vertextaglist[(v + 1) % numvertices]
+        linetaglist.append(gmsh.model.occ.addLine(pt_start, pt_end, -1))
 
-        # addLine parameters: startTag (integer), endTag (integer), tag = -1 (integer)
-        try:
-            linetag = gmsh.model.occ.addLine(pt_start, pt_end, -1)
-            linetaglist.append(linetag)
-        except:
-            if debug_vertices: 
-                print(f"skipping invalid line on layer {poly.layernum} ")
-                print("  pt_start: ", str(pt_start), " -> ", vertex_info[pt_start])
-                print("  pt_end: ", str(pt_end), " -> ", vertex_info[pt_end])
-
-
-    # after creating the lines, we can create a curve loop and a surface 
-    # to do so, we need the line segment numbers again
-    curvetag   = gmsh.model.occ.addCurveLoop(linetaglist, tag=-1)
+    curvetag = gmsh.model.occ.addCurveLoop(linetaglist, tag=-1)
     surfacetag = gmsh.model.occ.addPlaneSurface([curvetag], tag=-1)
+    return (2, surfacetag)
 
-    return surfacetag
+
+def create_surfaces_from_polygon (poly, zposition, meshseed):
+    """Create one or more gmsh plane surfaces from a polygon, at the given z position.
+
+    Handles self-touching "keyhole" polygons (see `_split_selftouching_polygon`): the
+    point sequence is split into
+    simple loops, loops are grouped by winding direction (holes wind opposite to the
+    boundary/boundaries that contain them, so whichever group has the larger total
+    area is the outer boundary), and any holes are cut out of the outer boundaries
+    with an OCC boolean. This also correctly handles a polygon record that is
+    actually several disjoint pieces bridged together, without a real hole: the
+    "hole" group is then empty and each piece just becomes its own surface.
+
+    Returns:
+        list of int: tags of the created surfaces (dim=2). Usually a single tag;
+        more than one only if the polygon consists of several disjoint pieces.
+    """
+
+    points = list(zip(poly.pts_x, poly.pts_y))
+    loops = _split_selftouching_polygon(points)
+
+    if len(loops) <= 1:
+        # common case: already a simple polygon, nothing to split
+        _, tag = _build_plane_surface(points, zposition, meshseed)
+        return [tag]
+
+    add_dimtags = []
+    subtract_dimtags = []
+    for loop_points in loops:
+        area = _polygon_signed_area(loop_points)
+        if abs(area) < 1e-9:
+            continue  # degenerate sliver introduced by the split, ignore
+        dimtag = _build_plane_surface(loop_points, zposition, meshseed)
+        (add_dimtags if area > 0 else subtract_dimtags).append((dimtag, area))
+
+    # whichever winding direction has the larger total area is the outer boundary
+    add_area = sum(abs(a) for _, a in add_dimtags)
+    subtract_area = sum(abs(a) for _, a in subtract_dimtags)
+    if subtract_area > add_area:
+        add_dimtags, subtract_dimtags = subtract_dimtags, add_dimtags
+
+    add_dimtags = [dimtag for dimtag, _ in add_dimtags]
+    subtract_dimtags = [dimtag for dimtag, _ in subtract_dimtags]
+
+    if not subtract_dimtags:
+        return [tag for (_, tag) in add_dimtags]
+
+    cut_result, _ = gmsh.model.occ.cut(add_dimtags, subtract_dimtags)
+    return [tag for (_, tag) in cut_result]
 
 
 def add_metal_volumes (allpolygons, metals_list, meshseed=0):
@@ -311,18 +484,22 @@ def add_metal_volumes (allpolygons, metals_list, meshseed=0):
             for metal_layer in all_assigned:  
                 layername = metal_layer.name
 
-                surfacetag = create_surface_from_polygon (poly, metal_layer.zmin, meshseed)
-                
+                # usually a single surface; more than one if the polygon is a self-touching
+                # "keyhole" shape (a hole, or several disjoint pieces bridged together)
+                surfacetags = create_surfaces_from_polygon (poly, metal_layer.zmin, meshseed)
+
                 if not (metal_layer.is_sheet):
                     if metal_layer.thickness > 0:
-                        out = gmsh.model.occ.extrude([(2,surfacetag)],0,0,metal_layer.thickness)
-                        tag = out[1][1]
-                        # set name of metal layer to extruded volume
-                        # we also use that to identify the volumes later
-                        gmsh.model.setEntityName(dim=3,tag=tag, name=layername)
+                        for surfacetag in surfacetags:
+                            out = gmsh.model.occ.extrude([(2,surfacetag)],0,0,metal_layer.thickness)
+                            tag = out[1][1]
+                            # set name of metal layer to extruded volume
+                            # we also use that to identify the volumes later
+                            gmsh.model.setEntityName(dim=3,tag=tag, name=layername)
                 else:
                     # sheet metal
-                    gmsh.model.setEntityName(dim=2,tag=surfacetag, name=layername)
+                    for surfacetag in surfacetags:
+                        gmsh.model.setEntityName(dim=2,tag=surfacetag, name=layername)
     
 
     # Try removing duplicates at this stage
@@ -412,7 +589,7 @@ def create_box_with_meshseed (xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
     return volumetag
 
 
-def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, refined_cellsize):
+def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, refined_cellsize, add_airbox=True):
     """
     Add dielectric layers (these extend through simulation area and have no polygons in GDSII)
     
@@ -523,41 +700,57 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
     _, geom_map = gmsh.model.occ.fragment(tool_tags, [])   
     gmsh.model.occ.synchronize()
 
-    # add surrounding air box
-    x1 = overall_xmin - air_xmin
-    y1 = overall_ymin - air_ymin
-    x2 = overall_xmax + air_xmax
-    y2 = overall_ymax + air_ymax
-    if len(dielectrics_list.dielectrics)>0:
-        # we have at least one dielectric
-        z1 = dielectrics_list.dielectrics[-1].zmin - air_zmin
-        z2 = dielectrics_list.dielectrics[0].zmax  + air_zmax
-    else:
-        # we have no dielectrics, get zmin/zmax from gds layers
-        z1 = math.inf
-        z2 = -math.inf
-        for gds_layer in gds_layers_list.metals:
-            z1 = min(z1, gds_layer.zmin)
-            z2 = max(z2, gds_layer.zmin)
-        z1 = z1 - air_zmin  
-        z2 = z2 + air_zmax
 
-        # we have no dielectrics, but we need to get get xy size of drawing
-        x1 = allpolygons.get_xmin() - air_xmin
-        y1 = allpolygons.get_ymin() - air_ymin
-        x2 = allpolygons.get_xmax() + air_xmax
-        y2 = allpolygons.get_ymax() + air_ymax
+    if add_airbox:
+        # add surrounding air box
+        x1 = overall_xmin - air_xmin
+        y1 = overall_ymin - air_ymin
+        x2 = overall_xmax + air_xmax
+        y2 = overall_ymax + air_ymax
 
-    box_tag = gmsh.model.occ.addBox(x1,y1,z1,x2-x1,y2-y1,z2-z1)
+        if len(dielectrics_list.dielectrics)>0:
+            # we have at least one dielectric
+            z1 = math.inf
+            z2 = -math.inf
+            for dielectric in dielectrics_list.dielectrics:
+                z1 = min(z1, dielectric.zmin)
+                z2 = max(z2, dielectric.zmax)
+            z1 = z1 - air_zmin
+            z2 = z2 + air_zmax
+        else:
+            # we have no dielectrics, get zmin/zmax from gds layers
+            z1 = math.inf
+            z2 = -math.inf
+            for gds_layer in gds_layers_list.metals:
+                z1 = min(z1, gds_layer.zmin)
+                z2 = max(z2, gds_layer.zmin)
+            z1 = z1 - air_zmin  
+            z2 = z2 + air_zmax
+
+            # we have no dielectrics, but we need to get get xy size of drawing
+            x1 = allpolygons.get_xmin() - air_xmin
+            y1 = allpolygons.get_ymin() - air_ymin
+            x2 = allpolygons.get_xmax() + air_xmax
+            y2 = allpolygons.get_ymax() + air_ymax
+
+        box_tag = gmsh.model.occ.addBox(x1,y1,z1,x2-x1,y2-y1,z2-z1)
+        
+        # apply a boolean difference to create the "airbox minus others" shape:
+        try:
+            out = gmsh.model.occ.cut([(3, box_tag)], tool_tags, -1, removeTool=False)
+            box_tag = out[0][0][1]
+            gmsh.model.setEntityName(dim=3,tag=box_tag, name= 'airbox')
+            gmsh.model.occ.synchronize()
+        except:
+            print('Error when processing dieelectrics to create surrounding airbox.')
+            print('  One reason can be overlapping dielectrics in XML stackup file, that is not allowed.')    
+            print('  However, it is possible to define inserted dielectric material in the layers section of the XML file,')
+            print('  which must then be drawn on the assigned GDSII layer. One example is localized backside etching, as shown below:')
+            print('  <Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="AIR" Layer="157"/>')
+            exit(51)
+
+        tags_created_3D['airbox'] = [box_tag]
     
-    # apply a boolean difference to create the "airbox minus others" shape:
-    out = gmsh.model.occ.cut([(3, box_tag)], tool_tags, -1, removeTool=False)
-    box_tag = out[0][0][1]
-    gmsh.model.setEntityName(dim=3,tag=box_tag, name= 'airbox')
-    gmsh.model.occ.synchronize()
-
-    tags_created_3D['airbox'] = [box_tag]
- 
     return tags_created_3D
 
 
@@ -709,6 +902,103 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
 
 
 
+def add_thermal_sources (allpolygons, metals_list, thermal_objects):
+    """Add thermal_objects from special port layers to gmsh
+
+    Args:
+        allpolygons (all_polygons_list): from gds reader
+        metals_list (metal_layers_list): from XML stackup reader
+        thermal_objects 
+
+    Returns:
+       list of thermal source dimtags
+    """
+
+    tags_created_3D = {}
+
+    # add geometries on metal and via layers
+    for poly in allpolygons.polygons:
+        # each poly knows its layer number
+        # get material name for poly, by using metal information from stackup
+        metal = metals_list.getbylayernumber (poly.layernum)
+        if metal is None: # this layer does not exist in XML stackup
+            # found a layer that is not defined in stackup from XML, check if used for ports
+            if poly.layernum in thermal_objects.layers:
+
+                # find source definition for this GDSII source layer number
+                object = thermal_objects.get_object_by_layernumber(poly.layernum)
+                if object is not None:
+                    if object.type == 'source':
+
+                        xmin = poly.xmin
+                        xmax = poly.xmax
+                        ymin = poly.ymin
+                        ymax = poly.ymax
+                        
+                        target_metal = metals_list.getbylayername(object.target_layername)
+                        zmin = target_metal.zmin
+                        zmax = target_metal.zmax 
+
+                        box_tag = gmsh.model.occ.addBox(xmin,ymin,zmin,xmax-xmin,ymax-ymin,zmax-zmin)
+                        gmsh.model.setEntityName(dim=3,tag=box_tag, name=f'source_{object.source_layernum}')
+                        tags_created_3D['source_'+str(object.source_layernum)]=box_tag
+
+    gmsh.model.occ.synchronize()
+
+    return tags_created_3D
+
+
+
+def add_thermal_boundaries (allpolygons, metals_list, thermal_objects):
+    """Add thermal_objects from special port layers to gmsh
+
+    Args:
+        allpolygons (all_polygons_list): from gds reader
+        metals_list (metal_layers_list): from XML stackup reader
+        thermal_objects 
+
+    Returns:
+       list of thermal boundary dimtags
+    """
+
+    tags_created_2D = {}
+
+    # add geometries on metal and via layers
+    for poly in allpolygons.polygons:
+        # each poly knows its layer number
+        # get material name for poly, by using metal information from stackup
+        metal = metals_list.getbylayernumber (poly.layernum)
+        if metal is None: # this layer does not exist in XML stackup
+            # found a layer that is not defined in stackup from XML, check if used for ports
+            if poly.layernum in thermal_objects.layers:
+
+                # find source definition for this GDSII source layer number
+                object = thermal_objects.get_object_by_layernumber(poly.layernum)
+                if object is not None:
+                    if object.type == 'constanttemp':
+
+                        surface_tags = []
+
+                        #get target layer, first match in list
+                        target_metal = metals_list.getbylayername (object.target_layername)
+                        for surfacetag_bot in create_surfaces_from_polygon (poly, target_metal.zmin, 0):
+                            gmsh.model.setEntityName(dim=2,tag=surfacetag_bot, name=f'constanttemp_{object.source_layernum}')
+                            surface_tags.append(surfacetag_bot)
+
+                        if target_metal.zmax != target_metal.zmin:
+                            for surfacetag_top in create_surfaces_from_polygon (poly, target_metal.zmax, 0):
+                                gmsh.model.setEntityName(dim=2,tag=surfacetag_top, name=f'constanttemp_{object.source_layernum}')
+                                surface_tags.append(surfacetag_top)
+
+                        tags_created_2D['source_'+str(object.source_layernum)]=surface_tags
+
+
+    gmsh.model.occ.synchronize()
+
+    return tags_created_2D
+
+
+
 
 ######### end of function createSimulation ()  ##########
 
@@ -728,6 +1018,27 @@ def create_elmer (excite_ports, settings):
     config_name, data_dir = create_model (excite_ports, settings)
     return config_name, data_dir
 
+
+def create_elmer_thermal (settings):
+    """Create output file for Elmer FEM thermal solver
+
+    Args:
+        settings (dict): simulation settings
+
+    Returns:
+        config_name(string), data_dir (string): create model files here
+    """
+    # configure for Elmer output
+    settings['elmer']=True
+    settings['elmer_thermal']=True
+
+    # dummy for meshing
+    settings['fstart']=1e9
+    settings['fstop']=1e9
+
+    # now we can run main function
+    config_name, data_dir = create_model ([], settings)
+    return config_name, data_dir
 
 
 def create_palace (excite_ports, settings):
@@ -840,7 +1151,8 @@ def create_model (excite_ports, settings):
     # optional iterative solver setting for Elmer
     iterative = get_optional_setting (settings, "iterative", False)
    
-    simulation_ports = settings['simulation_ports'] 
+    simulation_ports = get_optional_setting(settings, "simulation_ports",[]) # not required for thermal simulation 
+
     materials_list = settings['materials_list']
     dielectrics_list = settings['dielectrics_list'] 
     metals_list = settings['metals_list'] 
@@ -876,13 +1188,25 @@ def create_model (excite_ports, settings):
     # separate_z_group_for_metals setting 
     z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
 
+    # metal layers are modeled as surface for EM by default
+    filled_metals = get_optional_setting(settings, 'filled_metals', False)
 
-    # boundary conditions default to absorbing
-    boundary_condition = get_optional_setting (settings,'boundary',['ABC','ABC','ABC','ABC','ABC','ABC'])
-    print ('Using boundary condition ', str(boundary_condition))
-    if len(boundary_condition) != 6:
-        print('If specified, the boundary condition parameter must be a list with 6 string values, "PML", "ABC", "PEC" or "PMC')
-        exit(1)
+    # solver choice
+    elmer = get_optional_setting(settings, 'elmer', False)
+    elmer_thermal = get_optional_setting (settings, "elmer_thermal", False)
+    if elmer_thermal:
+        elmer = True
+        filled_metals = True # solid metal volumes for thermal
+        thermal_objects = settings['thermal_objects']
+    
+
+    if not elmer_thermal:
+        # boundary conditions default to absorbing
+        boundary_condition = get_optional_setting (settings,'boundary',['ABC','ABC','ABC','ABC','ABC','ABC'])
+        print ('Using boundary condition ', str(boundary_condition))
+        if len(boundary_condition) != 6:
+            print('If specified, the boundary condition parameter must be a list with 6 string values, "PML", "ABC", "PEC" or "PMC')
+            exit(1)
 
     # script control
     no_gui = get_optional_setting (settings,'no_gui', False)
@@ -894,14 +1218,6 @@ def create_model (excite_ports, settings):
     config_name = os.path.join(sim_path, 'config' + config_suffix + '.json')
     data_dir = 'output/' + model_basename 
 
-    # optional output for Elmer FEM
-    elmer = get_optional_setting(settings, 'elmer', False)
-    
-    # option model for Elmer thermal solver
-    elmer_thermal = get_optional_setting (settings, "elmer_thermal", False)
-    if elmer_thermal:
-        elmer = True
-    filled_metals = elmer_thermal # solid metals for thermal
     
 
     # optional multithreading for Elmer FEM because it requires modifies settings in case.sif file
@@ -976,13 +1292,14 @@ def create_model (excite_ports, settings):
             dielectric_volume_dict[metal.name] = []
         elif metal.is_sheet: # sheet layer for resistor etc
             metal_sheet_dict[metal.name] = []
-        else: 
-            if not filled_metals:
-                # regular case, planar metal will be represented at surfaces of hollow volumes
-                metal_surface_dict[metal.name]=[] 
-            else:
-                # special case for thermal etc: make planar metals as volumes, not surface 
-                metal_volume_dict[metal.name] = []
+        else:
+            # regular case, planar metal will be represented at surfaces of hollow volumes
+            metal_surface_dict[metal.name]=[] 
+
+            if filled_metals:
+                # special case for thermal etc: make planar metals as volumes
+                # but also keep surfaces for  visualisation of results in Paraview
+                metal_volume_dict[metal.name]=[]
                      
 
     for dielectric in dielectrics_list.dielectrics:
@@ -992,15 +1309,37 @@ def create_model (excite_ports, settings):
     airbox_surface_taglist = []    
 
 
+    # thermal simulation objects (sources etc)
+    if elmer_thermal:
+        thermal_volume_dict = {}
+        thermal_boundary_dict = {}
+        for object in thermal_objects.objects:
+            if object.type == 'source':
+                name=f'source_{object.source_layernum}'
+                thermal_volume_dict[name]=[]
+            elif object.type == 'constanttemp':
+                name=f'constanttemp_{object.source_layernum}'
+                thermal_boundary_dict[name]=[]
+
+
     # add drawn geometries to gmsh model
 
     print('Adding metal tags ...')
     # add as volume
     metal_dimtags_created_3D, sheetlayer_dimtags = add_metal_volumes (allpolygons, metals_list)
 
+
+    if elmer_thermal:
+        # thermal simulation: add thermal source volumes
+        print('Adding thermal sources ...')
+        thermalsource_dimtags_created_3D = add_thermal_sources (allpolygons, metals_list, thermal_objects)
+        print('Adding thermal boundaries ...')
+        thermalboundary_dimtags_created_2D = add_thermal_boundaries (allpolygons, metals_list, thermal_objects)
+
+
     # add dielectric boxes (oxide, substrate, air etc) to gmsh model
     print('Adding dielectrics ...')
-    dielectric_tags_created_3D = add_dielectrics (materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, refined_cellsize=refined_cellsize)
+    dielectric_tags_created_3D = add_dielectrics (materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, refined_cellsize=refined_cellsize, add_airbox=not elmer_thermal)
     
     # separate metal and dielectric volumes
     dielectric_volume_dimtags = []
@@ -1009,7 +1348,8 @@ def create_model (excite_ports, settings):
         for tag in tags:
             dielectric_volume_dimtags.append((3, tag))
 
-    # 3D volumes that are not a dielectric must be a drawn metal
+    
+    # 3D volumes that are not a dielectric must be a drawn metal (or thermal volume)
     metal_volume_dimtags = []
     all_volume_dimtags = gmsh.model.getEntities(3)
     for volume_dimtag in all_volume_dimtags:
@@ -1072,14 +1412,19 @@ def create_model (excite_ports, settings):
         if volume_dimtag not in dielectric_volume_dimtags:
             metal_volume_dimtags.append(volume_dimtag)    
 
-    # add ports
-    print('Adding ports ...')
-    port_dimtags_created_2D, all_port_information_struct = add_ports (allpolygons, metals_list, simulation_ports)
-    # create flat list of port dimtags
+    # add ports 
     port_tags = []
-    for key in port_dimtags_created_2D.keys():
-        for tag in port_dimtags_created_2D[key]:
-            port_tags.append((2,tag))
+    port_dimtags_created_2D = {}
+
+    if not elmer_thermal:
+        # regular EM simulation
+        print('Adding ports ...')
+        port_dimtags_created_2D, all_port_information_struct = add_ports (allpolygons, metals_list, simulation_ports)
+        # create flat list of port dimtags
+        
+        for key in port_dimtags_created_2D.keys():
+            for tag in port_dimtags_created_2D[key]:
+                port_tags.append((2,tag))
 
 
     #  sheet metal tags, this is a flat list of dimtags, information on layer/material is only in sheet itself (getEntityName)
@@ -1087,14 +1432,43 @@ def create_model (excite_ports, settings):
     geom_dimtags.extend(port_tags)
     geom_dimtags.extend(sheetlayer_dimtags)
 
+    if elmer_thermal:
+        # add thermal boundary dimtags
+        thermal_boundary_dimtags = []
+        for key in thermalboundary_dimtags_created_2D:
+            tags = thermalboundary_dimtags_created_2D[key]
+            for tag in tags:
+                thermal_boundary_dimtags.append((2,tag))
+        geom_dimtags.extend(thermal_boundary_dimtags)
+
+        # add thermal volume dimtags (i.e. thermal sources)
+        thermal_volume_dimtags = []
+        for key in thermalsource_dimtags_created_3D:
+            tag = thermalsource_dimtags_created_3D[key]
+            thermal_volume_dimtags.append((3,tag))
+
+    # sheet and volume names must be captured before fragment(), since fragment() can split
+    # a sheet or a 3D volume into multiple new entities (e.g. where a sheet touches another
+    # sheet, or touches/sits inside a volume boundary) and the new entities do not inherit
+    # the original entity's name
+    sheetlayer_names = {dimtag: gmsh.model.getEntityName(dim=dimtag[0], tag=dimtag[1]) for dimtag in sheetlayer_dimtags}
+    volume_names_before_fragment = {dimtag: gmsh.model.getEntityName(dim=3, tag=dimtag[1]) for dimtag in geom_dimtags if dimtag[0] == 3}
 
     # fragment to insert 2D sheets into 3D volumes
-    _, geom_map = gmsh.model.occ.fragment(geom_dimtags, [])   
+    _, geom_map = gmsh.model.occ.fragment(geom_dimtags, [])
     gmsh.model.occ.synchronize()
 
 
-    # Restore port and sheet tags
+    # Restore port, sheet and volume tags
     # restore names with possibly new tag numbers
+
+    # 3D volume tags (dielectric and metal volumes), same pattern as after the first fragment() above
+    for n, new_dimtag_list in enumerate(geom_map):
+        original_tag = geom_dimtags[n]
+        if original_tag in volume_names_before_fragment:
+            name = volume_names_before_fragment[original_tag]
+            for dim, tag in new_dimtag_list:
+                gmsh.model.setEntityName(dim=dim, tag=tag, name=name)
 
     # Sheet tags
     restored_sheetlayer_dimtags = []
@@ -1102,8 +1476,12 @@ def create_model (excite_ports, settings):
         # we get a list with one or more new dimtags for each the original dimtag
         original_tag = geom_dimtags[n]
         if original_tag in sheetlayer_dimtags:
-            #  sheetlayer_dimtags is flat list, this is all we have for now, information on layer/material is only in sheet itself (getEntityName)
-            restored_sheetlayer_dimtags.append(new_dimtag_list[0])
+            # the sheet might have been split into multiple pieces, re-apply the name to all of them
+            layername = sheetlayer_names[original_tag]
+            for dimtag in new_dimtag_list:
+                dim, tag = dimtag
+                gmsh.model.setEntityName(dim=dim, tag=tag, name=layername)
+                restored_sheetlayer_dimtags.append(dimtag)
     sheetlayer_dimtags = restored_sheetlayer_dimtags
 
 
@@ -1122,13 +1500,44 @@ def create_model (excite_ports, settings):
                     port_dimtags_created_2D[key]=newtags
                     break
 
-
-
     # create dict for lookup of sheet metal layers and dimtags
     for dimtag in sheetlayer_dimtags:
         dim, tag = dimtag
         layername = gmsh.model.getEntityName(dim=2,tag=tag)
         metal_sheet_dict[layername].append(tag)
+
+    # Thermal boundary tags
+    if elmer_thermal:
+        restored_thermalboundary_dimtags = []
+        for n, new_dimtag_list in enumerate(geom_map):
+            # we get a list with one or more new dimtags for each the original dimtag
+            original_tag = geom_dimtags[n]
+            if original_tag in thermal_boundary_dimtags:
+                # thermal boundary was perhaps split into pieces, if it touches multiple volumes
+                # get name of original surface 
+                layername = gmsh.model.getEntityName(dim=2,tag=original_tag[1])
+                for dimtag in new_dimtag_list:
+                    dim, tag = dimtag
+                    gmsh.model.setEntityName(dim=2,tag=tag, name=layername)
+                    restored_thermalboundary_dimtags.append(dimtag)
+
+        thermal_boundary_dimtags = restored_thermalboundary_dimtags
+
+        # create dict for lookup of thermal boundary layer and dimtags
+        for dimtag in thermal_boundary_dimtags:
+            dim, tag = dimtag
+            layername = gmsh.model.getEntityName(dim=2,tag=tag)
+            thermal_boundary_dict[layername].append(tag)
+
+        # restore thermal source dimtags
+        restored_thermalvolume_dimtags = []
+        for n, new_dimtag_list in enumerate(geom_map):
+            # we get a list with one or more new dimtags for each the original dimtag
+            original_tag = geom_dimtags[n]
+            if original_tag in thermal_volume_dimtags:
+                #  sheetlayer_dimtags is flat list, this is all we have for now, information on layer/material is only in sheet itself (getEntityName)
+                restored_thermalvolume_dimtags.append(new_dimtag_list[0])
+        thermal_volume_dimtags = restored_thermalvolume_dimtags        
 
 
 
@@ -1142,12 +1551,17 @@ def create_model (excite_ports, settings):
     geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]     
     for dim, tag in geom_dimtags:
         name = gmsh.model.getEntityName(dim=3,tag=tag)
-        if name in metal_volume_dict.keys():
-            metal_volume_dict[name].append(tag)
-        elif name in metal_surface_dict.keys():
+        if name in metal_surface_dict.keys():
             # get all surfaces of 3d body
             _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
-            metal_surface_dict[name].append(surfaceloops)    
+            metal_surface_dict[name].append(surfaceloops)   
+
+            # if filled metals enabled, we create surfaces AND volume
+            if filled_metals:
+                metal_volume_dict[name].append(tag)
+             
+        elif name in metal_volume_dict.keys():
+            metal_volume_dict[name].append(tag)
         elif name in dielectric_volume_dict.keys():
             dielectric_volume_dict[name].append(tag)
         elif name == "airbox":
@@ -1156,6 +1570,13 @@ def create_model (excite_ports, settings):
             _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
             for surfaceloop in surfaceloops:
                 airbox_surface_taglist.append(surfaceloop) 
+        elif name in thermal_volume_dict.keys():
+            # this is what the thermal solver uses
+            thermal_volume_dict[name].append(tag)
+
+            # register all surfaces of 3d body also, so that they appear in mesh view in Paraview
+            _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+            metal_surface_dict[name]= [surfaceloops]
         else:
             # this should not happen
             print(f"Found volume tag {tag} with name '{name}' which can't be assigned, abort")
@@ -1258,6 +1679,19 @@ def create_model (excite_ports, settings):
             # store, used when creating solver config file
             physical_groups_2D.append({"layername":key, "groupname":key, "grouptag":phys_group })            
 
+        # add for edge mesh refinement also
+        if key not in boundary_line_tags_dict.keys():
+            boundary_line_tags_dict[key]=[]
+        for tag in surface_list:
+            try:
+                clt, ct = gmsh.model.occ.getCurveLoops(tag)
+                for curvetag in ct:
+                    boundary_line_tags_dict[key].extend(curvetag)     
+            except:
+                print(f"Exception when adding sheet layer boundaries to boundary_line_tags_dict")        
+                exit(1)
+
+
 
     # create physical group for port surfaces
     for key in port_dimtags_created_2D.keys():
@@ -1280,6 +1714,43 @@ def create_model (excite_ports, settings):
                 exit(1)
 
 
+    # create physical group for thermal volumes
+    if elmer_thermal:
+        for key in thermal_volume_dict.keys():
+            volume_list = thermal_volume_dict[key]
+            if len(volume_list)>0:
+                phys_group = gmsh.model.addPhysicalGroup(3, volume_list, tag=-1)
+                gmsh.model.setPhysicalName(3, phys_group, key)
+
+                # get the material of the target layer for this source
+                targetname = "unknown thermal"
+                if "source_" in key:
+                    source_layer = int(key.replace("source_",""))
+                    source = thermal_objects.get_object_by_layernumber(source_layer)
+                    if source is not None:
+                        targetname = source.target_layername
+                    
+                # store, used when creating solver config file
+                physical_groups_3D.append({"layername":targetname, "groupname":key, "grouptag":phys_group })  
+
+
+        for key in thermal_boundary_dict.keys():
+            boundary_list = thermal_boundary_dict[key]
+            if len(boundary_list)>0:
+                phys_group = gmsh.model.addPhysicalGroup(2, boundary_list, tag=-1)
+                gmsh.model.setPhysicalName(2, phys_group, key)
+
+                # get the material of the target layer for this source
+                targetname = "unknown thermal"
+                if "constanttemp" in key:
+                    source_layer = int(key.replace("constanttemp_",""))
+                    source = thermal_objects.get_object_by_layernumber(source_layer)
+                    if source is not None:
+                        targetname = source.target_layername
+                    
+                # store, used when creating solver config file
+                physical_groups_2D.append({"layername":targetname, "groupname":key, "grouptag":phys_group })  
+
 
     gmsh.model.occ.synchronize()
     # gmsh.fltk.run()
@@ -1287,17 +1758,17 @@ def create_model (excite_ports, settings):
     # ----------------  PORT CONFIG METADATA JSON FILE -----------------
 
     # we start from all_port_information_struct metadata that was created by add_ports() above
+    if not elmer_thermal:
+        # add units to port information
+        all_port_information_struct['unit'] = unit
+        # add model name
+        all_port_information_struct['name'] = model_basename
 
-    # add units to port information
-    all_port_information_struct['unit'] = unit
-    # add model name
-    all_port_information_struct['name'] = model_basename
-
-    # write JSON with port information to Palace outputmodel directory
-    port_information_file = os.path.join(sim_path, 'port_information' + config_suffix + '.json')
-    with open(port_information_file, 'w', encoding='utf-8') as f:
-        json.dump(all_port_information_struct, f, ensure_ascii=False, indent=4)
-    f.close()
+        # write JSON with port information to Palace outputmodel directory
+        port_information_file = os.path.join(sim_path, 'port_information' + config_suffix + '.json')
+        with open(port_information_file, 'w', encoding='utf-8') as f:
+            json.dump(all_port_information_struct, f, ensure_ascii=False, indent=4)
+        f.close()
 
    
 
@@ -1553,68 +2024,68 @@ def create_model (excite_ports, settings):
 
 
     # AIRBOX
+    if not elmer_thermal:
+        # get surface tags of airbox 
+        simulation_boundary = airbox_surface_taglist[0]  # assume we have air margin all around
 
-    # get surface tags of airbox 
-    simulation_boundary = airbox_surface_taglist[0]  # assume we have air margin all around
-
-    PEC_boundaries = []
-    PML_boundaries = []
-    PMC_boundaries = []
- 
-    if len(simulation_boundary)==6:
-        bc = [boundary_condition[0],boundary_condition[2],boundary_condition[5],boundary_condition[3],boundary_condition[4],boundary_condition[1]]
-        for idx, boundary in enumerate (simulation_boundary):
-            if bc[idx] == 'PEC':
-                PEC_boundaries.append(boundary)
-            elif bc[idx] == 'PML' or bc[idx] == 'ABC':    
-                PML_boundaries.append(boundary)
-            elif bc[idx] == 'PMC':    
-                PMC_boundaries.append(boundary)
-            else:
-                print('Error: Boundary condition ', boundary_condition[idx],' is not supported. Use ABC, PML, PEC or PMC only.')    
-                exit(1)
-    else:
-        print('Invalid simulation boundary, the surrounding air margin must be > 0 on all six sides!')
-        exit(0)
-
-
-    phys_group_PML = gmsh.model.addPhysicalGroup(2, PML_boundaries, tag=-1)
-    gmsh.model.setPhysicalName(2, phys_group_PML, 'Absorbing_boundary')
-
-    phys_group_PEC = gmsh.model.addPhysicalGroup(2, PEC_boundaries, tag=-1)
-    gmsh.model.setPhysicalName(2, phys_group_PEC, 'PEC_boundary')
-
-    phys_group_PMC = gmsh.model.addPhysicalGroup(2, PMC_boundaries, tag=-1)
-    gmsh.model.setPhysicalName(2, phys_group_PMC, 'PMC_boundary')
+        PEC_boundaries = []
+        PML_boundaries = []
+        PMC_boundaries = []
+    
+        if len(simulation_boundary)==6:
+            bc = [boundary_condition[0],boundary_condition[2],boundary_condition[5],boundary_condition[3],boundary_condition[4],boundary_condition[1]]
+            for idx, boundary in enumerate (simulation_boundary):
+                if bc[idx] == 'PEC':
+                    PEC_boundaries.append(boundary)
+                elif bc[idx] == 'PML' or bc[idx] == 'ABC':    
+                    PML_boundaries.append(boundary)
+                elif bc[idx] == 'PMC':    
+                    PMC_boundaries.append(boundary)
+                else:
+                    print('Error: Boundary condition ', boundary_condition[idx],' is not supported. Use ABC, PML, PEC or PMC only.')    
+                    exit(1)
+        else:
+            print('Invalid simulation boundary, the surrounding air margin must be > 0 on all six sides!')
+            exit(0)
 
 
-    # config file entry for absorbing simulation boundary (we have no real PML yet, use 2nd order absorbing)
-    Palace_absorbing_boundaries = {}
-    Palace_absorbing_boundaries['Attributes']=[phys_group_PML] # absorbing simulation_boundary
-    Palace_absorbing_boundaries['Order']=2 
+        phys_group_PML = gmsh.model.addPhysicalGroup(2, PML_boundaries, tag=-1)
+        gmsh.model.setPhysicalName(2, phys_group_PML, 'Absorbing_boundary')
 
-    # config file entry for PEC simulation boundary
-    Palace_PEC_boundaries = {}
-    Palace_PEC_boundaries['Attributes']=[phys_group_PEC] # PEC simulation_boundary
+        phys_group_PEC = gmsh.model.addPhysicalGroup(2, PEC_boundaries, tag=-1)
+        gmsh.model.setPhysicalName(2, phys_group_PEC, 'PEC_boundary')
 
-    # config file entry for PEC simulation boundary
-    Palace_PMC_boundaries = {}
-    Palace_PMC_boundaries['Attributes']=[phys_group_PMC] # PMC simulation_boundary
+        phys_group_PMC = gmsh.model.addPhysicalGroup(2, PMC_boundaries, tag=-1)
+        gmsh.model.setPhysicalName(2, phys_group_PMC, 'PMC_boundary')
 
 
-    boundaries['Conductivity']= Palace_conductors
-    boundaries['LumpedPort'] = Palace_lumpedports
-    if len(Palace_impedances) > 0:
-        boundaries['Impedance']   = Palace_impedances
-    if len(PML_boundaries) > 0:
-        boundaries['Absorbing']   = Palace_absorbing_boundaries
-    if len(PEC_boundaries) > 0:
-        boundaries['PEC']   = Palace_PEC_boundaries
-    if len(PMC_boundaries) > 0:
-        boundaries['PMC']   = Palace_PMC_boundaries
+        # config file entry for absorbing simulation boundary (we have no real PML yet, use 2nd order absorbing)
+        Palace_absorbing_boundaries = {}
+        Palace_absorbing_boundaries['Attributes']=[phys_group_PML] # absorbing simulation_boundary
+        Palace_absorbing_boundaries['Order']=2 
+
+        # config file entry for PEC simulation boundary
+        Palace_PEC_boundaries = {}
+        Palace_PEC_boundaries['Attributes']=[phys_group_PEC] # PEC simulation_boundary
+
+        # config file entry for PEC simulation boundary
+        Palace_PMC_boundaries = {}
+        Palace_PMC_boundaries['Attributes']=[phys_group_PMC] # PMC simulation_boundary
 
 
-    config_data['Boundaries'] = boundaries    
+        boundaries['Conductivity']= Palace_conductors
+        boundaries['LumpedPort'] = Palace_lumpedports
+        if len(Palace_impedances) > 0:
+            boundaries['Impedance']   = Palace_impedances
+        if len(PML_boundaries) > 0:
+            boundaries['Absorbing']   = Palace_absorbing_boundaries
+        if len(PEC_boundaries) > 0:
+            boundaries['PEC']   = Palace_PEC_boundaries
+        if len(PMC_boundaries) > 0:
+            boundaries['PMC']   = Palace_PMC_boundaries
+
+
+        config_data['Boundaries'] = boundaries    
 
 
     # write Palace JSON simulation config file now, so that we can verify it while geometry is open in gmsh GUI
@@ -1632,8 +2103,15 @@ def create_model (excite_ports, settings):
 
         # bodies
 
-        Elmer_materials = []
-        Elmer_bodies    = []
+        Elmer_materials  = []
+        Elmer_bodies     = []
+        Elmer_boundaries = []
+
+        if elmer_thermal:
+            # thermal sources
+            Elmer_body_forces = []
+            Elmer_thermal_boundaryconditions = []
+
 
         for item in physical_groups_3D:
             # items can be from via layer or from dielectric stackup
@@ -1648,10 +2126,28 @@ def create_model (excite_ports, settings):
                     Elmer_material['name']='airbox'
                     Elmer_material['permittivity']=1.0
                     Elmer_material['conductivity']=0.0
+
+                    if elmer_thermal:
+                        Elmer_material['thermalcond']=0.026
+                        Elmer_material['density']=1.2
                 else:
                     Elmer_material['name']=material.name
                     Elmer_material['permittivity']=material.eps
                     Elmer_material['conductivity']=material.sigma
+
+                    if elmer_thermal:
+                        Elmer_material['density']=material.density
+                        if material.thermaltablename == "":
+                            # single value 
+                            Elmer_material['thermalcond']=material.thermalcond
+                        else:
+                            # table
+                            table = "Variable Temperature\n    Real\n"
+                            for T, k in material.thermaltable.points:
+                              table = table + f"      {T:.2f} {k:.2f}\n"
+                            table = table + "    End"
+                            Elmer_material['thermalcond']=table
+
                 
                 if Elmer_material != {}:
                     if Elmer_material not in Elmer_materials:
@@ -1663,11 +2159,32 @@ def create_model (excite_ports, settings):
                     Elmerbody = {}
                     Elmerbody['name']=layername
                     Elmerbody['material']=material_index+1
+                
+                    if elmer_thermal:
+                        # special case are thermal sources, which are identified by groupname prefix "source_"
+                        if "source_" in groupname:
+                            # get source properties from source_layer
+                            source_layer = int(groupname.replace("source_",""))
+                            source = thermal_objects.get_object_by_layernumber(source_layer)
+                            if source is not None:
+                                # Elmer heat source with power for given volume
+                                # Volumetric Heat Source = -distribute 1.0 
+                                force = source.power 
+
+                                index = len(Elmer_body_forces)+1
+                                Elmer_body_forces.append(force)
+
+                                # store body force index in body
+                                Elmerbody['bodyforce_number']=index
+
+                                # use name of thermal source, not material name
+                                Elmerbody['name']=groupname
+
                     Elmer_bodies.append(Elmerbody)
+  
 
 
         # surfaces
-        Elmer_boundaries = []
         for item in physical_groups_2D:
             # items can be from surface of metal conductor
             internal_layername, groupname, grouptag = item.values()
@@ -1679,97 +2196,126 @@ def create_model (excite_ports, settings):
 
             material = get_material_from_layer_or_dielectric_name(layername)
 
-            if material is not None:
-            
-                # we also need to check metal definition
-                metal = metals_list.getbylayername(layername)
-                if metal is not None:   
+            if not elmer_thermal:
+                #regular RF EM
+                if material is not None:
+                
+                    # we also need to check metal definition
+                    metal = metals_list.getbylayername(layername)
+                    if metal is not None:   
 
-                    if metal.is_metal:
-                        # regular metal
-                        Elmer_boundary = {}
-                        Elmer_boundary['name'] = gmsh.model.getPhysicalName(2,grouptag)
-                        Elmer_boundary['conductivity'] = material.sigma
-                        if '_z' in internal_layername:                        
-                            Elmer_boundary['thickness'] = metal.thickness * z_thickness_factor
-                        else:    
-                            Elmer_boundary['thickness'] = metal.thickness 
-                        Elmer_boundaries.append(Elmer_boundary)
+                        if metal.is_metal:
+                            # regular metal
+                            Elmer_boundary = {}
+                            Elmer_boundary['name'] = gmsh.model.getPhysicalName(2,grouptag)
+                            Elmer_boundary['conductivity'] = material.sigma
+                            if '_z' in internal_layername:                        
+                                Elmer_boundary['thickness'] = metal.thickness * z_thickness_factor
+                            else:    
+                                Elmer_boundary['thickness'] = metal.thickness 
+                            Elmer_boundaries.append(Elmer_boundary)
 
-                    elif metal.is_sheet:
-                        # sheet metal for resistors etc
-                        print('Sheet resistors not supported yet for Elmer model output!')
-                        exit(1)
-                    else:
-                        # we should never get here
-                        print(f'Invalid surface found, layer {metal}, physical group {grouptag}')
-            else:    
-                # this should not happen!
-                print(f'No material found for this conductor: {layername} {group_name}')
-
-
-
-
-        # PORTS
-        Elmer_ports = []
-        for item in physical_groups_ports:
-            layername, portname, grouptag = item.values()
-
-            portnum = int(portname.replace('P',''))           
-            Elmer_port_boundary = {}
-            Elmer_port_boundary['name'] = portname
-            Elmer_port_boundary['portnum'] = portnum
-            Elmer_port_boundary['Z0'] = port.port_Z0
-
-
-            # convert direction to number for Elmer
-            if 'X' in port.direction.upper():
-                direction = 1
-            elif 'Y' in port.direction.upper():
-                direction = 2
+                        elif metal.is_sheet:
+                            # sheet metal for resistors etc
+                            print('Sheet resistors not supported yet for Elmer model output!')
+                            exit(1)
+                        else:
+                            # we should never get here
+                            print(f'Invalid surface found, layer {metal}, physical group {grouptag}')
+                else:    
+                    # this should not happen!
+                    print(f'No material found for this conductor: {layername} {group_name}')
             else:
-                direction = 3
-            # polarity
-            if '-' in port.direction:
-                direction = - direction
-            Elmer_port_boundary['direction'] = direction
-            Elmer_ports.append(Elmer_port_boundary)
+                # Elmer thermal model
+                if "constanttemp_" in groupname:
+                        # get source properties from source_layer
+                        source_layer = int(groupname.replace("constanttemp_",""))
+                        thermal_boundary = thermal_objects.get_object_by_layernumber(source_layer)
+                        if thermal_boundary is not None:       
+
+                            Elmer_boundary = {}
+                            Elmer_boundary['name'] = gmsh.model.getPhysicalName(2,grouptag)
+                            Elmer_boundary['temp'] = thermal_boundary.temp
+                            Elmer_thermal_boundaryconditions.append(Elmer_boundary)
 
 
 
-        # write simulation frequencies for Elmer
-        elmer_freq_file = os.path.join(sim_path, 'frequencies.dat')
-        num_frequencies = util_elmer.write_elmer_frequencies (elmer_freq_file, 
-                                                                fstart, 
-                                                                fstop, 
-                                                                fstep, 
-                                                                f_discrete_list, 
-                                                                f_dump_list)
+        if not elmer_thermal:
+            # RF EM simulation
 
-        # write *.sif file for Elmer
-        elmer_physics_file = os.path.join(sim_path, 'physics.sif')
-        util_elmer.write_elmer_physics_file (unit,
-                                                elmer_physics_file, 
-                                                num_frequencies, 
-                                                Elmer_materials, 
-                                                Elmer_bodies,
-                                                Elmer_boundaries,
-                                                Elmer_ports,
-                                                PEC_boundaries,
-                                                PML_boundaries,
-                                                PMC_boundaries)
+            # PORTS
+            Elmer_ports = []
+            for item in physical_groups_ports:
+                layername, portname, grouptag = item.values()
+
+                portnum = int(portname.replace('P',''))           
+                Elmer_port_boundary = {}
+                Elmer_port_boundary['name'] = portname
+                Elmer_port_boundary['portnum'] = portnum
+                Elmer_port_boundary['Z0'] = port.port_Z0
+
+
+                # convert direction to number for Elmer
+                if 'X' in port.direction.upper():
+                    direction = 1
+                elif 'Y' in port.direction.upper():
+                    direction = 2
+                else:
+                    direction = 3
+                # polarity
+                if '-' in port.direction:
+                    direction = - direction
+                Elmer_port_boundary['direction'] = direction
+                Elmer_ports.append(Elmer_port_boundary)
+
+
+
+            # write simulation frequencies for Elmer
+            elmer_freq_file = os.path.join(sim_path, 'frequencies.dat')
+            num_frequencies = util_elmer.write_elmer_frequencies (elmer_freq_file, 
+                                                                    fstart, 
+                                                                    fstop, 
+                                                                    fstep, 
+                                                                    f_discrete_list, 
+                                                                    f_dump_list)
+
+            # write *.sif file for Elmer
+            elmer_physics_file = os.path.join(sim_path, 'physics.sif')
+            util_elmer.write_elmer_physics_file (unit,
+                                                    elmer_physics_file, 
+                                                    num_frequencies, 
+                                                    Elmer_materials, 
+                                                    Elmer_bodies,
+                                                    Elmer_boundaries,
+                                                    Elmer_ports,
+                                                    PEC_boundaries,
+                                                    PML_boundaries,
+                                                    PMC_boundaries)
+
+
+
+
+            # write_case_and_solver_files (targetdir, order, iterative) 
+            util_elmer.write_case_and_solver_files (sim_path, order, iterative, ELMER_MPI_THREADS=ELMER_MPI_THREADS)
+
+        else:
+
+            # write case.sif file for Elmer thermal
+            elmer_thermal_file = os.path.join(sim_path, 'case.sif')
+            util_elmer.write_elmer_thermal_file (unit,
+                                                    elmer_thermal_file,
+                                                    Elmer_materials, 
+                                                    Elmer_bodies,
+                                                    Elmer_boundaries,
+                                                    Elmer_body_forces,
+                                                    Elmer_thermal_boundaryconditions)
+
 
 
         elmer_start_file = os.path.join(sim_path, 'ELMERSOLVER_STARTINFO')
         with open(elmer_start_file, "w") as f:  
             f.write('case.sif\n')
         f.close()  
-
-
-        # write_case_and_solver_files (targetdir, order, iterative) 
-        util_elmer.write_case_and_solver_files (sim_path, order, iterative, ELMER_MPI_THREADS=ELMER_MPI_THREADS)
-
-
 
     
     if save_gmsh_geometry:
@@ -1846,11 +2392,15 @@ def create_model (excite_ports, settings):
         override_dict = {}  # used to store fields for edge refinement override, key is refined cellsize (micron), value is list of boundary linetags 
 
         # iterate over all entries and choose between global refined_cellsize and per-layer value
-        boundary_line_tags_using_refined_cellsize = []   
-
+        boundary_line_tags_using_refined_cellsize = []  
+        
         for key in boundary_line_tags_dict.keys():  # boundary_line_tags_dict is organized by layername, value is list of dimtags
+
             # key is layername
-            if key in refined_cellsize_override_dict.keys():
+            if key not in refined_cellsize_override_dict.keys():
+                # this layer uses default refined_cellsize value
+                boundary_line_tags_using_refined_cellsize.extend(boundary_line_tags_dict[key])
+            else:
                 # this layer uses special override refinement
                 refined_cellsize_value = refined_cellsize_override_dict[key]
                 tags = boundary_line_tags_dict[key]
@@ -1860,22 +2410,47 @@ def create_model (excite_ports, settings):
                     override_dict[refined_cellsize_value]=tags
                 else:    
                     override_dict[refined_cellsize_value].extend(tags)
-            else:
-                # this layer uses default refined_cellsize value
-                boundary_line_tags_using_refined_cellsize.extend(boundary_line_tags_dict[key])
 
 
-        # apply default refined_cellsize for all layers that have no override
-        i=1
-        i = refine_along_boundary (boundary_line_tags_using_refined_cellsize, refined_cellsize, i) # return next value of i
 
-        # apply other value if layername and value was provided in override_dict
-        for key in override_dict.keys():
-            refined_cellsize_value=key
-            tags = override_dict[key]
-            i = refine_along_boundary (tags, refined_cellsize_value, i)            
+        i=1    # initial number for mesh fields
 
-    
+        if not elmer_thermal:
+            # apply default refined_cellsize for all layers that have no override
+            i = refine_along_boundary (boundary_line_tags_using_refined_cellsize, refined_cellsize, i) # return next value of i
+
+            # apply other value if layername and value was provided in override_dict
+            for key in override_dict.keys():
+                refined_cellsize_value=key
+                tags = override_dict[key]
+                i = refine_along_boundary (tags, refined_cellsize_value, i)            
+
+
+        if elmer_thermal:
+            # special rule for elmer_thermal: refine near source(s) using refined_cellsize
+
+            for dimtag in thermal_volume_dimtags:
+                dim, tag = dimtag
+                xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.occ.getBoundingBox(dim, tag)
+
+                max_cellsize_outside = min(max_cellsize_air/math.sqrt(11.9), meshsize_max)
+
+                # Create a mesh size field
+                gmsh.model.mesh.field.add("Box", i)
+                gmsh.model.mesh.field.setNumber(i, "VIn", refined_cellsize)   # inside box
+                gmsh.model.mesh.field.setNumber(i, "VOut", max_cellsize_outside)  # outside box
+                gmsh.model.mesh.field.setNumber(i, "XMin", xmin-refined_cellsize)
+                gmsh.model.mesh.field.setNumber(i, "XMax", xmax+refined_cellsize)
+                gmsh.model.mesh.field.setNumber(i, "YMin", ymin-refined_cellsize)
+                gmsh.model.mesh.field.setNumber(i, "YMax", ymax+refined_cellsize)
+                gmsh.model.mesh.field.setNumber(i, "ZMin", zmin-refined_cellsize)
+                gmsh.model.mesh.field.setNumber(i, "ZMax", zmax+refined_cellsize)
+                gmsh.model.mesh.field.setNumber(i, "Thickness", 30*refined_cellsize)
+
+                fields_list.append(i)
+                i = i + 1
+
+        
         # Optional refinement of mesh at the upper end of the semiconductor
 
         if z_semi>0 and substrate_refinement:
@@ -2005,7 +2580,7 @@ def create_model (excite_ports, settings):
         # show meshed model in gmsh GUI
         if not no_gui:
 
-            if no_preview:
+            if no_preview and not elmer_thermal:
                 # hide physical volumes in viewer
                 # Step 1: Get all physical volumes
                 volume_groups = [(dim, tag) for dim, tag in gmsh.model.getPhysicalGroups() if dim == 3]

@@ -178,7 +178,7 @@ def write_elmer_physics_file (unit,
 
 
 def write_case_and_solver_files (targetdir, order, iterative, ELMER_MPI_THREADS=1):
-    # write case.sif and the solver files included there
+    # Elmer EM simulation: write case.sif and the solver files included there
 
     # set most efficient solver method 
     if order==2:
@@ -370,6 +370,108 @@ def write_case_and_solver_files (targetdir, order, iterative, ELMER_MPI_THREADS=
     with open(filename, "w") as f:  
         f.write(quadratic_iterative)
         f.close()  
+
+
+#------------------------- Elmer thermal model -------------------------
+
+def write_elmer_thermal_file (unit,
+                                elmer_thermal_file,
+                                Elmer_materials, 
+                                Elmer_bodies,
+                                Elmer_boundaries,
+                                Elmer_body_forces,
+                                Elmer_thermal_boundaryconditions):
+    
+    with open(elmer_thermal_file, "w") as f:
+
+        vtu_file = '../thermal_results.vtu'
+
+        header1=f'''
+Check Keywords "warn"
+
+Header
+Mesh DB "mesh" "."
+End
+
+Simulation
+Coordinate Mapping(3) = Integer 1 2 3
+Simulation Type = Steady state
+Steady State Max Iterations = 1
+Coordinate System = String "Cartesian"
+Coordinate Scaling = Real 1e-6
+Use Mesh Names = Logical True
+Mesh Levels = 1
+Post File = {vtu_file}
+End
+
+
+Equation 1
+Name = "ThermalPhysics"
+Active Solvers(2) = 1 2
+End
+
+Solver 1
+Equation = Heat Equation
+Procedure = "HeatSolve" "HeatSolver"
+Variable = Temperature
+Linear System Solver = Iterative
+Linear System Iterative Method = BiCGStabl
+Linear System Max Iterations = 2500
+Linear System Convergence Tolerance = 1.0e-10
+Linear System Preconditioning = ILU1
+Steady State Convergence Tolerance = 1.0e-5
+End        
+
+Solver 2
+  Equation = SaveScalars
+  Procedure = "SaveData" "SaveScalars"
+
+  Filename = "../thermal_results.dat"
+
+  Variable 1 = Temperature
+  Operator 1 = min
+  Operator 2 = max
+End
+'''
+
+        f.write(header1 + "\n")
+
+
+        # write Material sections
+        for n,material in enumerate(Elmer_materials):
+            item = f'Material {n+1}\n   Name = string "{material["name"]}"\n'
+            # thermal conductivity can be single value or table passed as string here
+            item = item + f"   Density = Real {material["density"]}\n"
+            item = item + f"   Heat Conductivity = {material["thermalcond"]}\n"
+            item = item + "End\n"
+            f.write(item + "\n")
+
+        # write Bodies sections
+        for n,body in enumerate(Elmer_bodies):
+            item = f'Body {n+1}\n   Equation = Integer 1\n'
+            item = item + f'   Name = "{body["name"]}"\n'
+            item = item + f"   Material = {body["material"]}\n"
+
+            if "bodyforce_number" in body.keys():
+                item = item + f'   Body Force = {body["bodyforce_number"]}\n'
+
+            item = item + "End\n"
+            f.write(item + '\n')
+
+        # write thermal power for heat source
+        for n,power in enumerate(Elmer_body_forces):
+            item = f'Body Force {n+1}\n'
+            item = item + f'   Volumetric Heat Source = -distribute {power:2e}\n'
+            item = item + "End\n"
+            f.write(item + '\n')
+
+        # write thermal boundary conditions
+        for n,thermal_bc in enumerate(Elmer_thermal_boundaryconditions):
+            item = f'Boundary Condition {n+1}\n'
+            item = item + f'   Name = "{thermal_bc['name']}"\n'
+            item = item + f'   Temperature = Real {thermal_bc['temp']:2f}\n'
+            item = item + "End\n"
+            f.write(item + '\n')
 
 
 #------------------------- mesh conversion *.msh to Elmer mesh -------------------------

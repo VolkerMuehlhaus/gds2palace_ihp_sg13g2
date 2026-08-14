@@ -18,9 +18,10 @@
 ########################################################################
 
 from . import util_stackup_reader as stackup_reader
+from . import util_stackup_writer as stackup_writer
 from . import util_gds_reader as gds_reader
 from . import util_utilities as utilities
 from . import util_simulation_setup as simulation_setup
 
-__version__ = "0.1.14"   # version of gds2palace
+__version__ = "0.3.2"   # version of gds2palace
 

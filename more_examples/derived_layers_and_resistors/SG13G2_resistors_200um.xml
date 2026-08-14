@@ -1,9 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<Stackup schemaVersion="2.0">
+<Stackup schemaVersion="3.0">
   <!-- Created/modified using the XML Stackup Editor in setupEM -->
   <!-- ============================================================ -->
   <!-- File description: Model for use with gds2palace S-Parameter simulation:
-IHP SG13G2 with 200 um final chip height (including BEOL). Resistors not included. -->
+IHP SG13G2 with 200 um final chip height (including BEOL). 
+Resistors Rsil, Rppd and Rhigh included using derived layers,
+but not fully tested. -->
   <Materials>
     <Material Name="Activ" Type="Conductor" Conductivity="357141.0" Color="00ff00" />
     <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" Color="39bfff" />
@@ -28,6 +30,9 @@ IHP SG13G2 with 200 um final chip height (including BEOL). Resistors not include
     <Material Name="Vmim" Type="Conductor" Conductivity="2191000.0" Color="ffe6bf" />
     <Material Name="MIM" Type="Conductor" Conductivity="500000.0" Color="e6ffbf" />
     <Material Name="LOWLOSS" Type="Conductor" Conductivity="1E10" Color="ff0000" />
+    <Material Name="RSIL" Type="Resistor" Rs="7" Color="d0d0d0" />
+    <Material Name="RPPD" Type="Resistor" Rs="260" Color="d0d0d0" />
+    <Material Name="RHIGH" Type="Resistor" Rs="1360" Color="d0d0d0" />
   </Materials>
   <ELayers LengthUnit="um">
     <Dielectrics>
@@ -59,6 +64,33 @@ IHP SG13G2 with 200 um final chip height (including BEOL). Resistors not include
       <Layer Name="MIM" Type="conductor" Zmin="5.6043" Zmax="5.7540" Material="MIM" Layer="36" />
       <Layer Name="Vmim" Type="via" Zmin="5.7540" Zmax="6.4303" Material="Vmim" Layer="129" />
       <Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="AIR" Layer="157" />
+      <!-- SG13G2 resistors created from derived layers defined in DerivedLayers section below-->
+      <Layer Name="RHIGH" Type="sheet" Zmin="0.4" Zmax="0.4" Material="RHIGH" Layer="312" />
+      <Layer Name="RPPD" Type="sheet" Zmin="0.4" Zmax="0.4" Material="RPPD" Layer="313" />
+      <Layer Name="RSIL" Type="sheet" Zmin="0.4" Zmax="0.4" Material="RSIL" Layer="314" />
     </Layers>
+    <DerivedLayers>
+      <DerivedLayer Name="GatPoly" Layer="310" Operation="OR">
+        <Operand Layer="5" />
+        <Operand Layer="128" />
+      </DerivedLayer>
+      <DerivedLayer Name="Rhigh_or_Rppd" Layer="311" Operation="AND">
+        <Operand Layer="28" />
+        <Operand Layer="14" />
+        <Operand Layer="310" />
+      </DerivedLayer>
+      <DerivedLayer Name="RHIGH" Layer="312" Operation="AND">
+        <Operand Layer="311" />
+        <Operand Layer="7" />
+      </DerivedLayer>
+      <DerivedLayer Name="RPPD" Layer="313" Operation="NOT">
+        <Operand Layer="311" />
+        <Operand Layer="7" />
+      </DerivedLayer>
+      <DerivedLayer Name="RSIL" Layer="314" Operation="NOT">
+        <Operand Layer="310" />
+        <Operand Layer="311" />
+      </DerivedLayer>
+    </DerivedLayers>
   </ELayers>
 </Stackup>
