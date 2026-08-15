@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<Stackup schemaVersion="3.0">
+  <Materials>
+    <Material Name="AIR" Type="Dielectric" Permittivity="1" Color="ffffff"/>
+    <Material Name="Passive" Type="Dielectric" Permittivity="7.5" Color="d9d9d9"/>
+    <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" Color="fffcad"/>
+    <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" Color="39bfff"/>
+    <Material Name="Via1" Type="Conductor" Conductivity="14705882.0" Color="909090"/>
+    <Material Name="Metal2" Type="Conductor" Conductivity="21640000.0" Color="39bfff"/>
+    <Material Name="RSIL" Type="Resistor" Rs="7" Color="d0d0d0"/>
+  </Materials>
+
+  <ELayers LengthUnit="um">
+    <Dielectrics>
+      <Dielectric Name="AIR" Material="AIR" Thickness="200.0000" />
+      <Dielectric Name="Passive" Material="Passive" Thickness="0.4000" />
+      <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303" />
+    </Dielectrics>
+
+    <Layers>
+      <!-- Passive: single (and therefore lowest) layer -> references the dielectric -->
+      <Layer Name="RSIL" Type="sheet" Material="RSIL" Layer="314"
+             Reference="Passive" ReferenceEdge="Bottom" Zmin="0" Zmax="0" />
+
+      <!-- SiO2: three-layer via stack, each referencing the layer directly below it -->
+      <Layer Name="Metal1" Type="conductor" Material="Metal1" Layer="8"
+             Reference="SiO2" ReferenceEdge="Bottom" Zmin="0" Zmax="0.42" />
+
+      <Layer Name="Via1" Type="via" Material="Via1" Layer="19"
+             Reference="Metal1" ReferenceEdge="Top" Zmin="0" Zmax="0.54" />
+
+      <Layer Name="Metal2" Type="conductor" Material="Metal2" Layer="10"
+             Reference="Via1" ReferenceEdge="Top" Zmin="0" Zmax="0.49" />
+    </Layers>
+  </ELayers>
+</Stackup>

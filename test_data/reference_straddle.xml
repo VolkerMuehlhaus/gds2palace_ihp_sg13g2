@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<Stackup schemaVersion="3.0">
+  <Materials>
+    <Material Name="Passive" Type="Dielectric" Permittivity="7.5" Color="d9d9d9"/>
+    <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" Color="fffcad"/>
+    <Material Name="Via1" Type="Conductor" Conductivity="14705882.0" Color="909090"/>
+  </Materials>
+
+  <ELayers LengthUnit="um">
+    <Dielectrics>
+      <Dielectric Name="Passive" Material="Passive" Thickness="0.4000" />
+      <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303" />
+    </Dielectrics>
+
+    <Layers>
+      <!-- Via reaching from inside SiO2 up through the SiO2/Passive boundary: Zmin is
+           below the reference edge (negative offset), Zmax is above it (positive offset) -->
+      <Layer Name="Via1" Type="via" Material="Via1" Layer="19"
+             Reference="SiO2" ReferenceEdge="Top" Zmin="-0.3" Zmax="0.1" />
+    </Layers>
+  </ELayers>
+</Stackup>

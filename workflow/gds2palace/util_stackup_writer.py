@@ -29,13 +29,37 @@ any parts of the file they don't understand (e.g. DerivedLayers, Tables, and
 XML comments) completely untouched.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.4.0"
 
 import xml.etree.ElementTree as ET
 
 VALID_MATERIAL_TYPES = ("Conductor", "Dielectric", "Semiconductor", "Resistor")
 VALID_LAYER_TYPES = ("conductor", "via", "dielectric", "sheet")
 VALID_DERIVED_OPERATIONS = ("AND", "OR", "XOR", "NOT", "SIZE")
+
+# Attribute order to enforce on save for a <Layer>/<Dielectric> that has Reference set,
+# so Reference/ReferenceEdge always read as "what this is positioned against" right next
+# to the element's identity, ahead of the numeric Material/Layer#/Zmin/Zmax/etc. details -
+# rather than landing wherever they happened to be set (typically last, since Reference is
+# usually added to an element that already has its other attributes). Elements without
+# Reference are left with whatever attribute order they already have.
+_LAYER_REFERENCE_ATTR_ORDER = ("Name", "Type", "Reference", "ReferenceEdge", "Material", "Layer", "Zmin", "Zmax")
+_DIELECTRIC_REFERENCE_ATTR_ORDER = ("Name", "Reference", "ReferenceEdge", "Material", "Thickness", "Zmin", "Zmax", "Boundary")
+
+
+def _reorder_attributes(element, canonical_order):
+  """Reorders element.attrib in place to match canonical_order; any attribute not listed
+     there keeps its existing relative order, appended after the canonical ones (so an
+     unexpected/future attribute is never silently dropped, just not specially placed).
+  """
+  remaining = dict(element.attrib)
+  ordered = {}
+  for key in canonical_order:
+    if key in remaining:
+      ordered[key] = remaining.pop(key)
+  ordered.update(remaining)
+  element.attrib.clear()
+  element.attrib.update(ordered)
 
 
 def _comment_preserving_parser():
@@ -137,16 +161,118 @@ def get_file_description(root):
   return ""
 
 
+REFERENCE_FORMAT_COMMENT_PREFIX = "Reference-relative positioning requires gds2palace util_stackup_reader.py version"
+
+
+def stamp_reference_format_comment(root, min_reader_version):
+  """Insert or update a comment noting the minimum gds2palace reader version needed to
+     correctly resolve this file's Reference-relative positioning. Meant to be called once,
+     right after a Dielectric/Layer set actually starts using Reference (e.g. by "Convert to
+     Reference position format" in the Stackup Editor) - not on every save, since it's a
+     one-time fact about the file's content, not something that needs refreshing like the
+     generator/description stamp. Idempotent: replaces a previous stamp of this same comment
+     rather than stacking a new one if called again (e.g. re-running the conversion).
+  Args:
+      root (xml.etree.ElementTree.Element): the <Stackup> root element
+      min_reader_version (string): util_stackup_reader.__version__ of the reader used to
+        perform the conversion, taken as the minimum version able to read the result back
+  """
+  for child in list(root):
+    if child.tag is ET.Comment and (child.text or "").strip().startswith(REFERENCE_FORMAT_COMMENT_PREFIX):
+      root.remove(child)
+
+  # goes right after the existing header block (generator stamp / description, if any) -
+  # stamp_header_comments() only ever touches its own contiguous run at index 0, so
+  # inserting immediately after it keeps this comment from being disturbed by a later re-save
+  insert_index = 0
+  for child in root:
+    if child.tag is ET.Comment:
+      insert_index += 1
+    else:
+      break
+  root.insert(insert_index, ET.Comment(f" {REFERENCE_FORMAT_COMMENT_PREFIX} {min_reader_version} or newer "))
+
+
+def _sort_layers_by_resulting_zmin (root):
+  """Reorders <Layer> children within <Layers> by resulting (resolved absolute) Zmin,
+     highest first - matching how <Dielectric> already reads top-to-bottom in the file.
+     Uses the reader to resolve Reference-based offsets into real absolute z, since a
+     Reference-based Layer's own Zmin attribute is just an offset relative to whatever it
+     references, not a meaningful sort key by itself. Purely a save-time presentation
+     choice (file order has no semantic meaning to the reader); silently leaves the
+     current order untouched if the data can't be fully resolved right now (e.g. a
+     mid-edit invalid state) - sort order isn't worth blocking a save over.
+
+     Any comment in <Layers> is moved to the very beginning of the section (ahead of the
+     optional <Substrate Offset=".../">, ahead of every <Layer>) rather than left in its
+     original slot: sorting means whichever <Layer> a comment used to introduce may no
+     longer sit next to it, so leaving it in place would misleadingly suggest it still
+     describes whatever ended up there instead.
+  """
+  layers_el = get_layers_element(root)
+  if layers_el is None:
+    return
+  layer_elements = layers_el.findall("Layer")
+  if len(layer_elements) < 2:
+    return
+
+  # local import: keeps this module usable standalone (no reader dependency) for callers
+  # that never touch a Reference-using file, where this whole function is a fast no-op.
+  # __package__ is None/"" when util_stackup_writer is imported directly rather than as
+  # part of the gds2palace package (same situation setupEM.stackup_editor handles the
+  # same way for its own sibling import), so relative import fails there.
+  if __package__ in (None, ""):
+    import util_stackup_reader as stackup_reader
+  else:
+    from . import util_stackup_reader as stackup_reader
+  try:
+    _, _, metals_list = stackup_reader.parse_substrate(root)
+  except (Exception, SystemExit):
+    return
+
+  zmin_by_name = {metal.name: metal.zmin for metal in metals_list.metals}
+  sorted_layers = sorted(layer_elements, key=lambda el: zmin_by_name.get(el.get("Name"), float("-inf")), reverse=True)
+
+  children = list(layers_el)
+  comments = [child for child in children if child.tag is ET.Comment]
+  substrate_el = layers_el.find("Substrate")
+  new_children = comments + ([substrate_el] if substrate_el is not None else []) + sorted_layers
+
+  for child in children:
+    layers_el.remove(child)
+  for child in new_children:
+    layers_el.append(child)
+
+
 def save_stackup_tree(tree, filename):
   """Write a stackup tree back to disk with consistent indentation.
 
   Note: this re-serializes the whole document, so exact original whitespace and
-  attribute order may change. Comments and all element content are preserved.
+  attribute order may change (any Reference-using Layer/Dielectric has its attribute
+  order deliberately normalized - see _reorder_attributes()), and <Layer> entries are
+  reordered by resulting Zmin, descending - see _sort_layers_by_resulting_zmin(). Comments
+  and all element content are preserved.
   Args:
       tree (xml.etree.ElementTree.ElementTree): tree to write, as returned by
         load_stackup_tree() or new_stackup_tree()
       filename (string): path to write to
   """
+  root = tree.getroot()
+
+  layers_el = get_layers_element(root)
+  if layers_el is not None:
+    for layer_el in layers_el.findall("Layer"):
+      if layer_el.get("Reference"):
+        _reorder_attributes(layer_el, _LAYER_REFERENCE_ATTR_ORDER)
+
+  dielectrics_el = get_dielectrics_element(root)
+  if dielectrics_el is not None:
+    for dielectric_el in dielectrics_el.findall("Dielectric"):
+      if dielectric_el.get("Reference"):
+        _reorder_attributes(dielectric_el, _DIELECTRIC_REFERENCE_ATTR_ORDER)
+
+  _sort_layers_by_resulting_zmin(root)
+
   ET.indent(tree, space="  ")
   tree.write(filename, xml_declaration=True, encoding="UTF-8")
 
@@ -385,17 +511,26 @@ def validate_stackup(root):
   dielectrics_el = get_dielectrics_element(root)
   dielectric_names = []
   if dielectrics_el is not None:
-    for el in dielectrics_el.findall("Dielectric"):
+    dielectric_elements = dielectrics_el.findall("Dielectric")
+
+    # collect all dielectric names up front (order in <Dielectrics> is meaningful for implicit
+    # stacking, but a Reference may still point at a Dielectric defined later in the file)
+    for el in dielectric_elements:
+      name = el.get("Name")
+      if not name:
+        continue
+      if name in dielectric_names:
+        errors.append(f"Duplicate dielectric Name '{name}'")
+      else:
+        dielectric_names.append(name)
+
+    for el in dielectric_elements:
       name = el.get("Name")
       material = el.get("Material")
       label = name or "<unnamed dielectric>"
 
       if not name:
         errors.append("Dielectric is missing required attribute 'Name'")
-      elif name in dielectric_names:
-        errors.append(f"Duplicate dielectric Name '{name}'")
-      else:
-        dielectric_names.append(name)
 
       if not material:
         errors.append(f"Dielectric '{label}' is missing required attribute 'Material'")
@@ -406,26 +541,85 @@ def validate_stackup(root):
       zmin = el.get("Zmin")
       zmax = el.get("Zmax")
       has_thickness = thickness is not None and thickness != ""
-      has_zminmax = (zmin is not None and zmin != "") and (zmax is not None and zmax != "")
+      has_zmin = zmin is not None and zmin != ""
+      has_zmax = zmax is not None and zmax != ""
+      reference = el.get("Reference")
 
-      if not has_thickness and not has_zminmax:
-        errors.append(f"Dielectric '{label}' needs either Thickness or both Zmin and Zmax")
-      if has_thickness and not _is_float(thickness):
-        errors.append(f"Dielectric '{label}' has non-numeric Thickness='{thickness}'")
-      if has_zminmax:
-        if not _is_float(zmin):
+      if reference:
+        # Reference set: Zmin (optional, default 0) and Zmax (optional, default
+        # Zmin+Thickness) are offsets - unlike absolute mode, Zmin alone isn't required,
+        # but something has to size the dielectric (Zmax or Thickness)
+        if not has_zmax and not has_thickness:
+          errors.append(f"Dielectric '{label}' has Reference set but needs either Zmax or Thickness to size it")
+        if has_zmin and not _is_float(zmin):
           errors.append(f"Dielectric '{label}' has non-numeric Zmin='{zmin}'")
-        if not _is_float(zmax):
+        if has_zmax and not _is_float(zmax):
           errors.append(f"Dielectric '{label}' has non-numeric Zmax='{zmax}'")
+        if has_thickness and not _is_float(thickness):
+          errors.append(f"Dielectric '{label}' has non-numeric Thickness='{thickness}'")
+
+        if reference not in dielectric_names:
+          errors.append(f"Dielectric '{label}' has Reference '{reference}' which matches no Dielectric")
+
+        reference_edge = el.get("ReferenceEdge")
+        if reference_edge is not None and reference_edge != "" and reference_edge.upper() not in ("TOP", "BOTTOM"):
+          errors.append(f"Dielectric '{label}' has invalid ReferenceEdge '{reference_edge}' (must be Top or Bottom)")
+      else:
+        has_zminmax = has_zmin and has_zmax
+        if not has_thickness and not has_zminmax:
+          errors.append(f"Dielectric '{label}' needs either Thickness or both Zmin and Zmax")
+        if has_thickness and not _is_float(thickness):
+          errors.append(f"Dielectric '{label}' has non-numeric Thickness='{thickness}'")
+        if has_zminmax:
+          if not _is_float(zmin):
+            errors.append(f"Dielectric '{label}' has non-numeric Zmin='{zmin}'")
+          if not _is_float(zmax):
+            errors.append(f"Dielectric '{label}' has non-numeric Zmax='{zmax}'")
 
       boundary = el.get("Boundary")
       if boundary is not None and boundary != "" and not _is_int(boundary):
         errors.append(f"Dielectric '{label}' has non-integer Boundary='{boundary}'")
 
+    # circular Dielectric -> Dielectric Reference check (Reference only ever targets another
+    # Dielectric, so - unlike Layer's Reference - there's no ambiguous-namespace case here)
+    dielectric_reference_target = {}
+    for el in dielectric_elements:
+      name = el.get("Name")
+      reference = el.get("Reference")
+      if name and reference and reference in dielectric_names:
+        dielectric_reference_target[name] = reference
+
+    resolved_dielectric_names = set(dielectric_names) - set(dielectric_reference_target.keys())
+    remaining_dielectric_refs = dict(dielectric_reference_target)
+    progress = True
+    while progress and remaining_dielectric_refs:
+      progress = False
+      for name, target in list(remaining_dielectric_refs.items()):
+        if target in resolved_dielectric_names:
+          resolved_dielectric_names.add(name)
+          del remaining_dielectric_refs[name]
+          progress = True
+    if remaining_dielectric_refs:
+      errors.append(f"Circular Dielectric Reference detected among: {sorted(remaining_dielectric_refs.keys())}")
+
   layers_el = get_layers_element(root)
   layer_numbers = set()
+  layer_names = []
   if layers_el is not None:
-    for el in layers_el.findall("Layer"):
+    layer_elements = layers_el.findall("Layer")
+
+    # collect all layer names up front (order in <Layers> is not meaningful, so a
+    # Layer's Reference may point to another Layer defined later in the file)
+    for el in layer_elements:
+      name = el.get("Name")
+      if not name:
+        continue
+      if name in layer_names:
+        errors.append(f"Duplicate layer Name '{name}'")
+      else:
+        layer_names.append(name)
+
+    for el in layer_elements:
       name = el.get("Name")
       ltype = el.get("Type")
       material = el.get("Material")
@@ -467,6 +661,52 @@ def validate_stackup(root):
         is_zero_thickness = float(zmin) == float(zmax)
         if ltype.upper() == "SHEET" and not is_zero_thickness:
           errors.append(f"Layer '{label}' has Type=\"sheet\" but Zmax != Zmin (sheet layers must have zero thickness)")
+
+      reference = el.get("Reference")
+      if reference:
+        dielectric_match = reference in dielectric_names
+        layer_match = reference in layer_names
+        if dielectric_match and layer_match:
+          errors.append(f"Layer '{label}' has Reference '{reference}' which is ambiguous - matches both a Dielectric and a Layer")
+        elif not dielectric_match and not layer_match:
+          errors.append(f"Layer '{label}' has Reference '{reference}' which matches no Dielectric or Layer")
+
+        reference_edge = el.get("ReferenceEdge")
+        if reference_edge is not None and reference_edge != "" and reference_edge.upper() not in ("TOP", "BOTTOM"):
+          errors.append(f"Layer '{label}' has invalid ReferenceEdge '{reference_edge}' (must be Top or Bottom)")
+
+    # circular Layer -> Layer Reference check (Dielectric targets are excluded: a Dielectric
+    # can't reference a Layer, so it can never be part of a cycle)
+    layer_reference_target = {}
+    for el in layer_elements:
+      name = el.get("Name")
+      reference = el.get("Reference")
+      if name and reference and reference in layer_names:
+        layer_reference_target[name] = reference
+
+    resolved_names = set(layer_names) - set(layer_reference_target.keys())
+    remaining = dict(layer_reference_target)
+    progress = True
+    while progress and remaining:
+      progress = False
+      for name, target in list(remaining.items()):
+        if target in resolved_names:
+          resolved_names.add(name)
+          del remaining[name]
+          progress = True
+    if remaining:
+      errors.append(f"Circular Layer Reference detected among: {sorted(remaining.keys())}")
+
+    # Reference-based positioning and <Substrate Offset> are mutually exclusive (see
+    # XML_stackup_format.md) - Offset applying before/after reference resolution is ambiguous
+    substrate_offset_el = get_substrate_offset_element(root)
+    if substrate_offset_el is not None:
+      offset_value = substrate_offset_el.get("Offset")
+      if offset_value is not None and _is_float(offset_value) and float(offset_value) != 0:
+        referenced_layer_names = [el.get("Name") or "<unnamed layer>" for el in layer_elements if el.get("Reference")]
+        if referenced_layer_names:
+          errors.append(f"<Substrate Offset=\"{offset_value}\"> cannot be combined with Reference-based Layer "
+                         f"positioning. Layers using Reference: {referenced_layer_names}")
 
   # DerivedLayers: these checks intentionally mirror util_stackup_reader.derived_layer's
   # requirements exactly (invalid Operation / wrong operand count for SIZE / fewer than

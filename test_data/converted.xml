@@ -2,11 +2,25 @@
 <Stackup schemaVersion="3.0">
   <!-- Created/modified using the XML Stackup Editor in setupEM -->
   <!-- ============================================================ -->
-  <!-- File description: Model for use with gds2palace S-Parameter simulation:
-IHP SG13G2 with 200 um final chip height (including BEOL). 
-Resistors Rsil, Rppd and Rhigh included using derived layers,
-but not fully tested. -->
-  <!-- Reference-relative positioning requires gds2palace util_stackup_reader.py version 1.6.0 or newer -->
+  <!-- File description: Reference-relative version of SG13G2_200um.xml, for testing
+Reference/ReferenceEdge. Every <Layer> is repositioned using Reference instead of
+absolute Zmin/Zmax + <Substrate Offset>: the lowest layer in each dielectric
+references that dielectric's Bottom edge, and every other layer references the
+nearest layer below it (Top edge). Resolved absolute z-positions are identical to
+SG13G2_200um.xml - verified against the reader's actual output, not just by hand.
+
+Two layers don't reside inside a single dielectric, so they don't fit the "lowest
+layer in a dielectric" rule directly:
+- BACKSIDEGND is the lowest layer in the whole file, entirely below Substrate (no
+  enclosing dielectric and nothing below it) - anchored to Substrate's Bottom edge
+  with a negative offset instead, extending the same rule to the stack's outer edge.
+- LBE spans both Substrate and EPI (not contained in either), but sits directly on
+  top of BACKSIDEGND with no gap, so it references BACKSIDEGND's Top edge instead of
+  a dielectric edge.
+
+One ambiguity: TopMetal1 has two layers touching its bottom edge at the same z
+(TopVia1, the main via stack; and Vmim, arriving via MIM/Vmim from the side) -
+TopVia1 was picked as the Reference since it's the main via-stack chain. -->
   <Materials>
     <Material Name="Activ" Type="Conductor" Conductivity="357141.0" Color="00ff00" />
     <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" Color="39bfff" />
@@ -31,9 +45,6 @@ but not fully tested. -->
     <Material Name="Vmim" Type="Conductor" Conductivity="2191000.0" Color="ffe6bf" />
     <Material Name="MIM" Type="Conductor" Conductivity="500000.0" Color="e6ffbf" />
     <Material Name="LOWLOSS" Type="Conductor" Conductivity="1E10" Color="ff0000" />
-    <Material Name="RSIL" Type="Resistor" Rs="7" Color="d0d0d0" />
-    <Material Name="RPPD" Type="Resistor" Rs="260" Color="d0d0d0" />
-    <Material Name="RHIGH" Type="Resistor" Rs="1360" Color="d0d0d0" />
   </Materials>
   <ELayers LengthUnit="um">
     <Dielectrics>
@@ -44,7 +55,11 @@ but not fully tested. -->
       <Dielectric Name="Substrate" Material="Substrate" Thickness="180.0000" />
     </Dielectrics>
     <Layers>
-      <!-- SG13G2 resistors created from derived layers defined in DerivedLayers section below-->
+      <!-- Backside, below/spanning Substrate + EPI -->
+      <!-- EPI: single (and therefore lowest) layer -> references the dielectric -->
+      <!-- SiO2: main via stack, each layer referencing the layer directly below it -->
+      <!-- Metal5 forks into two branches that both reach the same z (main via stack
+           TopVia1, and the MIM cap's Vmim via) before TopMetal1 -->
       <Layer Name="TopMetal2" Type="conductor" Reference="TopVia2" ReferenceEdge="Top" Material="TopMetal2" Layer="134" Zmin="0.0000" Zmax="3.0000" />
       <Layer Name="TopVia2" Type="via" Reference="TopMetal1" ReferenceEdge="Top" Material="TopVia2" Layer="133" Zmin="0.0000" Zmax="2.8000" />
       <Layer Name="TopMetal1" Type="conductor" Reference="TopVia1" ReferenceEdge="Top" Material="TopMetal1" Layer="126" Zmin="0.0000" Zmax="2.0000" />
@@ -61,36 +76,10 @@ but not fully tested. -->
       <Layer Name="Via1" Type="via" Reference="Metal1" ReferenceEdge="Top" Material="Via1" Layer="19" Zmin="0.0000" Zmax="0.5400" />
       <Layer Name="Metal1" Type="conductor" Reference="Cont" ReferenceEdge="Top" Material="Metal1" Layer="8" Zmin="0.0000" Zmax="0.4200" />
       <Layer Name="Cont" Type="via" Reference="Activ" ReferenceEdge="Top" Material="Cont" Layer="6" Zmin="0.0000" Zmax="0.6400" />
-      <Layer Name="RHIGH" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RHIGH" Layer="312" Zmin="0.0000" Zmax="0.0000" />
-      <Layer Name="RPPD" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RPPD" Layer="313" Zmin="0.0000" Zmax="0.0000" />
-      <Layer Name="RSIL" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RSIL" Layer="314" Zmin="0.0000" Zmax="0.0000" />
       <Layer Name="Activ" Type="conductor" Reference="SiO2" ReferenceEdge="Bottom" Material="Activ" Layer="1" Zmin="0.0000" Zmax="0.4000" />
       <Layer Name="SUBGND" Type="conductor" Reference="EPI" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="250" Zmin="0.0000" Zmax="3.7500" />
-      <Layer Name="LBE" Type="dielectric" Reference="Substrate" ReferenceEdge="Bottom" Material="AIR" Layer="157" Zmin="0.0000" Zmax="183.7500" />
+      <Layer Name="LBE" Type="dielectric" Reference="BACKSIDEGND" ReferenceEdge="Top" Material="AIR" Layer="157" Zmin="0.0000" Zmax="183.7500" />
       <Layer Name="BACKSIDEGND" Type="conductor" Reference="Substrate" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="251" Zmin="-6.2500" Zmax="0.0000" />
     </Layers>
-    <DerivedLayers>
-      <DerivedLayer Name="GatPoly" Layer="310" Operation="OR">
-        <Operand Layer="5" />
-        <Operand Layer="128" />
-      </DerivedLayer>
-      <DerivedLayer Name="Rhigh_or_Rppd" Layer="311" Operation="AND">
-        <Operand Layer="28" />
-        <Operand Layer="14" />
-        <Operand Layer="310" />
-      </DerivedLayer>
-      <DerivedLayer Name="RHIGH" Layer="312" Operation="AND">
-        <Operand Layer="311" />
-        <Operand Layer="7" />
-      </DerivedLayer>
-      <DerivedLayer Name="RPPD" Layer="313" Operation="NOT">
-        <Operand Layer="311" />
-        <Operand Layer="7" />
-      </DerivedLayer>
-      <DerivedLayer Name="RSIL" Layer="314" Operation="NOT">
-        <Operand Layer="310" />
-        <Operand Layer="311" />
-      </DerivedLayer>
-    </DerivedLayers>
   </ELayers>
 </Stackup>

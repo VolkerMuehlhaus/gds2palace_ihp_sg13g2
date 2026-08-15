@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<Stackup schemaVersion="3.0">
+  <Materials>
+    <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" Color="fffcad"/>
+    <Material Name="A" Type="Conductor" Conductivity="21640000.0" Color="39bfff"/>
+    <Material Name="B" Type="Conductor" Conductivity="21640000.0" Color="39bfff"/>
+  </Materials>
+
+  <ELayers LengthUnit="um">
+    <Dielectrics>
+      <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303" />
+    </Dielectrics>
+
+    <Layers>
+      <!-- A references B, B references A: expect reader exit(1) and a matching
+           validate_stackup() error, without needing to run the reader -->
+      <Layer Name="A" Type="conductor" Material="A" Layer="8"
+             Reference="B" ReferenceEdge="Top" Zmin="0" Zmax="0.42" />
+      <Layer Name="B" Type="conductor" Material="B" Layer="10"
+             Reference="A" ReferenceEdge="Top" Zmin="0" Zmax="0.49" />
+    </Layers>
+  </ELayers>
+</Stackup>

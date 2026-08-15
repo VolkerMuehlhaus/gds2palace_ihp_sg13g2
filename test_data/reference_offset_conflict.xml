@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<Stackup schemaVersion="3.0">
+  <Materials>
+    <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" Color="fffcad"/>
+    <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" Color="39bfff"/>
+  </Materials>
+
+  <ELayers LengthUnit="um">
+    <Dielectrics>
+      <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303" />
+    </Dielectrics>
+
+    <Layers>
+      <!-- Reference-based positioning together with a nonzero Substrate Offset is
+           invalid: expect reader exit(1) and a matching validate_stackup() error -->
+      <Substrate Offset="10.0" />
+      <Layer Name="Metal1" Type="conductor" Material="Metal1" Layer="8"
+             Reference="SiO2" ReferenceEdge="Bottom" Zmin="0" Zmax="0.42" />
+    </Layers>
+  </ELayers>
+</Stackup>

@@ -6,7 +6,6 @@
 IHP SG13G2 with 200 um final chip height (including BEOL). 
 Resistors Rsil, Rppd and Rhigh included using derived layers,
 but not fully tested. -->
-  <!-- Reference-relative positioning requires gds2palace util_stackup_reader.py version 1.6.0 or newer -->
   <Materials>
     <Material Name="Activ" Type="Conductor" Conductivity="357141.0" Color="00ff00" />
     <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" Color="39bfff" />
@@ -45,7 +44,7 @@ but not fully tested. -->
     </Dielectrics>
     <Layers>
       <!-- SG13G2 resistors created from derived layers defined in DerivedLayers section below-->
-      <Layer Name="TopMetal2" Type="conductor" Reference="TopVia2" ReferenceEdge="Top" Material="TopMetal2" Layer="134" Zmin="0.0000" Zmax="3.0000" />
+      <Layer Name="TopMetal2" Type="conductor" Reference="TopVia2" ReferenceEdge="Top" Material="TopMetal2" Layer="134" Zmin="0.0000" Zmax="5" />
       <Layer Name="TopVia2" Type="via" Reference="TopMetal1" ReferenceEdge="Top" Material="TopVia2" Layer="133" Zmin="0.0000" Zmax="2.8000" />
       <Layer Name="TopMetal1" Type="conductor" Reference="TopVia1" ReferenceEdge="Top" Material="TopMetal1" Layer="126" Zmin="0.0000" Zmax="2.0000" />
       <Layer Name="Vmim" Type="via" Reference="MIM" ReferenceEdge="Top" Material="Vmim" Layer="129" Zmin="0.0000" Zmax="0.6763" />
