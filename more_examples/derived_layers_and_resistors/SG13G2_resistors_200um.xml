@@ -6,6 +6,7 @@
 IHP SG13G2 with 200 um final chip height (including BEOL). 
 Resistors Rsil, Rppd and Rhigh included using derived layers,
 but not fully tested. -->
+  <!-- Reference-relative positioning requires gds2palace util_stackup_reader.py version 1.6.0 or newer -->
   <Materials>
     <Material Name="Activ" Type="Conductor" Conductivity="357141.0" Color="00ff00" />
     <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" Color="39bfff" />
@@ -36,38 +37,37 @@ but not fully tested. -->
   </Materials>
   <ELayers LengthUnit="um">
     <Dielectrics>
-      <Dielectric Name="AIR" Material="AIR" Thickness="200.0000" />
-      <Dielectric Name="Passive" Material="Passive" Thickness="0.4000" />
-      <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303" />
-      <Dielectric Name="EPI" Material="EPI" Thickness="3.7500" />
+      <Dielectric Name="AIR" Reference="Passive" ReferenceEdge="Top" Material="AIR" Thickness="200.0000" />
+      <Dielectric Name="Passive" Reference="SiO2" ReferenceEdge="Top" Material="Passive" Thickness="0.4000" />
+      <Dielectric Name="SiO2" Reference="EPI" ReferenceEdge="Top" Material="SiO2" Thickness="15.7303" />
+      <Dielectric Name="EPI" Reference="Substrate" ReferenceEdge="Top" Material="EPI" Thickness="3.7500" />
       <Dielectric Name="Substrate" Material="Substrate" Thickness="180.0000" />
     </Dielectrics>
     <Layers>
-      <Substrate Offset="183.75" />
-      <Layer Name="Activ" Type="conductor" Zmin="0.0000" Zmax="0.4000" Material="Activ" Layer="1" />
-      <Layer Name="Metal1" Type="conductor" Zmin="1.0400" Zmax="1.4600" Material="Metal1" Layer="8" />
-      <Layer Name="Metal2" Type="conductor" Zmin="2.0000" Zmax="2.4900" Material="Metal2" Layer="10" />
-      <Layer Name="Metal3" Type="conductor" Zmin="3.0300" Zmax="3.5200" Material="Metal3" Layer="30" />
-      <Layer Name="Metal4" Type="conductor" Zmin="4.0600" Zmax="4.5500" Material="Metal4" Layer="50" />
-      <Layer Name="Metal5" Type="conductor" Zmin="5.0900" Zmax="5.5800" Material="Metal5" Layer="67" />
-      <Layer Name="TopMetal1" Type="conductor" Zmin="6.4303" Zmax="8.4303" Material="TopMetal1" Layer="126" />
-      <Layer Name="TopMetal2" Type="conductor" Zmin="11.2303" Zmax="14.2303" Material="TopMetal2" Layer="134" />
-      <Layer Name="TopVia2" Type="via" Zmin="8.4303" Zmax="11.2303" Material="TopVia2" Layer="133" />
-      <Layer Name="TopVia1" Type="via" Zmin="5.5800" Zmax="6.4303" Material="TopVia1" Layer="125" />
-      <Layer Name="Via4" Type="via" Zmin="4.5500" Zmax="5.0900" Material="Via4" Layer="66" />
-      <Layer Name="Via3" Type="via" Zmin="3.5200" Zmax="4.0600" Material="Via3" Layer="49" />
-      <Layer Name="Via2" Type="via" Zmin="2.4900" Zmax="3.0300" Material="Via2" Layer="29" />
-      <Layer Name="Via1" Type="via" Zmin="1.4600" Zmax="2.0000" Material="Via1" Layer="19" />
-      <Layer Name="Cont" Type="via" Zmin="0.4000" Zmax="1.0400" Material="Cont" Layer="6" />
-      <Layer Name="SUBGND" Type="conductor" Zmin="-3.75" Zmax="0" Material="LOWLOSS" Layer="250" />
-      <Layer Name="BACKSIDEGND" Type="conductor" Zmin="-190" Zmax="-183.75" Material="LOWLOSS" Layer="251" />
-      <Layer Name="MIM" Type="conductor" Zmin="5.6043" Zmax="5.7540" Material="MIM" Layer="36" />
-      <Layer Name="Vmim" Type="via" Zmin="5.7540" Zmax="6.4303" Material="Vmim" Layer="129" />
-      <Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="AIR" Layer="157" />
       <!-- SG13G2 resistors created from derived layers defined in DerivedLayers section below-->
-      <Layer Name="RHIGH" Type="sheet" Zmin="0.4" Zmax="0.4" Material="RHIGH" Layer="312" />
-      <Layer Name="RPPD" Type="sheet" Zmin="0.4" Zmax="0.4" Material="RPPD" Layer="313" />
-      <Layer Name="RSIL" Type="sheet" Zmin="0.4" Zmax="0.4" Material="RSIL" Layer="314" />
+      <Layer Name="TopMetal2" Type="conductor" Reference="TopVia2" ReferenceEdge="Top" Material="TopMetal2" Layer="134" Zmin="0.0000" Zmax="3.0000" />
+      <Layer Name="TopVia2" Type="via" Reference="TopMetal1" ReferenceEdge="Top" Material="TopVia2" Layer="133" Zmin="0.0000" Zmax="2.8000" />
+      <Layer Name="TopMetal1" Type="conductor" Reference="TopVia1" ReferenceEdge="Top" Material="TopMetal1" Layer="126" Zmin="0.0000" Zmax="2.0000" />
+      <Layer Name="Vmim" Type="via" Reference="MIM" ReferenceEdge="Top" Material="Vmim" Layer="129" Zmin="0.0000" Zmax="0.6763" />
+      <Layer Name="MIM" Type="conductor" Reference="Metal5" ReferenceEdge="Top" Material="MIM" Layer="36" Zmin="0.0243" Zmax="0.1740" />
+      <Layer Name="TopVia1" Type="via" Reference="Metal5" ReferenceEdge="Top" Material="TopVia1" Layer="125" Zmin="0.0000" Zmax="0.8503" />
+      <Layer Name="Metal5" Type="conductor" Reference="Via4" ReferenceEdge="Top" Material="Metal5" Layer="67" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via4" Type="via" Reference="Metal4" ReferenceEdge="Top" Material="Via4" Layer="66" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal4" Type="conductor" Reference="Via3" ReferenceEdge="Top" Material="Metal4" Layer="50" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via3" Type="via" Reference="Metal3" ReferenceEdge="Top" Material="Via3" Layer="49" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal3" Type="conductor" Reference="Via2" ReferenceEdge="Top" Material="Metal3" Layer="30" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via2" Type="via" Reference="Metal2" ReferenceEdge="Top" Material="Via2" Layer="29" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal2" Type="conductor" Reference="Via1" ReferenceEdge="Top" Material="Metal2" Layer="10" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via1" Type="via" Reference="Metal1" ReferenceEdge="Top" Material="Via1" Layer="19" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal1" Type="conductor" Reference="Cont" ReferenceEdge="Top" Material="Metal1" Layer="8" Zmin="0.0000" Zmax="0.4200" />
+      <Layer Name="Cont" Type="via" Reference="Activ" ReferenceEdge="Top" Material="Cont" Layer="6" Zmin="0.0000" Zmax="0.6400" />
+      <Layer Name="RHIGH" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RHIGH" Layer="312" Zmin="0.0000" Zmax="0.0000" />
+      <Layer Name="RPPD" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RPPD" Layer="313" Zmin="0.0000" Zmax="0.0000" />
+      <Layer Name="RSIL" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RSIL" Layer="314" Zmin="0.0000" Zmax="0.0000" />
+      <Layer Name="Activ" Type="conductor" Reference="SiO2" ReferenceEdge="Bottom" Material="Activ" Layer="1" Zmin="0.0000" Zmax="0.4000" />
+      <Layer Name="SUBGND" Type="conductor" Reference="EPI" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="250" Zmin="0.0000" Zmax="3.7500" />
+      <Layer Name="LBE" Type="dielectric" Reference="Substrate" ReferenceEdge="Bottom" Material="AIR" Layer="157" Zmin="0.0000" Zmax="183.7500" />
+      <Layer Name="BACKSIDEGND" Type="conductor" Reference="Substrate" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="251" Zmin="-6.2500" Zmax="0.0000" />
     </Layers>
     <DerivedLayers>
       <DerivedLayer Name="GatPoly" Layer="310" Operation="OR">

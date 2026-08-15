@@ -2,6 +2,18 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 15-August-2026
+Stackup XML files now support Reference-relative positioning: a `<Layer>` or `<Dielectric>`
+can specify its position as an offset from the top or bottom edge of another named Layer or
+Dielectric, instead of always using an absolute Zmin/Zmax value. This removes the need to
+hand-recompute every dependent layer's z-position whenever a `<Dielectric Thickness="...">`
+changes. See `doc/XML_stackup_format` for details, and `test_data/` for example files.
+
+Using Reference-relative positioning (like derived layers and thermal tables before it)
+requires `schemaVersion="3.0"` in the stackup file. The reader now prints a warning if a
+stackup file declares a `schemaVersion` newer than the version this gds2palace installation
+supports, so an outdated installation is easier to notice.
+
 ## 14-August-2026
 Two major upgrades: 
 
