@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<Stackup schemaVersion="2.0">
+<Stackup schemaVersion="3.0">
   <!-- Created/modified using the XML Stackup Editor in setupEM -->
   <!-- ============================================================ -->
   <!-- File description: Thermal model for use with gds2palace and Elmer solver.

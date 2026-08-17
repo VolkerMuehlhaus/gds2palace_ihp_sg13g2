@@ -7,12 +7,17 @@ The files provided here enable RFIC FEM simulation using AWS Palace from GDSII l
 Palace, is an open-source, parallel finite element code for full-wave 3D electromagnetic simulations. It can be scaled from single computer to large high performance simulation clusters and cloud-based computing.  
 https://awslabs.github.io/palace/stable/  
 
+In addition to AWS Palace, gds2palace can also generate models for [Elmer FEM](https://www.elmerfem.org/), as an additional workflow option for EM (S-parameter) simulation as well as steady-state thermal simulation. See [CHANGES.md](./doc/CHANGES.md) for this and other recent additions.
+
 The gds2palace workflow in this repository is pre-configured for GDSII layout files in the [IHP SG13G2 Open PDK.](https://github.com/IHP-GmbH/IHP-Open-PDK)
 Special thanks to IHP and the public funded German project FMD-QNC (16ME0831) https://www.elektronikforschung.de/projekte/fmd-qnc for financial support, which has contributed to this work.
 
 # Documentation
 An extensive User's Guide for the gds2palace workflow is available in PDF format here:  
 [gds2palace FEM workflow for IHP](./doc/gds2palace_workflow_userguide.pdf) 
+
+The latest documentation is maintained in Markdown format here, and can be ahead of the PDF document above:  
+[gds2palace_workflow_userguide.md](./doc/userguide_md_format/gds2palace_workflow_userguide.md)
 
 An overview of the EM solver ecosystem (tools and utilities) for IHP SG13 can be found here:  
 https://github.com/IHP-GmbH/IHP-Open-PDK/tree/main/ihp-sg13g2/libs.doc/doc
