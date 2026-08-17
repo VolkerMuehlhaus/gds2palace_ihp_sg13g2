@@ -2,28 +2,25 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 15-August-2026
-Stackup XML files now support Reference-relative positioning: a `<Layer>` or `<Dielectric>`
+## 14/15-August-2026
+Three major upgrades:
+
+1) The stackup files now support derived layers, see folder `doc/XML_stackup_format` for details. This enables SG13G2 resistor in the stackup, see example in folder `more_examples`.  
+
+2) gds2palace can now create thermal simulation models for Elmer, a multi-physics FEM solver. At this moment, thermal models can be excited by user defined thermal sources, see documentation in doc folder.  
+
+3) Stackup XML files now support Reference-relative positioning: a `<Layer>` or `<Dielectric>`
 can specify its position as an offset from the top or bottom edge of another named Layer or
 Dielectric, instead of always using an absolute Zmin/Zmax value. This removes the need to
 hand-recompute every dependent layer's z-position whenever a `<Dielectric Thickness="...">`
 changes. See `doc/XML_stackup_format` for details, and `test_data/` for example files.
 
-Using Reference-relative positioning (like derived layers and thermal tables before it)
-requires `schemaVersion="3.0"` in the stackup file. The reader now prints a warning if a
-stackup file declares a `schemaVersion` newer than the version this gds2palace installation
-supports, so an outdated installation is easier to notice.
-
-## 14-August-2026
-Two major upgrades: 
-
-1) The stackup files now supports derived layers, see folder `doc/XML_stackup_format` for details. This enables SG13G2 resistor in the stackup, see example in folder `more_examples`.  
-
-2) gds2palace can now create thermal simulation models for Elmer, a multi-physics FEM solver. At this moment, thermal models can be excited by user defined thermal sources, see documentation in doc folder.  
+Using derived layers, Reference-relative positioning, or thermal tables requires
+`schemaVersion="3.0"` in the stackup file. The reader now prints a warning if a stackup file
+declares a `schemaVersion` newer than the version this gds2palace installation supports, so an
+outdated installation is easier to notice.
 
 As a side effect of derived layers, the handling of cutouts has been redesigned, and  model option `preprocess_gds` is no longer required.  
-
-The User's Guide document does *not* covers these new features yet, so please refer to the *.md documents in the meantime.
 
 For users who prefer GUI driven model setup, the companion tool `setupEM` has been upgraded to support these new features. It also includes a GUI-driven XML stackup editor now. For thermal modelling using gds2palace with Elmer, `setupThermal` is the equivalent of `setupEM`, included in the same Python package.
 

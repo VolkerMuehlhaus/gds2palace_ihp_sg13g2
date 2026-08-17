@@ -2,45 +2,74 @@
 
 Volker Mühlhaus,volker@muehlhaus.com
 ---
-Document version: 2026-07-02
+Document version: 2026-08-17
 
 ## Contents
-About this workflow  
-Workflow  
-Required software and Python modules  
-&ensp;Recommended installation of gds2palace as Python module  
-&ensp;Alternative, no longer recommended: local gds2palace directory  
-Installing AWS Palace  
-&ensp;Installing the Palace solver using Apptainer  
-&ensp;Installing the Palace solver using spack package manager  
-&ensp;Running Palace (after installation)  
-Quick tour  
-&ensp;Simulation model: Input files  
-&ensp;Simulation model: Simulation control  
-&ensp;Simulation model: Ports   
-&ensp;Running the model code to create Palace input files  
-&ensp;Running Palace FEM simulation from our input files  
-Simulation model file in detail  
-&ensp;Input files  
-&ensp;settings  
-&ensp;Port configuration  
-&ensp;Filenames and flow control  
-Examples  
-Conductor loss modelling
-Dielectric loss modelling  
-Advanced topics  
-&ensp;Adaptive mesh refinement at selected frequencies only  
-&ensp;Using wave ports instead of lumped ports not supported  
-&ensp;Using S-Parameter output, model extraction  
-&ensp;Lumped circuit model extraction  
-&ensp;Mathematical "black box" vector fit  
-Appendix  
-&ensp;Understanding volumes and surfaces created from GDSII  
-&ensp;Mapping of Volumes and Surfaces to Palace materials  
-&ensp;Software versions used in this document  
-&ensp;List of examples  
+[What's New](#whats-new)  
+[About this workflow](#about-this-workflow)  
+[Workflow](#workflow)  
+[Required software and Python modules](#required-software-and-python-modules)  
+&ensp;[Recommended installation of gds2palace as Python module](#recommended-installation-of-gds2palace-as-python-module)  
+&ensp;[Alternative, no longer recommended: local gds2palace directory](#alternative-no-longer-recommended-local-gds2palace-directory)  
+[Installing AWS Palace](#installing-aws-palace)  
+&ensp;[Installing the Palace solver using Apptainer](#installing-the-palace-solver-using-apptainer)  
+&ensp;[Installing the Palace solver using spack package manager](#installing-the-palace-solver-using-spack-package-manager)  
+&ensp;[Running Palace (after installation)](#running-palace-after-installation)  
+[Quick tour](#quick-tour)  
+&ensp;[Simulation model: Input files](#simulation-model-input-files)  
+&ensp;[Simulation model: Simulation control](#simulation-model-simulation-control)  
+&ensp;[Simulation model: Ports](#simulation-model-ports)  
+&ensp;[Running the model code to create Palace input files](#running-the-model-code-to-create-palace-input-files)  
+&ensp;[Running Palace FEM simulation from our input files](#running-palace-fem-simulation-from-our-input-files)  
+[Simulation model file in detail](#simulation-model-file-in-detail)  
+&ensp;[Input files](#input-files)  
+&ensp;[settings](#settings)  
+&ensp;[Port configuration](#port-configuration)  
+&ensp;[Filenames and flow control](#filenames-and-flow-control)  
+[Examples](#examples)  
+[Conductor loss modelling](#conductor-loss-modelling)  
+[Dielectric loss modelling](#dielectric-loss-modelling)  
+[Advanced topics](#advanced-topics)  
+&ensp;[Adaptive mesh refinement at selected frequencies only](#adaptive-mesh-refinement-at-selected-frequencies-only)  
+&ensp;[Using wave ports instead of lumped ports not supported](#using-wave-ports-instead-of-lumped-ports-not-supported)  
+&ensp;[Using S-Parameter output, model extraction](#using-s-parameter-output-model-extraction)  
+&ensp;[Lumped circuit model extraction](#lumped-circuit-model-extraction)  
+&ensp;[Mathematical "black box" vector fit](#mathematical-black-box-vector-fit)  
+[Using gds2palace with Elmer FEM for EM simulation](#using-gds2palace-with-elmer-fem-for-em-simulation)  
+&ensp;[Installing Elmer FEM](#installing-elmer-fem)  
+&ensp;[From a Palace model to an Elmer model](#from-a-palace-model-to-an-elmer-model)  
+&ensp;[Frequency sweep](#frequency-sweep)  
+&ensp;[Mesh order and solver method](#mesh-order-and-solver-method)  
+&ensp;[Boundary conditions and current limitations](#boundary-conditions-and-current-limitations)  
+&ensp;[Running the Elmer EM simulation and getting S-parameters](#running-the-elmer-em-simulation-and-getting-s-parameters)  
+[Using gds2palace with Elmer FEM for thermal simulation](#using-gds2palace-with-elmer-fem-for-thermal-simulation)  
+&ensp;[Stackup XML: thermal material properties](#stackup-xml-thermal-material-properties)  
+&ensp;[Heat sources and constant-temperature boundaries](#heat-sources-and-constant-temperature-boundaries)  
+&ensp;[Model script settings](#model-script-settings)  
+&ensp;[Running ElmerSolver and viewing results](#running-elmersolver-and-viewing-results)  
+&ensp;[Using setupThermal instead of writing Python code](#using-setupthermal-instead-of-writing-python-code)  
+[Appendix](#appendix)  
+&ensp;[Understanding volumes and surfaces created from GDSII](#understanding-volumes-and-surfaces-created-from-gdsii)  
+&ensp;[Mapping of Volumes and Surfaces to Palace materials](#mapping-of-volumes-and-surfaces-to-palace-materials)  
+&ensp;[Extended XML stackup format](#extended-xml-stackup-format)  
+&ensp;[Software versions used in this document](#software-versions-used-in-this-document)  
+&ensp;[List of examples](#list-of-examples)  
 
 
+
+## What's New
+
+This chapter gives a brief overview of major features added since the previous edition of this guide. For the complete, dated change log, see [`CHANGES.md`](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/doc/CHANGES.md) in the repository.
+
+- **Elmer FEM as an additional solver.** gds2palace can now generate simulation input not only for AWS Palace, but also for [Elmer FEM](https://www.elmerfem.org/), an open-source multiphysics solver. This adds two new workflows, both built from the same GDSII layout + XML stackup + Python model script approach already used for Palace:
+  - **Elmer EM simulation** — S-parameter simulation, see chapter "Using gds2palace with Elmer FEM for EM simulation".
+  - **Elmer thermal simulation** — steady-state heat conduction (temperature) simulation from user-defined heat sources and constant-temperature boundaries, see chapter "Using gds2palace with Elmer FEM for thermal simulation".
+- **Derived layers in the XML stackup.** A layer's geometry can now be computed from other layers using boolean operations (AND/OR/XOR/NOT) and resizing, instead of only being read directly from GDSII. This is used, for example, to derive SG13G2 resistor geometry from existing process layers, see the example in folder `more_examples/derived_layers_and_resistors`.
+- **Reference-relative layer positioning in the XML stackup.** A `<Layer>` or `<Dielectric>` can now be positioned as an offset from the top or bottom edge of another named layer/dielectric, instead of always requiring an absolute Zmin/Zmax. This removes the need to hand-recompute every dependent layer's z-position whenever a thickness changes.
+- **Simplified handling of cutouts.** Mesh generation was redesigned so that the `preprocess_gds` option is no longer required for layouts with cutouts (holes) or other self-intersecting polygon boundaries.
+- **setupThermal.** The companion desktop tool `setupEM` now also includes `setupThermal`, a GUI for building Elmer thermal models without writing Python code, and a GUI-driven XML stackup editor. See <u>https://github.com/VolkerMuehlhaus/setupEM</u>
+
+The XML stackup file format used by both Palace and Elmer models has grown to support these new features. See chapter "Extended XML stackup format" in the Appendix, and the full attribute reference in [`XML_stackup_format.md`](../XML_stackup_format/XML_stackup_format.md).
 
 ## About this workflow 
 Palace, for **PA** rallel **LA** rge-scale **C** omputational **E** lectromagnetics, is an open-source, parallel finite element code for full-wave 3D electromagnetic simulations. It can be scaled from single computer to large high performance simulation clusters and cloud-based computing.  
@@ -747,6 +776,194 @@ Another approach is to do vector fitting of arbitrary n-port data. One possible 
 ![](./images/gds2palace_workflow_userguide.pdf-0041-14.png)
 
 
+## Using gds2palace with Elmer FEM for EM simulation
+
+[Elmer FEM](https://www.elmerfem.org/) is an open-source multiphysics FEM solver. In addition to the AWS Palace output described so far in this guide, gds2palace can create input files for Elmer's electromagnetic (`VectorHelmholtz`) solver, producing S-parameters from the same layout, stackup and port model already used for Palace.
+
+### Installing Elmer FEM
+
+Elmer FEM is not distributed with gds2palace and must be installed separately, see <u>https://www.elmerfem.org/</u>. gds2palace needs to find two Elmer command-line tools: `ElmerGrid` (mesh conversion) and `ElmerSolver` (the solver itself).
+
+- **Windows:** set the environment variable `ELMER_HOME` to your Elmer install directory. gds2palace looks for `%ELMER_HOME%\bin\ElmerGrid.exe`.
+- **Linux/macOS:** make sure `ElmerGrid` and `ElmerSolver` are available on your `PATH`.
+
+### From a Palace model to an Elmer model
+
+An Elmer EM model uses the same **GDSII layout**, **XML stackup file**, **settings dictionary** and **port definitions** already described in chapter "Simulation model file in detail". The only change needed at the end of the model script is which output function is called:
+
+```python
+# Palace output
+config_name, data_dir = simulation_setup.create_palace (excite_ports, settings)
+utilities.create_run_script(sim_path)
+```
+
+becomes
+
+```python
+# Elmer FEM output
+config_name, data_dir = simulation_setup.create_elmer (excite_ports, settings)
+utilities.create_elmer_run_script(sim_path, settings)
+```
+
+Everything else in the model script — `gds_filename`, `XML_filename`, `settings['unit']`, `settings['margin']`, `settings['refined_cellsize']`, and port definitions via `simulation_setup.all_simulation_ports()` / `simulation_setup.simulation_port(...)` — stays exactly the same as for a Palace model.
+
+**Important difference in how ports are excited:** Palace runs one solver pass per active port excitation (controlled by each port's `voltage` and the `excite_ports` list) to build up the full S-matrix, and ports with `voltage=0` are skipped to save simulation time. Elmer's EM solver instead uses a *constraint modes* ("scanning") analysis that solves for **all** ports defined in the model in a single run. This means:
+
+- Every port you define in `simulation_ports` appears in the resulting Elmer S-matrix, regardless of its `voltage` setting.
+- There is no equivalent to the Palace "excite only port 1" trick to save time — with Elmer, you get the full n-port S-matrix or nothing.
+- Depending on port count and mesh size, a full n-port Elmer run can be faster or slower than n separate Palace excitation runs; this depends on the specific model.
+
+### Frequency sweep
+
+`settings['fstart']`, `settings['fstop']`, `settings['fstep']`, `settings['fpoint']` and `settings['fdump']` are read the same way as for Palace and written to a plain frequency list (`frequencies.dat`) for Elmer. Note that Palace's adaptive frequency sweep interpolation (`settings['adaptive_sweep']`) has no Elmer equivalent — Elmer solves at every frequency you list, so simulation time scales directly with the number of frequency points.
+
+### Mesh order and solver method
+
+```python
+settings['order'] = 2          # 1 = linear, 2 = quadratic (recommended), default 2
+settings['iterative'] = False  # True = iterative linear solver, False = direct solver (default)
+```
+
+- `settings['order']` selects the basis function order, same setting as used for Palace. Elmer supports order 1 (linear) and order 2 (quadratic); other values fall back to the order-1 solver recipe.
+- `settings['iterative']` selects between Elmer's direct solver (MUMPS, default, robust for small/medium models) and an iterative solver, which can be more memory-efficient for large models.
+- `settings['ELMER_MPI_THREADS']` (optional) enables MPI-parallel solving: gds2palace partitions the mesh with `ElmerGrid` for the given number of MPI processes, and the generated `run_elmer` script (see below) uses `mpirun` to start `ElmerSolver`.
+
+```python
+settings['ELMER_MPI_THREADS'] = 8   # partition mesh and solve using 8 MPI processes
+```
+
+### Boundary conditions and current limitations
+
+`settings['boundary']` (the six-sided outer simulation boundary, values ABC/PML/PEC/PMC) works the same way as for Palace, with one exception: **PMC boundaries are not supported by the Elmer EM output** and will stop model generation with an error. Use ABC (absorbing) or PEC instead.
+
+A few other Palace features are not yet available in the Elmer EM flow:
+
+- **Sheet resistor layers** (`Type="sheet"` metal paired with a `Resistor` material, as used for on-chip resistors) are not yet supported for Elmer EM output.
+- **Composite ports** (grouping several EM ports into one output port) are not supported, same limitation as for Palace.
+- Metal loss is modeled from conductivity using Elmer's built-in "good conductor" surface impedance; the explicit finite-thickness side-wall correction available for Palace (`settings['z_thickness_factor']`) does not carry over to Elmer output.
+
+### Running the Elmer EM simulation and getting S-parameters
+
+`utilities.create_elmer_run_script(sim_path, settings)` writes a `run_elmer` script into the model output directory, next to the generated Elmer input files (`physics.sif`, `case.sif`, `frequencies.dat`, `mesh/`, `ELMERSOLVER_STARTINFO`):
+
+```bash
+#!/bin/bash
+ElmerSolver
+combine_snp
+```
+
+or, if `settings['ELMER_MPI_THREADS']` is set to more than 1:
+
+```bash
+#!/bin/bash
+mpirun -np 8 ElmerSolver case.sif
+combine_snp
+```
+
+Run it from the model output directory:
+
+```
+cd <model>_data
+./run_elmer
+```
+
+`ElmerSolver` finds `case.sif` automatically via `ELMERSOLVER_STARTINFO`. The same `combine_snp` postprocessing script already used for Palace results also recognizes Elmer's `scalar_results` output and converts it to Touchstone (`.sNp`) format, so downstream use of Elmer S-parameters is identical to Palace results.
+
+
+## Using gds2palace with Elmer FEM for thermal simulation
+
+In addition to EM simulation, gds2palace can generate input for Elmer's steady-state Heat Equation solver, producing a 3D temperature field from user-defined heat sources and constant-temperature boundaries. This shares the same GDSII + XML stackup pipeline as the EM flows, but does not use frequencies or ports.
+
+Elmer FEM must be installed as described above (`ElmerGrid` and `ElmerSolver` on `PATH`, or `ELMER_HOME` set on Windows).
+
+A complete, extensively documented worked example (model script, stackup XML, and GDSII layout) is available at [`more_examples/thermal_simulation_using_Elmer/Elmer_Thermal_Workflow.md`](../../more_examples/thermal_simulation_using_Elmer/Elmer_Thermal_Workflow.md) — this chapter summarizes the key points.
+
+### Stackup XML: thermal material properties
+
+For a thermal run, every `<Material>` needs a thermal conductivity. Only steady-state conductivity is evaluated so far; electrical parameters (used for S-parameter simulation) are not needed for a thermal-only model, though the same stackup file can be reused for both EM and thermal simulation.
+
+```xml
+<Material Name="TopMetal2" Type="Conductor" Conductivity="30300000.0"
+          Density="2700" ThermalConductivity="237" Color="ff8000"/>
+```
+
+- `Density` (kg/m³) is written through to Elmer but not used by the steady-state solver.
+- `ThermalConductivity` is a single value in W/(m·K), for materials whose conductivity doesn't change meaningfully with temperature.
+- `ThermalConductivityTable` points to a `<Table>` instead, for temperature-dependent conductivity (e.g. silicon substrate):
+
+```xml
+<Material Name="HighResSubstrate" Type="Semiconductor" Conductivity="0.025"
+          ThermalConductivityTable="SiliconThermalCond" Density="2329"/>
+...
+<Tables>
+  <Table Name="SiliconThermalCond">
+    <Point Temperature="280" Value="163.00"/>
+    <Point Temperature="290" Value="155.20"/>
+  </Table>
+</Tables>
+```
+
+gds2palace writes this straight through as an Elmer temperature-dependent material table — no manual `.sif` editing needed. See chapter "Extended XML stackup format" in the Appendix and [`XML_stackup_format.md`](../XML_stackup_format/XML_stackup_format.md) for the full attribute reference.
+
+### Heat sources and constant-temperature boundaries
+
+Instead of ports, a thermal model declares where heat enters and leaves through `thermal_objects`, using ordinary marker polygons drawn on dedicated GDSII layers:
+
+```python
+thermal_objects = simulation_setup.all_thermal_objects()
+thermal_objects.add_heatsource(simulation_setup.heatsource(
+    power=0.65, source_layernum=201, target_layername='TFR'))
+thermal_objects.add_consttemp(simulation_setup.constanttemp(
+    temp=298, source_layernum=202, target_layername='BACKSIDEGND'))
+```
+
+- `source_layernum` is a GDSII layer number you draw purely as an xy footprint marker; it does not set a z-position.
+- `target_layername` is the name of an existing `<Layer>` from the stackup XML — its z-range becomes the 3D volume the source/boundary is applied to.
+- `heatsource(power, ...)` dissipates `power` Watts as a volumetric heat source over that volume. In the example above, 0.65 W is applied to the `TFR` resistor layer via marker layer 201.
+- `constanttemp(temp, ...)` fixes that volume's temperature (Kelvin), acting as a heat sink/reference boundary. In the example above, layer 202 pins the `BACKSIDEGND` layer to 298 K (25 °C), a typical backside heatsink boundary.
+
+The target layer for a heat source must be a volume (`Zmax` larger than `Zmin`). The target layer for a constant-temperature boundary is usually a zero-thickness sheet layer (`Zmax = Zmin`) — if it has finite thickness instead, two boundaries are created, one at each face.
+
+### Model script settings
+
+```python
+settings['unit']              = 1e-6   # geometry is in microns
+settings['margin']            = 100    # air margin around the layout, in microns
+settings['refined_cellsize']  = 5      # extra-fine mesh near heat sources
+settings['meshsize_max']      = 100    # coarsest mesh size, in microns
+settings['elmer_thermal']     = True   # selects the thermal flow instead of EM/Palace
+settings['thermal_objects']   = thermal_objects
+```
+
+`settings['no_gui'] = True` skips the interactive gmsh mesh preview, useful for unattended/batch runs. Then create the model:
+
+```python
+config_name, data_dir = simulation_setup.create_elmer_thermal (settings)
+```
+
+Note there is no `excite_ports` argument here — a thermal run has no ports.
+
+### Running ElmerSolver and viewing results
+
+Output goes to an `elmer_model/` folder next to the script, containing the gmsh mesh, the Elmer-native `mesh/` folder (from `ElmerGrid`), `case.sif` (materials, body/volume definitions, the heat source as a volumetric Body Force, and the constant-temperature Boundary Condition), and `ELMERSOLVER_STARTINFO`. It's worth a quick look at `case.sif` before solving, especially the first time you use a new stackup — it's plain text and easy to sanity-check.
+
+```
+cd elmer_model
+ElmerSolver
+```
+
+Results appear in the same directory:
+
+- `thermal_results.vtu` — full 3D temperature field, open in ParaView.
+- `thermal_results.dat` — quick min/max temperature summary (plain text).
+
+If `settings['ELMER_MPI_THREADS']` is set to more than 1, gds2palace also partitions the mesh for you; run `ElmerSolver_mpi` with your MPI launcher of choice instead of the single-threaded `ElmerSolver`.
+
+### Using setupThermal instead of writing Python code
+
+[setupThermal](https://github.com/VolkerMuehlhaus/setupEM) is a desktop GUI (part of the `setupEM` project) that drives this same flow without writing a Python model script by hand: pick the layout/stackup files, add heat sources and constant-temperature boundaries in a table (GDSII source layer, target stackup layer name, and power in W or temperature in K), then generate and run the model, or launch `ElmerSolver` directly from the app with output streamed to an on-screen log. The **Model** tab shows the generated Python code, so you can inspect or export it if you'd rather take over from there manually.
+
+
 ## Appendix 
 
 ### Understanding volumes and surfaces created from GDSII 
@@ -824,6 +1041,18 @@ In the Palace config file, this results in an Impedance boundary with Rs value m
 
 ![](./images/gds2palace_workflow_userguide.pdf-0046-05.png)
 
+
+### Extended XML stackup format
+
+The XML stackup format has grown beyond the basic dielectric stack and conductor/via layer mapping described above. The current major additions, all optional and backward-compatible with older stackup files, are:
+
+- **Derived layers** — a layer's geometry can be computed from other layers via boolean operations (`AND`/`OR`/`XOR`/`NOT`) and resizing, instead of only being read directly from GDSII. Used, for example, to derive on-chip resistor geometry from existing process layers.
+- **Reference-relative positioning** — a `<Layer>` or `<Dielectric>` can be positioned as an offset from the top or bottom edge of another named layer/dielectric, instead of requiring an absolute Zmin/Zmax.
+- **Thermal material properties** — `Density`, `ThermalConductivity` and `ThermalConductivityTable` on `<Material>`, plus a `<Tables>` block for temperature-dependent conductivity, used by the Elmer thermal flow described in chapter "Using gds2palace with Elmer FEM for thermal simulation".
+
+Using derived layers, reference-relative positioning, or thermal conductivity tables requires `schemaVersion="3.0"` in the `<Stackup>` root element. The stackup reader prints a warning if a file declares a newer `schemaVersion` than the installed gds2palace version supports, so an outdated installation is easier to notice.
+
+The full attribute reference, with examples, is in [`XML_stackup_format.md`](../XML_stackup_format/XML_stackup_format.md), and derived-layer details specifically are in [`derived_layers.md`](../XML_stackup_format/derived_layers.md).
 
 ### Software versions used in this document 
 
