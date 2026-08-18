@@ -1,12 +1,18 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<Stackup schemaVersion="3.0">
+<Stackup schemaVersion="3.1">
   <!-- Created/modified using the XML Stackup Editor in setupEM -->
   <!-- ============================================================ -->
   <!-- File description: Model for use with gds2palace S-Parameter simulation:
-IHP SG13G2 with 200 um final chip height (including BEOL). 
+IHP SG13G2 with 200 um final chip height (including BEOL).
 Resistors Rsil, Rppd and Rhigh included using derived layers,
-but not fully tested. -->
+but not fully tested. Substrate height defined using variable. -->
   <!-- Reference-relative positioning requires gds2palace util_stackup_reader.py version 1.6.0 or newer -->
+  <!-- <Variables>/"="-expressions require gds2palace util_stackup_reader.py version 1.7.0 or newer -->
+  <Variables>
+    <Variable Name="air_thickness" Value="200.0000" />
+    <Variable Name="total_thickness" Value="200.0000" />
+    <Variable Name="bulk_thickness" Value="=total_thickness-20" />
+  </Variables>
   <Materials>
     <Material Name="Activ" Type="Conductor" Conductivity="357141.0" Color="00ff00" />
     <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" Color="39bfff" />
@@ -37,11 +43,11 @@ but not fully tested. -->
   </Materials>
   <ELayers LengthUnit="um">
     <Dielectrics>
-      <Dielectric Name="AIR" Reference="Passive" ReferenceEdge="Top" Material="AIR" Thickness="200.0000" />
+      <Dielectric Name="AIR" Reference="Passive" ReferenceEdge="Top" Material="AIR" Thickness="=air_thickness" />
       <Dielectric Name="Passive" Reference="SiO2" ReferenceEdge="Top" Material="Passive" Thickness="0.4000" />
       <Dielectric Name="SiO2" Reference="EPI" ReferenceEdge="Top" Material="SiO2" Thickness="15.7303" />
       <Dielectric Name="EPI" Reference="Substrate" ReferenceEdge="Top" Material="EPI" Thickness="3.7500" />
-      <Dielectric Name="Substrate" Material="Substrate" Thickness="180.0000" />
+      <Dielectric Name="Substrate" Material="Substrate" Thickness="=bulk_thickness" />
     </Dielectrics>
     <Layers>
       <!-- SG13G2 resistors created from derived layers defined in DerivedLayers section below-->
@@ -66,7 +72,7 @@ but not fully tested. -->
       <Layer Name="RSIL" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RSIL" Layer="314" Zmin="0.0000" Zmax="0.0000" />
       <Layer Name="Activ" Type="conductor" Reference="SiO2" ReferenceEdge="Bottom" Material="Activ" Layer="1" Zmin="0.0000" Zmax="0.4000" />
       <Layer Name="SUBGND" Type="conductor" Reference="EPI" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="250" Zmin="0.0000" Zmax="3.7500" />
-      <Layer Name="LBE" Type="dielectric" Reference="Substrate" ReferenceEdge="Bottom" Material="AIR" Layer="157" Zmin="0.0000" Zmax="183.7500" />
+      <Layer Name="LBE" Type="dielectric" Reference="Substrate" ReferenceEdge="Bottom" Material="AIR" Layer="157" Zmin="0.0000" Zmax="=bulk_thickness + 3.7500" />
       <Layer Name="BACKSIDEGND" Type="conductor" Reference="Substrate" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="251" Zmin="-6.2500" Zmax="0.0000" />
     </Layers>
     <DerivedLayers>

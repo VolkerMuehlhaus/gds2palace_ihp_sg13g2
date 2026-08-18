@@ -2,8 +2,8 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 14/15-August-2026
-Three major upgrades:
+## 14-18-August-2026
+Four major upgrades:
 
 1) The stackup files now support derived layers, see folder `doc/XML_stackup_format` for details. This enables SG13G2 resistor in the stackup, see example in folder `more_examples`.  
 
@@ -15,10 +15,21 @@ Dielectric, instead of always using an absolute Zmin/Zmax value. This removes th
 hand-recompute every dependent layer's z-position whenever a `<Dielectric Thickness="...">`
 changes. See `doc/XML_stackup_format` for details, and `test_data/` for example files.
 
+4) Stackup XML files now support a `<Variables>` block: named values (numbers or strings,
+plain literals or `=`-prefixed expressions) that any attribute value anywhere in the file can
+reference instead of a fixed value, removing the need to hand-copy the same physical value
+into multiple attributes or files. A `<Variable>`'s value can itself be an expression built
+from other variables (e.g. `Value="=metal_thickness + via_thickness"`), resolved regardless of
+declaration order. A Python caller of `read_substrate()`/`parse_substrate()` can also override
+a variable's value via the new `variable_overrides` argument - e.g. for a parametric sweep
+script - without editing the XML file. See `doc/XML_stackup_format` for details, and
+`more_examples/derived_layers_and_resistors` for a worked example.
+
 Using derived layers, Reference-relative positioning, or thermal tables requires
-`schemaVersion="3.0"` in the stackup file. The reader now prints a warning if a stackup file
-declares a `schemaVersion` newer than the version this gds2palace installation supports, so an
-outdated installation is easier to notice.
+`schemaVersion="3.0"` in the stackup file; using `<Variables>`/`=`-expressions requires
+`schemaVersion="3.1"`. The reader now prints a warning if a stackup file declares a
+`schemaVersion` newer than the version this gds2palace installation supports, so an outdated
+installation is easier to notice.
 
 As a side effect of derived layers, the handling of cutouts has been redesigned, and  model option `preprocess_gds` is no longer required.  
 

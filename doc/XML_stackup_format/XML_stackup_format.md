@@ -14,6 +14,9 @@ derived-layer examples using `AND`/`OR`/`NOT`).
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <Stackup schemaVersion="2.0">
+  <Variables>              <!-- optional, see "<Variables> (schema proposal)" near the end -->
+    ...
+  </Variables>
   <Materials>
     ...
   </Materials>
@@ -297,6 +300,78 @@ constant `ThermalConductivity`).
 <Material Name="Substrate" Type="Semiconductor" Permittivity="11.9" Conductivity="2.0"
           ThermalConductivityTable="Si_k_vs_T" Color="01e0ff"/>
 ```
+
+## `<Variables>`
+
+A file using `<Variables>`/`=`-expressions declares `schemaVersion="3.1"` (see
+[`variables_example.xml`](variables_example.xml)) — the same precedent as the `"2.0"` →
+`"3.0"` bump for `Reference`/`ReferenceEdge` — so an older reader warns instead of silently
+misreading it.
+
+Optional, sibling of `<Materials>` directly under `<Stackup>` — but unlike every other section
+in this document, it must come **first**, before `<Materials>` (see the
+[Top-level structure](#top-level-structure) diagram above). Defines named values that can then
+be referenced from *any* attribute value anywhere else in the file (Materials, Dielectrics,
+Layers, Substrate, DerivedLayers, Tables — see "Using a variable or equation" below), instead
+of hand-copying the same physical value into every attribute/file that needs it.
+
+One `<Variable>` element per value:
+
+| Attribute | Required | Default  | Description |
+|-----------|----------|----------|--------------|
+| `Name`    | yes      | —        | Variable name. Must be unique across `<Variables>`. |
+| `Value`   | yes      | —        | A plain literal (number or string), or a `=`-prefixed expression that may reference other variables (see below). |
+| `Type`    | no       | inferred | `number` or `string`. For a plain-literal `Value`, an explicit `Type` controls parsing — `Type="string"` keeps a numeric-looking literal as text instead of it being inferred as a number; if omitted, `Type` is inferred by trying to parse `Value` as a number. For a `=`-expression `Value`, `Type` cannot override the computed result's type — it is instead validated against it, and a mismatch is an error. |
+
+```xml
+<Variables>
+  <Variable Name="cu_conductivity" Value="21640000.0" />
+  <Variable Name="metal_thickness" Value="0.42" />
+  <Variable Name="via_thickness"   Value="0.54" />
+  <Variable Name="via_top"         Value="=metal_thickness + via_thickness" />
+  <Variable Name="metal_color"     Value="39bfff" Type="string" />
+</Variables>
+```
+
+Variables may reference other variables regardless of declaration order — resolved by
+dependency, the same "repeat until no progress, remainder = circular/unresolved → error"
+approach already used for `<Layer Reference="...">` (see
+[Reference-relative positioning (Layers)](#reference-relative-positioning-layers) above).
+
+### Using a variable or equation in any attribute
+
+Any attribute value **starting with `=`** is an expression, evaluated with bare identifiers
+resolved against `<Variables>`. A plain variable reference is just the trivial one-token case
+of an expression — there's no separate reference syntax:
+
+```xml
+<Material Name="Metal1" Type="Conductor" Conductivity="=cu_conductivity" Color="=metal_color"/>
+
+<Layer Name="Metal1" Type="conductor" Material="Metal1" Layer="8"
+       Zmin="1.04" Zmax="=1.04 + metal_thickness" />
+<Layer Name="Via1" Type="via" Material="Via1" Layer="19"
+       Zmin="=metal_thickness + 1.04" Zmax="=via_top + 1.04" />
+```
+
+A value **without** a leading `=` is a plain literal, parsed exactly as it is today — this
+keeps every existing stackup file's meaning unchanged (no attribute value in this repo's
+example files begins with `=`).
+
+This applies to every attribute in the file, not only Materials/Dielectrics/Layers — including
+`<Substrate Offset="...">`, `<DerivedLayer Layer="..." Oversize="...">` and its `<Operand
+Layer="...">` children, and `<Table>`'s `<Point Temperature="..." Value="...">` children. See
+[`variables_example.xml`](variables_example.xml) for a complete illustrative file, including
+`DerivedLayers` and `Tables` usage.
+
+**Expression syntax:** `+ - * / **`, unary `-`/`+`, parentheses, numeric literals (including
+scientific notation, same as accepted by `float()` today), and bare identifiers naming a
+`<Variable>`. A `string`-typed variable may only be used as the sole token in an expression
+(`="tech_name"`, i.e. whole-value substitution) — using a string variable inside arithmetic is
+an error. No string concatenation or function calls (`min()`, `max()`, etc.) are supported.
+
+**Integer attributes:** GDSII layer numbers (`<Layer Layer="...">`, `<DerivedLayer Layer="...">`,
+`<Operand Layer="...">`, `<Dielectric Boundary="...">`) are integers — an expression resolving
+to a non-integer value used in one of these attributes is an error, not a silent truncation.
 
 ## What `read_substrate()` returns
 

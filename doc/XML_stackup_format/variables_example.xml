@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<!-- Illustrative example for the <Variables> feature (util_stackup_reader.py 1.7.0+,
+     schemaVersion "3.1"). See XML_stackup_format.md, section "<Variables>", for the full
+     description of this syntax. This file is not wired into more_examples/ or workflow/
+     because it's a format demonstration rather than a realistic full fab stackup (e.g. its
+     DerivedLayers/Tables entries don't correspond to a real GDSII layout) - but it does
+     parse successfully through util_stackup_reader.read_substrate(). -->
+<Stackup schemaVersion="3.1">
+
+  <Variables>
+    <!-- plain numeric literals -->
+    <Variable Name="cu_conductivity"  Value="21640000.0" />
+    <Variable Name="via_conductivity" Value="1660000.0" />
+    <Variable Name="metal_thickness"  Value="0.42" />
+    <Variable Name="via_thickness"    Value="0.54" />
+    <Variable Name="oversize_amount"  Value="2" />
+    <Variable Name="thermal_k_300"    Value="148" />
+    <Variable Name="topmetal1_layer"  Value="126" />
+    <Variable Name="topmetal2_layer"  Value="134" />
+
+    <!-- equation referencing other variables -->
+    <Variable Name="via_top" Value="=metal_thickness + via_thickness" />
+
+    <!-- string variable, reused below to deduplicate a repeated Color value -->
+    <Variable Name="metal_color" Value="39bfff" Type="string" />
+  </Variables>
+
+  <Materials>
+    <Material Name="AIR"   Type="Dielectric" Permittivity="1"   Color="ffffff"/>
+    <Material Name="SiO2"  Type="Dielectric" Permittivity="4.1" Color="fffcad"/>
+    <!-- both metals share one conductivity and one color, via variable references -->
+    <Material Name="Metal1" Type="Conductor" Conductivity="=cu_conductivity" Color="=metal_color"/>
+    <Material Name="Metal2" Type="Conductor" Conductivity="=cu_conductivity" Color="=metal_color"/>
+    <Material Name="Via1"   Type="Conductor" Conductivity="=via_conductivity" Color="909090"/>
+  </Materials>
+
+  <ELayers LengthUnit="um">
+    <Dielectrics>
+      <Dielectric Name="AIR"  Material="AIR"  Thickness="200.0000" />
+      <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303" />
+    </Dielectrics>
+
+    <Layers>
+      <!-- Zmax computed as a literal plus a variable -->
+      <Layer Name="Metal1" Type="conductor" Material="Metal1" Layer="8"
+             Zmin="1.04" Zmax="=1.04 + metal_thickness" />
+      <!-- Zmin/Zmax both computed from variables, chained off the value above -->
+      <Layer Name="Via1" Type="via" Material="Via1" Layer="19"
+             Zmin="=1.04 + metal_thickness" Zmax="=1.04 + via_top" />
+      <Layer Name="Metal2" Type="conductor" Material="Metal2" Layer="10"
+             Zmin="=1.04 + via_top" Zmax="=1.04 + via_top + metal_thickness" />
+
+      <!-- target Layer entry for the DerivedLayer below, same z-range as Metal2 -->
+      <Layer Name="TM1_TM2_Overlap" Type="conductor" Material="Metal2" Layer="240"
+             Zmin="=1.04 + via_top" Zmax="=1.04 + via_top + metal_thickness" />
+    </Layers>
+
+    <DerivedLayers>
+      <!-- layer 240 = topmetal2_layer AND topmetal1_layer, grown by oversize_amount -->
+      <DerivedLayer Name="TM1_TM2_Overlap" Layer="240" Operation="AND" Oversize="=oversize_amount">
+        <Operand Layer="=topmetal2_layer"/>
+        <Operand Layer="=topmetal1_layer"/>
+      </DerivedLayer>
+    </DerivedLayers>
+  </ELayers>
+
+  <Tables>
+    <Table Name="Si_k_vs_T">
+      <Point Temperature="250" Value="170"/>
+      <!-- Value computed from a variable -->
+      <Point Temperature="300" Value="=thermal_k_300"/>
+      <Point Temperature="350" Value="130"/>
+    </Table>
+  </Tables>
+
+</Stackup>
