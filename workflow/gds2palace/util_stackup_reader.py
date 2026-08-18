@@ -43,8 +43,13 @@
 # 18 Aug 2026: added variable_overrides parameter to read_substrate()/parse_substrate(), so
 #              an external caller (e.g. a parametric sweep script) can override a <Variable>'s
 #              value without editing the XML file - see variables_list.apply_overrides()
+# 18 Aug 2026: made the "variables" argument optional (default None -> empty variables_list)
+#              on stackup_material/dielectric_layer/metal_layer/derived_layer/thermal_table,
+#              so a caller built before <Variables> existed (e.g. setupEM's stackup_editor.py,
+#              which constructs these directly rather than via parse_substrate()) keeps working
+#              unchanged for ordinary files, instead of every call raising TypeError outright
 
-__version__ = "1.7.1"
+__version__ = "1.7.2"
 
 import os
 import math
@@ -517,14 +522,19 @@ class stackup_material:
     stackup material object, can be dielectric or metal with conductivity or sheet with Ohm/square
   """
     
-  def __init__ (self, data, variables):
+  def __init__ (self, data, variables=None):
     """create stackup material object from XML data line
 
     Args:
         data (string): line from XML data, required parameters are "Name" and "Type" strings. Optional: "Permittivity","DielectricLossTangent","Conductivity","Rs","Color"
-        variables (variables_list): fully-resolved <Variables>, for resolving any "="-prefixed
-          expression among this material's attributes
+        variables (variables_list, optional): fully-resolved <Variables>, for resolving any
+          "="-prefixed expression among this material's attributes. Defaults to an empty
+          variables_list if omitted - fine for a file with no expressions; a caller that omits
+          this for a file that does use one gets a clear _UndefinedVariableError-driven message
+          instead of this constructor raising TypeError outright.
     """
+    if variables is None:
+      variables = variables_list()
 
 
     self.name = resolve_attr(data, "Name", None, variables)
@@ -600,7 +610,7 @@ class dielectric_layer:
     dielectric layer object. Holds information on stackup layers that are always there, without drawing them explicitely in GDSII
   """
     
-  def __init__ (self, data, variables):
+  def __init__ (self, data, variables=None):
     """create stackup layer object (usually dielectric or semiconductor) from XML data line
 
     Args:
@@ -609,9 +619,12 @@ class dielectric_layer:
           Optional "Reference"/"ReferenceEdge": if "Reference" names another Dielectric, "Zmin"
           (default 0) and "Zmax" (default Zmin+Thickness) are offsets from that Dielectric's edge
           instead of absolute z, resolved later by resolve().
-        variables (variables_list): fully-resolved <Variables>, for resolving any "="-prefixed
-          expression among this dielectric's attributes
+        variables (variables_list, optional): fully-resolved <Variables>, for resolving any
+          "="-prefixed expression among this dielectric's attributes. Defaults to an empty
+          variables_list if omitted - see stackup_material.__init__ for why.
     """
+    if variables is None:
+      variables = variables_list()
     self.name = resolve_attr(data, "Name", None, variables)
     self.material = resolve_attr(data, "Material", None, variables)
 
@@ -898,16 +911,19 @@ class metal_layer:
     drawing layer object ( name metal_layer is misleading, this drawn layer that uses material from the XML materials section)
   """
     
-  def __init__ (self, data, variables):
+  def __init__ (self, data, variables=None):
     """create metal layer object (planar metal, via, sheet or dielectric) from XML data line
 
     Args:
         data (string): line from XML data, required parameters: "Name","Layer","Type","Material","Zmin","Zmax".
           Optional "Reference"/"ReferenceEdge": if "Reference" names another Dielectric or Layer, "Zmin"/"Zmax"
           are interpreted as offsets from that layer's edge instead of absolute z, resolved later by resolve().
-        variables (variables_list): fully-resolved <Variables>, for resolving any "="-prefixed
-          expression among this layer's attributes
+        variables (variables_list, optional): fully-resolved <Variables>, for resolving any
+          "="-prefixed expression among this layer's attributes. Defaults to an empty
+          variables_list if omitted - see stackup_material.__init__ for why.
        """
+    if variables is None:
+      variables = variables_list()
     self.name = resolve_attr(data, "Name", None, variables)
     self.layernum = resolve_int_attr(data, "Layer", variables)
     self.type = resolve_attr(data, "Type", None, variables).upper()
@@ -1214,7 +1230,7 @@ class derived_layer:
 
   VALID_OPERATIONS = ("AND", "OR", "XOR", "NOT", "SIZE")
 
-  def __init__ (self, data, variables):
+  def __init__ (self, data, variables=None):
     """create derived layer object from XML data line
 
     Args:
@@ -1224,9 +1240,12 @@ class derived_layer:
           "Layer" attribute, in order. For "NOT", first operand minus all following operands.
           Order does not matter for "AND", "OR", "XOR". "SIZE" takes exactly one operand and
           requires a non-zero Oversize; it just resizes that operand onto the new layer number.
-        variables (variables_list): fully-resolved <Variables>, for resolving any "="-prefixed
-          expression among this derived layer's (and its Operands') attributes
+        variables (variables_list, optional): fully-resolved <Variables>, for resolving any
+          "="-prefixed expression among this derived layer's (and its Operands') attributes.
+          Defaults to an empty variables_list if omitted - see stackup_material.__init__ for why.
     """
+    if variables is None:
+      variables = variables_list()
     self.name = resolve_attr(data, "Name", None, variables)
     self.layernum = resolve_int_attr(data, "Layer", variables)
 
@@ -1355,7 +1374,9 @@ class derived_layers_list:
 # ----------- thermal tables -----------------
 
 class thermal_table:
-    def __init__(self, xml_data, variables):
+    def __init__(self, xml_data, variables=None):
+        if variables is None:
+            variables = variables_list()
         self.name = resolve_attr(xml_data, "Name", None, variables)
         self.points = []
 
@@ -1375,10 +1396,18 @@ class thermal_tables_list(list):
 
 # ----------- parse substrate file, get materials from list created before -----------
 
+GENERATOR_COMMENT_PREFIX = "Created/modified using the XML Stackup Editor in"
 DESCRIPTION_COMMENT_PREFIX = "File description:"
+_HEADER_SEPARATOR_TEXT = "=" * 60
 # duplicated (not imported) from util_stackup_writer.py deliberately: that module
 # is specific to the interactive XML editor, while this reader module is used by
-# the whole gds2palace pipeline and is meant to stay independent of it.
+# the whole gds2palace pipeline and is meant to stay independent of it. Two formats
+# are recognized: the current one (generator stamp, separator, one comment per
+# description line with nothing prepended, closing separator) and the older one
+# (generator stamp, separator, a single comment prefixed with
+# DESCRIPTION_COMMENT_PREFIX holding the whole possibly-multi-line description) that
+# util_stackup_writer.py itself still reads for backward compatibility with files
+# saved before the format changed.
 
 
 def read_file_description (XML_filename):
@@ -1398,6 +1427,23 @@ def read_file_description (XML_filename):
     root = xml.etree.ElementTree.parse(XML_filename, parser=_make_comment_preserving_parser()).getroot()
   except xml.etree.ElementTree.ParseError:
     return ""
+
+  children = list(root)
+  if (len(children) >= 2
+      and children[0].tag is xml.etree.ElementTree.Comment
+      and (children[0].text or "").strip().startswith(GENERATOR_COMMENT_PREFIX)
+      and children[1].tag is xml.etree.ElementTree.Comment
+      and (children[1].text or "").strip() == _HEADER_SEPARATOR_TEXT):
+    lines = []
+    for child in children[2:]:
+      if child.tag is not xml.etree.ElementTree.Comment:
+        break
+      text = (child.text or "").strip()
+      if text == _HEADER_SEPARATOR_TEXT:
+        return "\n".join(lines)
+      lines.append(text)
+    # no closing separator found - not a well-formed current-format block, fall
+    # through to the legacy single-comment lookup below
 
   for child in root:
     if child.tag is xml.etree.ElementTree.Comment:
