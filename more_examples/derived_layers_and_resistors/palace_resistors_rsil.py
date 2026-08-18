@@ -25,6 +25,11 @@ run_command = ['./run_sim']
 gds_filename = "resistors_with_ports.gds"   # geometries
 XML_filename = "SG13G2_resistors_200um.xml"          # stackup
 
+# override the "total_thickness" <Variable> from XML_filename, in microns.
+# Set to None to use the value declared in XML_filename as-is.
+total_thickness = 50
+air_thickness = 20
+
 # preprocess GDSII for safe handling of cutouts/holes?
 preprocess_gds = True
 
@@ -80,7 +85,13 @@ simulation_ports.add_port(simulation_setup.simulation_port(portnumber=2, voltage
 # ======================== simulation ================================
 
 # get technology stackup data
-materials_list, dielectrics_list, metals_list = stackup_reader.read_substrate (XML_filename)
+variable_overrides = {}
+if total_thickness is not None:
+    variable_overrides['total_thickness'] = total_thickness
+if air_thickness is not None:
+    variable_overrides['air_thickness'] = air_thickness
+
+materials_list, dielectrics_list, metals_list = stackup_reader.read_substrate (XML_filename, variable_overrides=variable_overrides)
 # get list of layers from technology
 layernumbers = metals_list.getlayernumbers()
 layernumbers.extend(simulation_ports.portlayers)

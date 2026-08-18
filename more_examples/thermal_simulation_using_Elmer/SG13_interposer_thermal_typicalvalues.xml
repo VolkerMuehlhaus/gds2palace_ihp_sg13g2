@@ -1,24 +1,41 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<Stackup schemaVersion="3.0">
+<Stackup schemaVersion="3.1">
   <!-- Created/modified using the XML Stackup Editor in setupEM -->
   <!-- ============================================================ -->
   <!-- File description: Thermal model for use with gds2palace and Elmer solver.
 IHP interposer technology based on SG13.
-Silicon thermal values from literature (not actual IHP data). -->
+Silicon thermal values from literature (not actual IHP data).
+Thermal conductivity values defined using variables, since several materials share the
+same value. Density is omitted throughout - not used by this model, defaults to 1 in the
+reader. Substrate thickness (Dielectric, Substrate Offset, and the LBE/BACKSIDEGND Layers
+below it) defined using a variable too, since that dimension is otherwise repeated in
+several places. -->
+  <!-- <Variables>/"="-expressions require gds2palace util_stackup_reader.py version 1.7.0 or newer -->
+  <Variables>
+    <Variable Name="k_metal"            Value="237" />
+    <Variable Name="k_via"              Value="174" />
+    <Variable Name="k_passive"          Value="0.5" />
+    <Variable Name="k_oxide"            Value="1" />
+    <Variable Name="k_lowloss"          Value="100" />
+    <Variable Name="k_air"              Value="0.026" />
+    <Variable Name="total_thickness" Value="250.0" />
+    <Variable Name="substrate_thickness" Value="=total_thickness-12.4704" />
+    
+  </Variables>
   <Materials>
-    <Material Name="Metal4" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Density="2700" Color="93e837" />
-    <Material Name="Metal5" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Density="2700" Color="dcd146" />
-    <Material Name="TopMetal1" Type="Conductor" Conductivity="27800000.0" ThermalConductivity="237" Density="2700" Color="ffe6bf" />
-    <Material Name="TopMetal2" Type="Conductor" Conductivity="30300000.0" ThermalConductivity="237" Density="2700" Color="ff8000" />
-    <Material Name="TopVia2" Type="Conductor" Conductivity="3143000.0" ThermalConductivity="174" Density="2200" Color="ff8000" />
-    <Material Name="TopVia1" Type="Conductor" Conductivity="2191000.0" ThermalConductivity="174" Density="2200" Color="ffe6bf" />
-    <Material Name="Via4" Type="Conductor" Conductivity="1660000.0" ThermalConductivity="174" Density="2200" Color="deac5e" />
-    <Material Name="Passive" Type="Dielectric" Permittivity="6.6" DielectricLossTangent="0.0" ThermalConductivity="0.5" Density="2200" Color="a0a0f0" />
-    <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" DielectricLossTangent="0.0" ThermalConductivity="1" Density="2200" Color="fffcad" />
-    <Material Name="HighResSubstrate" Type="Semiconductor" Permittivity="11.9" DielectricLossTangent="0" Conductivity="0.025" ThermalConductivityTable="SiliconThermalCond" Density="2329" Color="01e0ff" />
-    <Material Name="AIR" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" ThermalConductivity="0.026" Density="1.2" Color="d0d0d0" />
-    <Material Name="LOWLOSS" Type="Conductor" Conductivity="1E10" ThermalConductivity="100" Density="2700" Color="ff0000" />
-    <Material Name="TFR" Type="Conductor" Conductivity="500000.0" ThermalConductivity="100" Density="2700" Color="aaaaaa" />
+    <Material Name="Metal4" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="=k_metal" Color="93e837" />
+    <Material Name="Metal5" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="=k_metal" Color="dcd146" />
+    <Material Name="TopMetal1" Type="Conductor" Conductivity="27800000.0" ThermalConductivity="=k_metal" Color="ffe6bf" />
+    <Material Name="TopMetal2" Type="Conductor" Conductivity="30300000.0" ThermalConductivity="=k_metal" Color="ff8000" />
+    <Material Name="TopVia2" Type="Conductor" Conductivity="3143000.0" ThermalConductivity="=k_via" Color="ff8000" />
+    <Material Name="TopVia1" Type="Conductor" Conductivity="2191000.0" ThermalConductivity="=k_via" Color="ffe6bf" />
+    <Material Name="Via4" Type="Conductor" Conductivity="1660000.0" ThermalConductivity="=k_via" Color="deac5e" />
+    <Material Name="Passive" Type="Dielectric" Permittivity="6.6" DielectricLossTangent="0.0" ThermalConductivity="=k_passive" Color="a0a0f0" />
+    <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" DielectricLossTangent="0.0" ThermalConductivity="=k_oxide" Color="fffcad" />
+    <Material Name="HighResSubstrate" Type="Semiconductor" Permittivity="11.9" DielectricLossTangent="0" Conductivity="0.025" ThermalConductivityTable="SiliconThermalCond" Color="01e0ff" />
+    <Material Name="AIR" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" ThermalConductivity="=k_air" Color="d0d0d0" />
+    <Material Name="LOWLOSS" Type="Conductor" Conductivity="1E10" ThermalConductivity="=k_lowloss" Color="ff0000" />
+    <Material Name="TFR" Type="Conductor" Conductivity="500000.0" ThermalConductivity="=k_lowloss" Color="aaaaaa" />
   </Materials>
   <Tables>
     <Table Name="SiliconThermalCond">
@@ -46,10 +63,10 @@ Silicon thermal values from literature (not actual IHP data). -->
     <Dielectrics>
       <Dielectric Name="Passive" Material="Passive" Thickness="0.4000" />
       <Dielectric Name="SiO2" Material="SiO2" Thickness="12.2703" />
-      <Dielectric Name="Substrate_Interposer" Material="HighResSubstrate" Thickness="250.0000" />
+      <Dielectric Name="Substrate_Interposer" Material="HighResSubstrate" Thickness="=substrate_thickness" />
     </Dielectrics>
     <Layers>
-      <Substrate Offset="250.0" />
+      <Substrate Offset="=substrate_thickness" />
       <Layer Name="Metal4" Type="conductor" Zmin="0.6000" Zmax="1.0900" Material="Metal4" Layer="50" />
       <Layer Name="TFR" Type="conductor" Zmin="1.1900" Zmax="1.2700" Material="TFR" Layer="146" />
       <Layer Name="Metal5" Type="conductor" Zmin="1.6300" Zmax="2.1200" Material="Metal5" Layer="67" />
@@ -58,8 +75,8 @@ Silicon thermal values from literature (not actual IHP data). -->
       <Layer Name="TopVia2" Type="via" Zmin="4.9703" Zmax="7.7703" Material="TopVia2" Layer="133" />
       <Layer Name="TopVia1" Type="via" Zmin="2.1200" Zmax="2.9703" Material="TopVia1" Layer="125" />
       <Layer Name="Via4" Type="via" Zmin="1.0900" Zmax="1.6300" Material="Via4" Layer="66" />
-      <Layer Name="LBE" Type="via" Zmin="-250.0000" Zmax="0.0000" Material="AIR" Layer="157" />
-      <Layer Name="BACKSIDEGND" Type="conductor" Zmin="-250" Zmax="-251" Material="LOWLOSS" Layer="251" />
+      <Layer Name="LBE" Type="via" Zmin="=-substrate_thickness" Zmax="0.0000" Material="AIR" Layer="157" />
+      <Layer Name="BACKSIDEGND" Type="conductor" Zmin="=-substrate_thickness" Zmax="=-substrate_thickness - 1" Material="LOWLOSS" Layer="251" />
     </Layers>
   </ELayers>
 </Stackup>
