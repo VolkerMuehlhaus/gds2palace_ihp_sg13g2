@@ -4,7 +4,8 @@ A derived layer is a new layer number whose geometry is *computed* — via a boo
 operation and/or a resize (grow/shrink) — from other layers, instead of being read
 directly from GDSII. Derived layers are defined in the stackup XML file and are
 resolved automatically by `gds_reader.read_gds()` (see `util_stackup_reader.py` and
-`util_gds_reader.py`).
+`util_gds_reader.py`). A file declaring any `<DerivedLayer>` requires
+`schemaVersion="3.0"` or newer (see [`XML_stackup_format.md`](XML_stackup_format.md)).
 
 Reference file in this repo: [`SG13G2_resistors_200um.xml`](../SG13G2_resistors_200um.xml) —
 uses `OR`/`AND`/`NOT` (including chaining, see below) to recognize resistor geometry from

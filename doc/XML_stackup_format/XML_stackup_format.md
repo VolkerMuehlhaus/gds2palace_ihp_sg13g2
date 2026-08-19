@@ -39,7 +39,7 @@ derived-layer examples using `AND`/`OR`/`NOT`).
 
 `schemaVersion` doesn't change how the reader parses a file (no attribute's meaning branches
 on it) — but `read_substrate()` does print a warning if a file declares a `schemaVersion`
-newer than `util_stackup_reader.SUPPORTED_SCHEMA_VERSION` (currently `"3.0"`), since such a
+newer than `util_stackup_reader.SUPPORTED_SCHEMA_VERSION` (currently `"3.1"`), since such a
 file may use attributes this version of the reader doesn't know about yet.
 
 ## `<Materials>`
@@ -230,6 +230,10 @@ a derived layer's own `<Layer>` entry (the one giving it a Z-position/material) 
 `Reference` like any other layer.
 
 ### `<DerivedLayers>` (boolean operations on layers)
+
+A file declaring any `<DerivedLayer>` requires `schemaVersion="3.0"` or newer — the same
+precedent as the `"2.0"` → `"3.0"` bump for `Reference`/`ReferenceEdge` (both features
+predate the `"3.0"` → `"3.1"` bump for `<Variables>`/expressions).
 
 Defines new layer numbers whose geometry is *computed* from other layers (boolean
 operations and/or resizing) instead of being read directly from GDSII — e.g. an overlap
