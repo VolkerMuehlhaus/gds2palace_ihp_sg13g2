@@ -1,11 +1,15 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <Stackup schemaVersion="3.1">
-  <!-- Created/modified using the XML Stackup Editor in setupEM -->
+  <!-- Created/modified using the XML Stackup Editor in Stackup Editor -->
   <!-- ============================================================ -->
-  <!-- File description: Model for use with gds2palace S-Parameter simulation:
-IHP SG13G2 with 200 um final chip height (including BEOL).
-Resistors Rsil, Rppd and Rhigh included using derived layers,
-but not fully tested. Substrate height defined using variable. -->
+  <!-- Model for use with gds2palace S-Parameter simulation: -->
+  <!-- IHP SG13G2 with Resistors Rsil, Rppd and Rhigh included using derived layers.  -->
+  <!-- Substrate height defined using variable "total_thickness", default to 200 um final chip height (including BEOL). -->
+  <!-- Air above defined using variable "air_thickness", default to 200 um. -->
+  <!--  -->
+  <!-- Do not use with openEMS flow, the thin MIM dielectric will cause a tiny timestep = long simulation time.  -->
+  <!-- MIM is modelled differently for openEMS stackups, with an equivalent dielectric that has same C per area, but without that tiny gap. -->
+  <!-- ============================================================ -->
   <!-- Reference-relative positioning requires gds2palace util_stackup_reader.py version 1.6.0 or newer -->
   <!-- <Variables>/"="-expressions require gds2palace util_stackup_reader.py version 1.7.0 or newer -->
   <Variables>

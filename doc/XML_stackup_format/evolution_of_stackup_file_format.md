@@ -10,6 +10,7 @@ Document version: 2026-08-19
 [Generation 1: the legacy format (schemaVersion "2.0")](#generation-1-the-legacy-format-schemaversion-20)  
 [Generation 2: Reference-relative positioning (schemaVersion "3.0")](#generation-2-reference-relative-positioning-schemaversion-30)  
 [Generation 3: Variables and expressions (schemaVersion "3.1")](#generation-3-variables-and-expressions-schemaversion-31)  
+[Overriding Variables from a model script](#overriding-variables-from-a-model-script)  
 [Also arriving with schemaVersion "3.0": Derived Layers](#also-arriving-with-schemaversion-30-derived-layers)  
 [Beyond schemaVersion: Thermal Conductivity Tables](#beyond-schemaversion-thermal-conductivity-tables)  
 [Trying it yourself](#trying-it-yourself)  
@@ -132,6 +133,72 @@ any Layer referencing it) follow — the "one source of truth" problem from the 
 is solved the same way the positioning problem was solved in Generation 2 itself: by replacing a
 copied literal with a named reference to where the value actually lives.
 
+## Overriding Variables from a model script
+
+Once a stackup's dimensions live in `<Variables>` instead of scattered literals, a model
+`.py` script can override any of them at run time — no XML edit needed for something as
+routine as sweeping the substrate thickness or the air box height between runs.
+`read_substrate()`/`parse_substrate()` in `util_stackup_reader.py` take an optional
+`variable_overrides` dict, applied to the file's `<Variables>` before anything else is
+resolved.
+
+This mechanism is identical in both workflow repos — `gds2palace_ihp_sg13g2` and
+`openems_ihp_sg13g2`. 
+
+An override key must name a `<Variable>` that actually exists in the file's
+`<Variables>` section — an unknown name is an error (`read_substrate()` prints an error
+and exits), so a typo or a stale override left over from a renamed variable fails fast
+instead of silently doing nothing.
+
+### gds2palace
+
+```python
+XML_filename = "SG13G2_resistors_200um.xml"          # stackup
+
+# override the "total_thickness" <Variable> from XML_filename, in microns.
+# Set to None to use the value declared in XML_filename as-is.
+total_thickness = 300
+air_thickness = 50
+
+variable_overrides = {}
+if total_thickness is not None:
+    variable_overrides['total_thickness'] = total_thickness
+if air_thickness is not None:
+    variable_overrides['air_thickness'] = air_thickness
+
+materials_list, dielectrics_list, metals_list = stackup_reader.read_substrate(
+    XML_filename, variable_overrides=variable_overrides)
+```
+
+### openEMS
+
+The openEMS flow calls the very same function, only the surrounding import (`from modules import
+*` instead of `from gds2palace import *`) differs:
+
+```python
+XML_filename = "SG13G2_resistors_200um.xml"          # stackup
+
+# override the "total_thickness" <Variable> from XML_filename, in microns.
+# Set to None to use the value declared in XML_filename as-is.
+total_thickness = 50
+air_thickness = 20
+
+variable_overrides = {}
+if total_thickness is not None:
+    variable_overrides['total_thickness'] = total_thickness
+if air_thickness is not None:
+    variable_overrides['air_thickness'] = air_thickness
+
+materials_list, dielectrics_list, metals_list = stackup_reader.read_substrate(
+    XML_filename, variable_overrides=variable_overrides)
+```
+
+The override isn't limited to numeric variables — a string-typed `<Variable>` (like
+`thermal_table_choice` from file 04, see below) overrides the same way, just with a
+string value in the dict instead of a number. See
+[`../../more_examples/XML_stackup_format_examples/README.md`](../../more_examples/XML_stackup_format_examples/README.md#using-variable_overrides-from-a-gds2palace-model-script)
+for that variant end to end.
+
 ## Also arriving with schemaVersion "3.0": Derived Layers
 
 Reference-relative positioning was not the only feature that bumped the format to
@@ -155,19 +222,10 @@ downstream.
 
 ## Beyond schemaVersion: Thermal Conductivity Tables
 
-Every feature above this point bumps `schemaVersion` (`"2.0"` → `"3.0"` → `"3.1"`) the moment
-it's used. Thermal conductivity tables are different: they're optional content that an older
-reader simply doesn't need to know about to parse the rest of the file correctly, so they don't
-require any particular `schemaVersion` on their own. This tab still rounds out what "full
-featureset" means for this format (see
-[`04_full_featureset_schemaVersion3.1.xml`](../../more_examples/XML_stackup_format_examples/04_full_featureset_schemaVersion3.1.xml),
-which combines everything in this document — Reference, Variables, Derived Layers, and Thermal
-Tables — into one file).
+`ThermalConductivity`, `ThermalConductivityTable`, and `Density` are material parameters that only matter for a *thermal* simulation (the Elmer thermal flow). Note that the optional `Density` parameter is passed through to the Elmer solver but has no effect on a steady-state
+thermal simulation. 
 
-`ThermalConductivity`, `ThermalConductivityTable`, and `Density` are not used at all for EM
-simulation — they only matter for a *thermal* simulation (the Elmer thermal flow), and even
-there, `Density` is passed through to the Elmer solver but has no effect on a steady-state
-thermal simulation specifically. A plain constant `ThermalConductivity` is often not good
+A plain constant `ThermalConductivity` is often not good
 enough for that thermal flow — silicon's thermal conductivity,
 for example, drops by roughly a factor of two between 250 K and 450 K, and a temperature-dependent
 lookup curve matters for an accurate result. Instead of a constant, a `<Material>`'s **Thermal
@@ -198,6 +256,7 @@ other numeric field in this format, either can itself be a `=`-expression. Point
 be entered in temperature order — the editor sorts every table's points ascending by Temperature
 automatically the moment the file is saved, since the downstream Elmer solver reads them as a
 piecewise-linear lookup curve and needs them in order to interpolate correctly.
+
 
 ## Trying it yourself
 
