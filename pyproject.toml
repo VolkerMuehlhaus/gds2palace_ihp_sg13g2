@@ -9,7 +9,7 @@ description = "Create AWS Palace model from RFIC GDSII layout file"
 authors = [
     { name = "Volker Muehlhaus", email = "volker@muehlhaus.com" }
 ]
-license = { text = "Apache" }
+license = "GPL-3.0-or-later"
 readme = "README_pypi.md"
 requires-python = ">=3.9"
 dependencies = [
