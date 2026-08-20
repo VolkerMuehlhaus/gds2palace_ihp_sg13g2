@@ -13,6 +13,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+README_pypi.md
 .eggs/
 lib/
 lib64/

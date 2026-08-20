@@ -154,3 +154,7 @@ Current density at 93 Ghz:
 
 ![butler 5](./doc/png/butler5.png)
 
+# License
+
+This project is licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later) - see [LICENSE](./LICENSE) for the full text.
+
