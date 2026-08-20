@@ -1,7 +1,7 @@
 # Python model code
 The *.py files are Python model code to create a simulation model from *.gds layout and *.xml technology stackup. Each *.py file creates one simulation model, or to be more precise: the files required to run the AWS Palace simulation. These output files will be created in a directory "palace_model" inside your current directory where you run the model.
 
-To run these Python files, you need to have gdspy and gmsh modules installed. It is recommended to create a venv for this, and also install the scikit-rf module that we need for postprocessing the Palace simulation results.
+To run these Python files, you need to have gdspy, gmsh and numpy modules installed. It is recommended to create a venv for this, and also install the scikit-rf module that we need for postprocessing the Palace simulation results, and matplotlib for the inductor synthesis example scripts.
 
 # gds2palace, the 'machine room' of this workflow
 The gds2palace folder contains the code modules required by this workflow. So far, this directory was always required in your current directory where you start the actual model code. 

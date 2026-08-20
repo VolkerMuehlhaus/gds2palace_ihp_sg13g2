@@ -30,6 +30,8 @@ In addition to Palace that is required for simulation of the output files, these
 
 - gdspy (version 1.6.13 or later recommended)
 - gmsh
+- numpy
+- matplotlib (for the inductor synthesis example scripts)
 - scikit-rf (for the script that converts Palace output to Touchstone SnP format)
 
 Documentation assumes that you have created a Python venv named "palace" in ~/venv/palace and installed the modules there.
