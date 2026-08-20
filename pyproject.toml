@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gds2palace"
+dynamic = ["version"]
+description = "Create AWS Palace model from RFIC GDSII layout file"
+authors = [
+    { name = "Volker Muehlhaus", email = "volker@muehlhaus.com" }
+]
+license = { text = "Apache" }
+readme = "README_pypi.md"
+requires-python = ">=3.9"
+dependencies = [
+    "gdspy>1.6.0",
+    "gmsh",
+]
+
+[project.urls]
+Homepage = "https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2"
+Repository = "https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2"
+
+[tool.setuptools.dynamic]
+version = {attr = "gds2palace.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["workflow"]
+include = ["gds2palace*"]
