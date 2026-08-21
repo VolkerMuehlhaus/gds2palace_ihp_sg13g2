@@ -13,6 +13,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+README_pypi.md
 .eggs/
 lib/
 lib64/
@@ -161,3 +162,7 @@ cython_debug/
 
 sub-1/
 sub-2/
+test_data/
+
+# generated Palace model/simulation output (run artifacts, not source content)
+more_examples/**/palace_model/

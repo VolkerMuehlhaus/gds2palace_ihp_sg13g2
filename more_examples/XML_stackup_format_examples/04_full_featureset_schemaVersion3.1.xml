@@ -1,0 +1,162 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<Stackup schemaVersion="3.1">
+  <!-- Created/modified using the XML Stackup Editor in setupEM -->
+  <!-- ============================================================ -->
+  <!-- File description: XML stackup format example 4 of 4: full feature set
+  (schemaVersion 3.1). Reference-relative positioning + Variables/expressions
+  + DerivedLayers (resistor recognition layers) + Tables (two real Si
+  thermal-conductivity datasets, selected via a string Variable).
+  See README.md in this folder. -->
+  <!-- Based on ../derived_layers_and_resistors/SG13G2_resistors_200um.xml,
+  combining every feature demonstrated separately in files 01-03 of this
+  folder, plus the two features that don't bump schemaVersion on their own:
+    - Reference-relative positioning (Dielectrics and Layers)      -> "3.0"
+    - <Variables>/"="-expressions, including substrate height set
+      via a variable ("bulk_thickness", derived from "total_thickness") -> "3.1"
+    - <DerivedLayers> (boolean ops on GDSII layers): resistor recognition
+      layers RHIGH/RPPD/RSIL, built from poly/implant/contact layers
+    - <Tables> (temperature-dependent thermal conductivity), added here: two
+      real Si thermal-conductivity datasets (literature vs. IHP-measured),
+      with Substrate's and EPI's ThermalConductivityTable both picking the
+      table via a string Variable ("thermal_table_choice") instead
+      of a hardcoded name. This enables switching datasets.       
+  Requires gds2palace util_stackup_reader.py 1.7.0 or newer.
+  See ../../doc/XML_stackup_format/XML_stackup_format.md (full reference)
+  and derived_layers.md (DerivedLayers reference). -->
+  <Variables>
+    <Variable Name="air_thickness" Value="200.0000" />
+    <Variable Name="total_thickness" Value="200.0000" />
+    <Variable Name="bulk_thickness" Value="=total_thickness-20" />
+    <!-- selects which <Table> below Substrate's ThermalConductivityTable resolves to -->
+    <Variable Name="thermal_table_choice" Value="Si_vs_T_IHP" Type="string" />
+  </Variables>
+  <Materials>
+    <Material Name="Activ" Type="Conductor" Conductivity="357141.0" ThermalConductivity="237" Color="00ff00" />
+    <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" ThermalConductivity="237" Color="39bfff" />
+    <Material Name="Metal2" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Color="ccccd9" />
+    <Material Name="Metal3" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Color="d80000" />
+    <Material Name="Metal4" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Color="93e837" />
+    <Material Name="Metal5" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Color="dcd146" />
+    <Material Name="TopMetal1" Type="Conductor" Conductivity="27800000.0" ThermalConductivity="237" Color="ffe6bf" />
+    <Material Name="TopMetal2" Type="Conductor" Conductivity="30300000.0" ThermalConductivity="237" Color="ff8000" />
+    <Material Name="TopVia2" Type="Conductor" Conductivity="3143000.0" ThermalConductivity="174" Color="ff8000" />
+    <Material Name="TopVia1" Type="Conductor" Conductivity="2191000.0" ThermalConductivity="174" Color="ffe6bf" />
+    <Material Name="Via4" Type="Conductor" Conductivity="1660000.0" ThermalConductivity="174" Color="deac5e" />
+    <Material Name="Via3" Type="Conductor" Conductivity="1660000.0" ThermalConductivity="174" Color="9ba940" />
+    <Material Name="Via2" Type="Conductor" Conductivity="1660000.0" ThermalConductivity="174" Color="ff3736" />
+    <Material Name="Via1" Type="Conductor" Conductivity="1660000.0" ThermalConductivity="174" Color="ccccff" />
+    <Material Name="Cont" Type="Conductor" Conductivity="2390000.0" ThermalConductivity="174" Color="00ffff" />
+    <Material Name="Passive" Type="Dielectric" Permittivity="6.6" DielectricLossTangent="0.0" ThermalConductivity="0.5" Color="a0a0f0" />
+    <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" DielectricLossTangent="0.0" ThermalConductivity="1" Color="fffcad" />
+    <Material Name="Substrate" Type="Semiconductor" Permittivity="11.9" DielectricLossTangent="0" Conductivity="2.0" ThermalConductivityTable="=thermal_table_choice" Color="01e0ff" />
+    <Material Name="EPI" Type="Semiconductor" Permittivity="11.9" DielectricLossTangent="0" Conductivity="5.0" ThermalConductivityTable="=thermal_table_choice" Color="294fff" />
+    <Material Name="AIR" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" ThermalConductivity="0.026" Color="d0d0d0" />
+    <Material Name="Vmim" Type="Conductor" Conductivity="2191000.0" ThermalConductivity="174" Color="ffe6bf" />
+    <Material Name="MIM" Type="Conductor" Conductivity="500000.0" ThermalConductivity="237" Color="e6ffbf" />
+    <Material Name="LOWLOSS" Type="Conductor" Conductivity="1E10" ThermalConductivity="100" Color="ff0000" />
+    <Material Name="RSIL" Type="Resistor" Rs="7" Color="d0d0d0" />
+    <Material Name="RPPD" Type="Resistor" Rs="260" Color="d0d0d0" />
+    <Material Name="RHIGH" Type="Resistor" Rs="1360" Color="d0d0d0" />
+  </Materials>
+  <ELayers LengthUnit="um">
+    <Dielectrics>
+      <Dielectric Name="AIR" Reference="Passive" ReferenceEdge="Top" Material="AIR" Thickness="=air_thickness" />
+      <Dielectric Name="Passive" Reference="SiO2" ReferenceEdge="Top" Material="Passive" Thickness="0.4000" />
+      <Dielectric Name="SiO2" Reference="EPI" ReferenceEdge="Top" Material="SiO2" Thickness="15.7303" />
+      <Dielectric Name="EPI" Reference="Substrate" ReferenceEdge="Top" Material="EPI" Thickness="3.7500" />
+      <!-- substrate height as a variable: change total_thickness above and both the
+           substrate bulk (bulk_thickness) and LBE's Zmax below follow automatically -->
+      <Dielectric Name="Substrate" Material="Substrate" Thickness="=bulk_thickness" />
+    </Dielectrics>
+    <Layers>
+      <!-- SG13G2 resistors created from derived layers defined in DerivedLayers section below-->
+      <Layer Name="TopMetal2" Type="conductor" Reference="TopVia2" ReferenceEdge="Top" Material="TopMetal2" Layer="134" Zmin="0.0000" Zmax="3.0000" />
+      <Layer Name="TopVia2" Type="via" Reference="TopMetal1" ReferenceEdge="Top" Material="TopVia2" Layer="133" Zmin="0.0000" Zmax="2.8000" />
+      <Layer Name="TopMetal1" Type="conductor" Reference="TopVia1" ReferenceEdge="Top" Material="TopMetal1" Layer="126" Zmin="0.0000" Zmax="2.0000" />
+      <Layer Name="Vmim" Type="via" Reference="MIM" ReferenceEdge="Top" Material="Vmim" Layer="129" Zmin="0.0000" Zmax="0.6763" />
+      <Layer Name="MIM" Type="conductor" Reference="Metal5" ReferenceEdge="Top" Material="MIM" Layer="36" Zmin="0.0243" Zmax="0.1740" />
+      <Layer Name="TopVia1" Type="via" Reference="Metal5" ReferenceEdge="Top" Material="TopVia1" Layer="125" Zmin="0.0000" Zmax="0.8503" />
+      <Layer Name="Metal5" Type="conductor" Reference="Via4" ReferenceEdge="Top" Material="Metal5" Layer="67" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via4" Type="via" Reference="Metal4" ReferenceEdge="Top" Material="Via4" Layer="66" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal4" Type="conductor" Reference="Via3" ReferenceEdge="Top" Material="Metal4" Layer="50" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via3" Type="via" Reference="Metal3" ReferenceEdge="Top" Material="Via3" Layer="49" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal3" Type="conductor" Reference="Via2" ReferenceEdge="Top" Material="Metal3" Layer="30" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via2" Type="via" Reference="Metal2" ReferenceEdge="Top" Material="Via2" Layer="29" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal2" Type="conductor" Reference="Via1" ReferenceEdge="Top" Material="Metal2" Layer="10" Zmin="0.0000" Zmax="0.4900" />
+      <Layer Name="Via1" Type="via" Reference="Metal1" ReferenceEdge="Top" Material="Via1" Layer="19" Zmin="0.0000" Zmax="0.5400" />
+      <Layer Name="Metal1" Type="conductor" Reference="Cont" ReferenceEdge="Top" Material="Metal1" Layer="8" Zmin="0.0000" Zmax="0.4200" />
+      <Layer Name="Cont" Type="via" Reference="Activ" ReferenceEdge="Top" Material="Cont" Layer="6" Zmin="0.0000" Zmax="0.6400" />
+      <Layer Name="RHIGH" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RHIGH" Layer="312" Zmin="0.0000" Zmax="0.0000" />
+      <Layer Name="RPPD" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RPPD" Layer="313" Zmin="0.0000" Zmax="0.0000" />
+      <Layer Name="RSIL" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RSIL" Layer="314" Zmin="0.0000" Zmax="0.0000" />
+      <Layer Name="Activ" Type="conductor" Reference="SiO2" ReferenceEdge="Bottom" Material="Activ" Layer="1" Zmin="0.0000" Zmax="0.4000" />
+      <Layer Name="SUBGND" Type="conductor" Reference="EPI" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="250" Zmin="0.0000" Zmax="3.7500" />
+      <Layer Name="LBE" Type="dielectric" Reference="Substrate" ReferenceEdge="Bottom" Material="AIR" Layer="157" Zmin="0.0000" Zmax="=bulk_thickness + 3.7500" />
+      <Layer Name="BACKSIDEGND" Type="conductor" Reference="Substrate" ReferenceEdge="Bottom" Material="LOWLOSS" Layer="251" Zmin="-6.2500" Zmax="0.0000" />
+    </Layers>
+    <DerivedLayers>
+      <DerivedLayer Name="GatPoly" Layer="310" Operation="OR">
+        <Operand Layer="5" />
+        <Operand Layer="128" />
+      </DerivedLayer>
+      <DerivedLayer Name="Rhigh_or_Rppd" Layer="311" Operation="AND">
+        <Operand Layer="28" />
+        <Operand Layer="14" />
+        <Operand Layer="310" />
+      </DerivedLayer>
+      <DerivedLayer Name="RHIGH" Layer="312" Operation="AND">
+        <Operand Layer="311" />
+        <Operand Layer="7" />
+      </DerivedLayer>
+      <DerivedLayer Name="RPPD" Layer="313" Operation="NOT">
+        <Operand Layer="311" />
+        <Operand Layer="7" />
+      </DerivedLayer>
+      <DerivedLayer Name="RSIL" Layer="314" Operation="NOT">
+        <Operand Layer="310" />
+        <Operand Layer="311" />
+      </DerivedLayer>
+    </DerivedLayers>
+  </ELayers>
+  <Tables>
+    <!-- literature-reported Si thermal conductivity vs. temperature -->
+    <Table Name="Si_vs_T_literature">
+      <Point Temperature="280" Value="163.00"/>
+      <Point Temperature="290" Value="155.20"/>
+      <Point Temperature="300" Value="148.00"/>
+      <Point Temperature="310" Value="141.30"/>
+      <Point Temperature="320" Value="135.10"/>
+      <Point Temperature="330" Value="129.30"/>
+      <Point Temperature="340" Value="124.00"/>
+      <Point Temperature="350" Value="119.00"/>
+      <Point Temperature="360" Value="114.40"/>
+      <Point Temperature="370" Value="110.20"/>
+      <Point Temperature="380" Value="106.20"/>
+      <Point Temperature="390" Value="102.40"/>
+      <Point Temperature="400" Value="98.90"/>
+      <Point Temperature="410" Value="96.10"/>
+      <Point Temperature="420" Value="93.40"/>
+      <Point Temperature="430" Value="90.90"/>
+      <Point Temperature="440" Value="88.50"/>
+      <Point Temperature="450" Value="86.20"/>
+    </Table>
+    <!-- IHP-measured Si thermal conductivity vs. temperature -->
+    <Table Name="Si_vs_T_IHP">
+      <Point Temperature="295" Value="85"/>
+      <Point Temperature="298.15" Value="83.01"/>
+      <Point Temperature="313.15" Value="77.75"/>
+      <Point Temperature="328.15" Value="73.05"/>
+      <Point Temperature="343.15" Value="68.82"/>
+      <Point Temperature="358.15" Value="65.01"/>
+      <Point Temperature="373.15" Value="61.55"/>
+      <Point Temperature="388.15" Value="58.40"/>
+      <Point Temperature="403.15" Value="55.52"/>
+      <Point Temperature="418.15" Value="52.88"/>
+      <Point Temperature="433.15" Value="50.45"/>
+      <Point Temperature="448.15" Value="48.21"/>
+      <Point Temperature="463.15" Value="46.14"/>
+      <Point Temperature="478.15" Value="44.22"/>
+      <Point Temperature="493.15" Value="42.44"/>
+    </Table>
+  </Tables>
+</Stackup>

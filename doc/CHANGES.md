@@ -2,6 +2,48 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 20-August-2026
+Corrected a license inconsistency: the repository's LICENSE file and PyPI metadata said Apache-2.0, while every source file's own header comment already said GPLv3. The code headers were correct — gds2palace depends directly on gmsh (GPL-licensed, no linking exception covering this use), so GPLv3 is now the license declared everywhere (LICENSE file, pyproject.toml, and file headers that were previously missing one). Versions already published to PyPI (0.3.5, 0.3.6) were advertised as Apache-2.0 and that can't be changed retroactively; this correction applies from the next release onward.
+
+The `gds2palace` PyPI package can now be built directly with `python -m build` from this repository, instead of maintaining a separate manually-synced copy. See `pyproject.toml` and `scripts/build_pypi_readme.py` at the repo root.
+
+## 14-18-August-2026
+Four major upgrades:
+
+1) The stackup files now support derived layers, see folder `doc/XML_stackup_format` for details. This enables SG13G2 resistor in the stackup, see example in folder `more_examples`.  
+
+2) gds2palace can now create thermal simulation models for Elmer, a multi-physics FEM solver. At this moment, thermal models can be excited by user defined thermal sources, see documentation in doc folder.  
+
+3) Stackup XML files now support Reference-relative positioning: a `<Layer>` or `<Dielectric>`
+can specify its position as an offset from the top or bottom edge of another named Layer or
+Dielectric, instead of always using an absolute Zmin/Zmax value. This removes the need to
+hand-recompute every dependent layer's z-position whenever a `<Dielectric Thickness="...">`
+changes. See `doc/XML_stackup_format` for details, and `test_data/` for example files.
+
+4) Stackup XML files now support a `<Variables>` block: named values (numbers or strings,
+plain literals or `=`-prefixed expressions) that any attribute value anywhere in the file can
+reference instead of a fixed value, removing the need to hand-copy the same physical value
+into multiple attributes or files. A `<Variable>`'s value can itself be an expression built
+from other variables (e.g. `Value="=metal_thickness + via_thickness"`), resolved regardless of
+declaration order. A Python caller of `read_substrate()`/`parse_substrate()` can also override
+a variable's value via the new `variable_overrides` argument - e.g. for a parametric sweep
+script - without editing the XML file. See `doc/XML_stackup_format` for details, and
+`more_examples/derived_layers_and_resistors` for a worked example.
+
+Using derived layers, Reference-relative positioning, or thermal tables requires
+`schemaVersion="3.0"` in the stackup file; using `<Variables>`/`=`-expressions requires
+`schemaVersion="3.1"`. The reader now prints a warning if a stackup file declares a
+`schemaVersion` newer than the version this gds2palace installation supports, so an outdated
+installation is easier to notice.
+
+As a side effect of derived layers, the handling of cutouts has been redesigned, and  model option `preprocess_gds` is no longer required.  
+
+For users who prefer GUI driven model setup, the companion tool `setupEM` has been upgraded to support these new features. It also includes a GUI-driven XML stackup editor now. For thermal modelling using gds2palace with Elmer, `setupThermal` is the equivalent of `setupEM`, included in the same Python package.
+
+https://github.com/VolkerMuehlhaus/setupEM
+
+Development of gds2palace is now assisted by Claude Code, and some *.md files have been added to this repository to provide context for AI-assisted workflows.
+
 ## 14-June-2026
 Completely redesigned the core mesh algorithm, which previously had thrown Palace MFEM error message for certain stacked chip configurations. Now, metals are properly cut from dielectrics no matter if they cross dielectric boundaries. Handling of gmsh dimtags to material properties was completely redesigned. Some error check were added on invalid port configurations, and invalid stackup configurations where two conductor layers touch directly with no via metal between them.
 

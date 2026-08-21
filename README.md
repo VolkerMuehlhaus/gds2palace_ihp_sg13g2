@@ -7,12 +7,17 @@ The files provided here enable RFIC FEM simulation using AWS Palace from GDSII l
 Palace, is an open-source, parallel finite element code for full-wave 3D electromagnetic simulations. It can be scaled from single computer to large high performance simulation clusters and cloud-based computing.  
 https://awslabs.github.io/palace/stable/  
 
+In addition to AWS Palace, gds2palace can also generate models for [Elmer FEM](https://www.elmerfem.org/), as an additional workflow option for EM (S-parameter) simulation as well as steady-state thermal simulation. See [CHANGES.md](./doc/CHANGES.md) for this and other recent additions.
+
 The gds2palace workflow in this repository is pre-configured for GDSII layout files in the [IHP SG13G2 Open PDK.](https://github.com/IHP-GmbH/IHP-Open-PDK)
 Special thanks to IHP and the public funded German project FMD-QNC (16ME0831) https://www.elektronikforschung.de/projekte/fmd-qnc for financial support, which has contributed to this work.
 
 # Documentation
 An extensive User's Guide for the gds2palace workflow is available in PDF format here:  
 [gds2palace FEM workflow for IHP](./doc/gds2palace_workflow_userguide.pdf) 
+
+The latest documentation is maintained in Markdown format here, and can be ahead of the PDF document above:  
+[gds2palace_workflow_userguide.md](./doc/userguide_md_format/gds2palace_workflow_userguide.md)
 
 An overview of the EM solver ecosystem (tools and utilities) for IHP SG13 can be found here:  
 https://github.com/IHP-GmbH/IHP-Open-PDK/tree/main/ihp-sg13g2/libs.doc/doc
@@ -25,6 +30,8 @@ In addition to Palace that is required for simulation of the output files, these
 
 - gdspy (version 1.6.13 or later recommended)
 - gmsh
+- numpy
+- matplotlib (for the inductor synthesis example scripts)
 - scikit-rf (for the script that converts Palace output to Touchstone SnP format)
 
 Documentation assumes that you have created a Python venv named "palace" in ~/venv/palace and installed the modules there.
@@ -146,4 +153,8 @@ Current density at 93 Ghz:
 ![butler 4](./doc/png/butler4.png)
 
 ![butler 5](./doc/png/butler5.png)
+
+# License
+
+This project is licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later) - see [LICENSE](./LICENSE) for the full text.
 
