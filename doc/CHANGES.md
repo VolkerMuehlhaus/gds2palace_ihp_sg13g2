@@ -3,7 +3,7 @@
 This is an (incomplete) list of changes and new features.
 
 ## 21-August-2026
-Added PMC boundary support to the Elmer EM output (`util_elmer.py`). Previously, `settings['boundary']` containing `'PMC'` would stop model generation with `exit(1)` for the Elmer flow, even though the mesh already tagged those faces correctly and Palace already supported PMC for the same models. Per the ElmerModelsManual `VectorHelmholtz` chapter, PMC is the natural (Neumann) boundary condition of that solver's formulation - the one you get by writing no Robin/Dirichlet keywords at all - so the fix just emits an empty, named `Boundary Condition` block for those faces instead of erroring out. **Verified so far only by generating the mesh and `physics.sif` (correct boundary indices, no crash); not yet verified by an actual `ElmerSolver` run** - treat the S-parameter output as unconfirmed until tested.
+Added PMC boundary support to the Elmer EM output. Verified by mesh/physics.sif generation only, not yet by an actual ElmerSolver run.
 
 ## 20-August-2026
 Corrected a license inconsistency: the repository's LICENSE file and PyPI metadata said Apache-2.0, while every source file's own header comment already said GPLv3. The code headers were correct — gds2palace depends directly on gmsh (GPL-licensed, no linking exception covering this use), so GPLv3 is now the license declared everywhere (LICENSE file, pyproject.toml, and file headers that were previously missing one). Versions already published to PyPI (0.3.5, 0.3.6) were advertised as Apache-2.0 and that can't be changed retroactively; this correction applies from the next release onward.
