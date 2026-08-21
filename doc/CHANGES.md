@@ -3,7 +3,7 @@
 This is an (incomplete) list of changes and new features.
 
 ## 21-August-2026
-Allowed settings['air_around'] to be 0 on one or more sides, placing the simulation boundary flush with the dielectric/metal stack there instead of requiring a nonzero air gap on all six sides. Boundary faces are now classified by exterior geometry rather than by the airbox volume's own face loop, which broke down once a zero margin merged the airbox's internal cavity into its outer loop. Verified against the previous nonzero-margin behavior (identical config.json output) and against 1- and 2-sided zero-margin cases (correct PEC/ABC/PMC separation); not yet verified by an actual Palace/ElmerSolver run.
+Allowed settings['air_around'] to be 0 on one or more sides, placing the simulation boundary flush with the dielectric/metal stack there instead of requiring a nonzero air gap on all six sides. Boundary faces are now classified by exterior geometry rather than by the airbox volume's own face loop, which broke down once a zero margin merged the airbox's internal cavity into its outer loop. Verified against the previous nonzero-margin behavior (identical config.json output), against 1- and 2-sided zero-margin cases (correct PEC/ABC/PMC separation), and by an actual Palace run.
 
 Added PMC boundary support to the Elmer EM output. Verified by mesh/physics.sif generation only, not yet by an actual ElmerSolver run.
 
