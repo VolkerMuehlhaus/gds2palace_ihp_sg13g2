@@ -834,7 +834,7 @@ settings['ELMER_MPI_THREADS'] = 8   # partition mesh and solve using 8 MPI proce
 
 ### Boundary conditions and current limitations
 
-`settings['boundary']` (the six-sided outer simulation boundary, values ABC/PML/PEC/PMC) works the same way as for Palace, with one exception: **PMC boundaries are not supported by the Elmer EM output** and will stop model generation with an error. Use ABC (absorbing) or PEC instead.
+`settings['boundary']` (the six-sided outer simulation boundary, values ABC/PML/PEC/PMC) works the same way as for Palace, including PMC.
 
 A few other Palace features are not yet available in the Elmer EM flow:
 
