@@ -598,7 +598,9 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
     :param gds_layers_list: from gds reader
     :param allpolygons: from gds reader
     :param margin: spacing to add from metal bounding box to dielectric boundary
-    :param air_around: air margin between dielectric and simulation boundary. Can be float or a list of 6 float values.
+    :param air_around: air margin between dielectric and simulation boundary. Can be float or a list of 6 float values
+        [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 on a given side is allowed and
+        places the simulation boundary flush with the dielectric/metal stack on that side.
     :param refined_cellsize: refined_cellsize parameter set by user
     """    
 # 
@@ -701,6 +703,8 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
     gmsh.model.occ.synchronize()
 
 
+    airbox_bounds = None
+
     if add_airbox:
         # add surrounding air box
         x1 = overall_xmin - air_xmin
@@ -733,6 +737,12 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
             x2 = allpolygons.get_xmax() + air_xmax
             y2 = allpolygons.get_ymax() + air_ymax
 
+        # remember the 6 target boundary coordinates - used later to classify the true
+        # exterior faces of the simulation domain by geometric plane position, since a
+        # zero-margin side means that side's exterior face won't belong to the airbox
+        # volume's own face loop (see boundary-condition classification further below)
+        airbox_bounds = {'xmin': x1, 'xmax': x2, 'ymin': y1, 'ymax': y2, 'zmin': z1, 'zmax': z2}
+
         box_tag = gmsh.model.occ.addBox(x1,y1,z1,x2-x1,y2-y1,z2-z1)
         
         # apply a boolean difference to create the "airbox minus others" shape:
@@ -750,8 +760,8 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
             exit(51)
 
         tags_created_3D['airbox'] = [box_tag]
-    
-    return tags_created_3D
+
+    return tags_created_3D, airbox_bounds
 
 
 
@@ -1339,7 +1349,7 @@ def create_model (excite_ports, settings):
 
     # add dielectric boxes (oxide, substrate, air etc) to gmsh model
     print('Adding dielectrics ...')
-    dielectric_tags_created_3D = add_dielectrics (materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, refined_cellsize=refined_cellsize, add_airbox=not elmer_thermal)
+    dielectric_tags_created_3D, airbox_bounds = add_dielectrics (materials_list, dielectrics_list, metals_list, allpolygons, margin, air_around, refined_cellsize=refined_cellsize, add_airbox=not elmer_thermal)
     
     # separate metal and dielectric volumes
     dielectric_volume_dimtags = []
@@ -2025,28 +2035,71 @@ def create_model (excite_ports, settings):
 
     # AIRBOX
     if not elmer_thermal:
-        # get surface tags of airbox 
-        simulation_boundary = airbox_surface_taglist[0]  # assume we have air margin all around
-
         PEC_boundaries = []
         PML_boundaries = []
         PMC_boundaries = []
-    
-        if len(simulation_boundary)==6:
-            bc = [boundary_condition[0],boundary_condition[2],boundary_condition[5],boundary_condition[3],boundary_condition[4],boundary_condition[1]]
-            for idx, boundary in enumerate (simulation_boundary):
-                if bc[idx] == 'PEC':
+
+        # Classify the true exterior faces of the whole fragmented assembly (dielectrics +
+        # airbox + metals, already glued by the fragment() calls above) by which of the 6
+        # target boundary planes each one lies on - rather than assuming the airbox volume's
+        # own face loop always has exactly 6 faces in a fixed order. That assumption breaks
+        # whenever any air_around side is 0: the airbox's internal cavity (normally a fully
+        # enclosed, topologically separate shell) then breaches open through that side, so its
+        # side walls merge into the airbox's own outer loop, inflating its face count well past
+        # 6 (empirically confirmed: 23 faces for a single zero-margin side across a multi-layer
+        # stack) - even though the true exterior boundary is still exactly 6 sides, some of
+        # which now belong to a dielectric volume instead of the airbox where its margin is 0.
+        #
+        # gmsh.model.getBoundary(..., combined=True) returns only faces owned by exactly one
+        # volume - i.e. genuine exterior faces - which correctly excludes the internal
+        # dielectric/airbox interface faces regardless of which topological loop gmsh's
+        # getSurfaceLoops() groups them into.
+        geom_tol = gmsh.option.getNumber("Geometry.Tolerance")
+        boundary_face_tol = 10 * geom_tol
+
+        side_order = ['xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax']
+        axis_of_side = {'xmin':0, 'xmax':0, 'ymin':1, 'ymax':1, 'zmin':2, 'zmax':2}
+
+        all_volume_dimtags = gmsh.model.occ.getEntities(dim=3)
+        exterior_faces = gmsh.model.getBoundary(all_volume_dimtags, combined=True, oriented=False, recursive=False)
+
+        faces_by_side = {name: [] for name in side_order}
+        unmatched_faces = []
+
+        for dim, tag in exterior_faces:
+            fxmin, fymin, fzmin, fxmax, fymax, fzmax = gmsh.model.occ.getBoundingBox(2, tag)
+            bbox_min = (fxmin, fymin, fzmin)
+            bbox_max = (fxmax, fymax, fzmax)
+            matched = None
+            for name in side_order:
+                axis = axis_of_side[name]
+                target = airbox_bounds[name]
+                if abs(bbox_min[axis]-target) < boundary_face_tol and abs(bbox_max[axis]-target) < boundary_face_tol:
+                    matched = name
+                    break
+            if matched:
+                faces_by_side[matched].append(tag)
+            else:
+                unmatched_faces.append(tag)
+
+        if unmatched_faces:
+            print(f'WARNING: {len(unmatched_faces)} exterior face(s) could not be matched to any of the 6 boundary sides: {unmatched_faces}')
+
+        for idx, side in enumerate(side_order):
+            bc_type = boundary_condition[idx]
+            faces = faces_by_side[side]
+            if len(faces) == 0:
+                print(f"WARNING: no exterior face found for simulation boundary side '{side}' (target {airbox_bounds[side]}). No '{bc_type}' boundary applied there.")
+            for boundary in faces:
+                if bc_type == 'PEC':
                     PEC_boundaries.append(boundary)
-                elif bc[idx] == 'PML' or bc[idx] == 'ABC':    
+                elif bc_type == 'PML' or bc_type == 'ABC':
                     PML_boundaries.append(boundary)
-                elif bc[idx] == 'PMC':    
+                elif bc_type == 'PMC':
                     PMC_boundaries.append(boundary)
                 else:
-                    print('Error: Boundary condition ', boundary_condition[idx],' is not supported. Use ABC, PML, PEC or PMC only.')    
+                    print('Error: Boundary condition ', bc_type, ' is not supported. Use ABC, PML, PEC or PMC only.')
                     exit(1)
-        else:
-            print('Invalid simulation boundary, the surrounding air margin must be > 0 on all six sides!')
-            exit(0)
 
 
         phys_group_PML = gmsh.model.addPhysicalGroup(2, PML_boundaries, tag=-1)
