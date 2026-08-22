@@ -2063,10 +2063,21 @@ def create_model (excite_ports, settings):
         all_volume_dimtags = gmsh.model.occ.getEntities(dim=3)
         exterior_faces = gmsh.model.getBoundary(all_volume_dimtags, combined=True, oriented=False, recursive=False)
 
+        # Resistor sheet layers and port faces can end up coplanar with an airbox target
+        # plane (e.g. a zero-margin air_around side, or a via-port sitting at the domain
+        # edge) - fragment() then glues them into the volume's true exterior boundary, so
+        # getBoundary(combined=True) reports them as genuine exterior faces. They must not
+        # receive an airbox PEC/PML/PMC boundary condition on top of their own port/sheet
+        # boundary, so exclude them before side-matching.
+        excluded_face_tags = {tag for _, tag in sheetlayer_dimtags}
+        excluded_face_tags.update(tag for tags in port_dimtags_created_2D.values() for tag in tags)
+
         faces_by_side = {name: [] for name in side_order}
         unmatched_faces = []
 
         for dim, tag in exterior_faces:
+            if tag in excluded_face_tags:
+                continue
             fxmin, fymin, fzmin, fxmax, fymax, fzmax = gmsh.model.occ.getBoundingBox(2, tag)
             bbox_min = (fxmin, fymin, fzmin)
             bbox_max = (fxmax, fymax, fzmax)
