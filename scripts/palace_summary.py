@@ -17,8 +17,9 @@
 ########################################################################
 
 """Print a human-readable summary of AWS Palace solver results (palace.json /
-error-indicators.csv) for a given <model>_data directory. Standalone CLI
-equivalent of setupEM's results-summary panel, for workflows that run
+error-indicators.csv) for a given <model>_data directory, or recursively for
+every such directory found some levels below a given search path. Standalone
+CLI equivalent of setupEM's results-summary panel, for workflows that run
 gds2palace without the setupEM GUI.
 """
 
@@ -90,6 +91,28 @@ def _read_error_indicators(dir_path):
         }
     except (KeyError, ValueError):
         return None
+
+
+def _find_run_dirs(search_root):
+    """Recursively locate every directory at or below search_root that directly
+    contains a config.json (a gds2palace/Palace run directory). Does not descend
+    further once such a directory is found, since a run's own output tree never
+    contains a nested config.json - this also keeps the walk from wasting time
+    inside large mesh/output data trees.
+    """
+    found = []
+    for dirpath, dirnames, filenames in os.walk(search_root):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        if 'config.json' in filenames:
+            found.append(dirpath)
+            dirnames[:] = []  # don't descend into this run's own output tree
+    found.sort()
+    return found
+
+
+def _derive_model_basename(run_path):
+    dirname = os.path.basename(os.path.normpath(run_path))
+    return dirname[:-len('_data')] if dirname.endswith('_data') else dirname
 
 
 def _list_iteration_dirs(output_dir):
@@ -224,38 +247,69 @@ def main():
     parser = argparse.ArgumentParser(
         description="Print a summary of AWS Palace solver results (degrees of "
                      "freedom, mesh size, runtime, peak RAM, adaptive-mesh-"
-                     "refinement error indicators) found in a gds2palace "
-                     "<model>_data directory."
+                     "refinement error indicators). Recursively searches "
+                     "search_path for every gds2palace run directory (one "
+                     "containing config.json) and prints a summary for each "
+                     "one found."
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
-        "run_path", nargs="?", default=os.getcwd(),
-        help="path to the <model>_data directory containing config.json "
-             "(default: current directory)"
+        "search_path", nargs="?", default=os.getcwd(),
+        help="directory to search, recursively, for Palace run directories "
+             "(i.e. <model>_data directories containing config.json). Can "
+             "point directly at a single run directory, or at a parent "
+             "directory containing many (default: current directory)"
     )
     parser.add_argument(
         "--model-basename", default=None,
-        help="model base name, used to locate the fallback output directory "
-             "output/<model_basename> when config.json is missing, and shown "
-             "in the summary header (default: derived from the run_path "
-             "directory name by stripping a trailing '_data' suffix)"
+        help="model base name override, used only when exactly one run "
+             "directory is found (ignored, with a note printed, when "
+             "multiple runs are found - each then uses its own name). Also "
+             "used to locate the fallback output directory "
+             "output/<model_basename> when config.json is missing "
+             "(default: derived from the run directory name by stripping a "
+             "trailing '_data' suffix)"
     )
     args = parser.parse_args()
 
-    run_path = os.path.abspath(args.run_path)
-    model_basename = args.model_basename
-    if not model_basename:
-        dirname = os.path.basename(os.path.normpath(run_path))
-        model_basename = dirname[:-len('_data')] if dirname.endswith('_data') else dirname
+    search_path = os.path.abspath(args.search_path)
+    run_dirs = _find_run_dirs(search_path)
+
+    if not run_dirs:
+        # no config.json anywhere below search_path - fall back to treating
+        # search_path itself as the run directory, so this still works for
+        # the output/<model_basename> fallback case and for "no results yet"
+        run_dirs = [search_path]
+
+    if len(run_dirs) == 1:
+        model_basename = args.model_basename or _derive_model_basename(run_dirs[0])
+        basenames = [model_basename]
         args.model_basename = model_basename  # show the resolved value, not None
+    else:
+        if args.model_basename:
+            print(f"NOTE: ignoring --model-basename '{args.model_basename}' -- "
+                  f"{len(run_dirs)} run directories found, each uses its own name.\n")
+        basenames = [_derive_model_basename(d) for d in run_dirs]
 
     print_run_config(parser, args)
 
-    summary = build_results_summary(run_path, model_basename)
-    print(summary)
+    if len(run_dirs) > 1:
+        print(f"Found {len(run_dirs)} Palace run directories under {search_path}:")
+        for d in run_dirs:
+            print(f"  {d}")
+        print()
 
-    if summary.startswith("No Palace results found yet") or summary.startswith("No palace.json found yet"):
-        sys.exit(1)
+    any_incomplete = False
+    for run_path, model_basename in zip(run_dirs, basenames):
+        if len(run_dirs) > 1:
+            print(f"----- {run_path} -----")
+        summary = build_results_summary(run_path, model_basename)
+        print(summary)
+        print()
+        if summary.startswith("No Palace results found yet") or summary.startswith("No palace.json found yet"):
+            any_incomplete = True
+
+    sys.exit(1 if any_incomplete else 0)
 
 
 if __name__ == "__main__":
