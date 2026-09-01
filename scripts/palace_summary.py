@@ -93,7 +93,6 @@ def _read_error_indicators(dir_path):
         return {
             'norm': float(fields['Norm']),
             'maximum': float(fields['Maximum']),
-            'mean': float(fields['Mean']),
         }
     except (KeyError, ValueError):
         return None
@@ -271,7 +270,7 @@ def build_results_summary(run_path, model_basename):
         if errors:
             lines.append(
                 f"Error indicator    : Norm={_format_sci(errors['norm'])}  "
-                f"Max={_format_sci(errors['maximum'])}  Mean={_format_sci(errors['mean'])}"
+                f"Max={_format_sci(errors['maximum'])}"
             )
         lines.append("=" * 40)
         return "\n".join(lines), None
@@ -279,7 +278,7 @@ def build_results_summary(run_path, model_basename):
     # Adaptive mesh refinement: one row per iteration subfolder, plus the root as "Final"
     rows = _collect_amr_rows(output_dir, iteration_dirs)
 
-    headers = ["Iteration", "DOF", "Mesh elems", "Error Norm", "Error Max", "Error Mean",
+    headers = ["Iteration", "DOF", "Mesh elems", "Error Norm", "Error Max",
                "Max dS", "Time", "Peak RAM"]
     table_rows = []
     for label, summary, errors, delta_s in rows:
@@ -291,7 +290,6 @@ def build_results_summary(run_path, model_basename):
             _format_int(summary.get('mesh_elements')),
             _format_sci(errors.get('norm')),
             _format_sci(errors.get('maximum')),
-            _format_sci(errors.get('mean')),
             _format_delta(delta_s),
             _format_duration(summary.get('duration_s')),
             _format_ram(summary.get('peak_ram_mb')),
