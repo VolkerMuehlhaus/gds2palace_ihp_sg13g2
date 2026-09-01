@@ -92,7 +92,6 @@ def _read_error_indicators(dir_path):
     try:
         return {
             'norm': float(fields['Norm']),
-            'minimum': float(fields['Minimum']),
             'maximum': float(fields['Maximum']),
             'mean': float(fields['Mean']),
         }
