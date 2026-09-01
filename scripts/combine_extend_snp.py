@@ -310,32 +310,41 @@ def port_deembedding (snp_filename, port_info_available, port_info_data):
 
 
 
-workdir = os.getcwd()
-found_datafiles = []
+def main():
+    global found_datafiles
 
-# work recursively through directories
-traverse_directories(workdir)
+    workdir = os.getcwd()
+    found_datafiles = []
 
-# evaluate the found data files
-for found_filename in found_datafiles:
+    # work recursively through directories
+    traverse_directories(workdir)
+
+    # evaluate the found data files
+    for found_filename in found_datafiles:
+        _process_datafile(found_filename)
+
+
+def _process_datafile(found_filename):
     # print(str(f))
 
     # Before we evaluate S-parameters, also check if we have a file port_information.json
+    # Search upward from the data file's directory, since it can be one level
+    # further down for AMR iteration folders (.../output/<model>/iterationN/port-S.csv)
+    # than for a normal run (.../output/<model>/port-S.csv). Capped at a small fixed
+    # depth so we never wander off into unrelated directories further up the tree.
     port_info_available = False
-    # Get the directory two levels up
-    two_up_dir = os.path.abspath(os.path.join(os.path.dirname(found_filename), "..", ".."))
-    # Possible full filename for port_information.json
-    port_info_filename = os.path.join(two_up_dir, "port_information.json")
-    
-    # Check if it exists
-    if not os.path.isfile(port_info_filename):
-        # let's try one level above
-        one_up_dir = os.path.abspath(os.path.join(os.path.dirname(found_filename), ".."))
-        # Possible full filename for port_information.json
-        port_info_filename = os.path.join(one_up_dir, "port_information.json")
+    MAX_LEVELS_UP = 4
+    search_dir = os.path.abspath(os.path.dirname(found_filename))
+    port_info_filename = None
+    for _ in range(MAX_LEVELS_UP):
+        search_dir = os.path.abspath(os.path.join(search_dir, ".."))
+        candidate = os.path.join(search_dir, "port_information.json")
+        if os.path.isfile(candidate):
+            port_info_filename = candidate
+            break
 
-    # If we found the port file one or two levels above
-    if os.path.isfile(port_info_filename):
+    # If we found the port file within MAX_LEVELS_UP directories above
+    if port_info_filename is not None:
         print(f"Found extra file with port information: {port_info_filename}")
 
         # Load the JSON data
@@ -462,4 +471,8 @@ for found_filename in found_datafiles:
             fn = dc_extrapolated_filename + '.s' + str(num_ports) + 'p'
             if os.path.isfile(fn):
                 port_deembedding (fn, port_info_available, port_info_data)
-       
+
+
+if __name__ == "__main__":
+    main()
+
