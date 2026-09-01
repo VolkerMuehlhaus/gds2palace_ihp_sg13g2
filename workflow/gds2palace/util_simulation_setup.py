@@ -1808,6 +1808,21 @@ def create_model (excite_ports, settings):
 
     # refinement value controls adaptive mesh refinement
     # always write this control block, even when 0 iterations specified, because user can then edit json himself
+    #
+    # Investigated (not implemented): an HFSS-style two-stage AMR, where a first Palace run
+    # meshes cheaply at only 1-2 frequencies (SaveAdaptMesh: true) and a second run loads that
+    # adapted mesh (config["Model"]["Mesh"] pointed at the .mesh file, MaxIts: 0) for one
+    # full-band sweep on the fixed mesh, instead of paying for the full sweep on every AMR pass.
+    # The mesh hand-off mechanism works (Palace accepts SaveAdaptMesh's MFEM-native .mesh file
+    # directly as Model.Mesh input, and reproduces matching S-parameters), but on a real test
+    # case (2-port inductor, ~250k unknowns after 2 AMR passes) the two-stage total was SLOWER
+    # than the existing single-stage flow (152s vs 124s) - because AdaptiveTol's PROM-based
+    # adaptive frequency sweep already keeps "full sweep every AMR pass" cheap (only ~15-20
+    # full-order solves get interpolated across the whole band, not one solve per sample), and a
+    # fresh second Palace invocation pays its own fixed overhead (mesh preprocessing, operator
+    # construction, preconditioner setup, a final error-estimate pass) that ate up the savings
+    # from the cheaper AMR stage. Not worth the added complexity unless a future, much larger
+    # model shows the fixed per-invocation overhead becoming a small fraction of total time.
     Refinement = {
         "UniformLevels": 0,
         "Tol": 1e-2,
