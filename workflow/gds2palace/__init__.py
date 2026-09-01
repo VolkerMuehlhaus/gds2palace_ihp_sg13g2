@@ -22,5 +22,5 @@ from . import util_gds_reader as gds_reader
 from . import util_utilities as utilities
 from . import util_simulation_setup as simulation_setup
 
-__version__ = "0.4.0"   # version of gds2palace
+__version__ = "0.4.1"   # version of gds2palace
 

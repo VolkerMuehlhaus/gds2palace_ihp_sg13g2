@@ -170,9 +170,18 @@ def write_elmer_physics_file (unit,
                 f.write(item + '\n')
 
             if len(PMC_boundaries) > 0:
-                print('PMC boundaries are not supported by Elmer workflow')
-                f.close()   
-                exit(1)
+                # No physics keywords needed: per the ElmerModelsManual VectorHelmholtz chapter,
+                # the natural (Neumann) boundary condition of this curl-curl formulation - i.e.
+                # what a boundary gets when no Robin/Dirichlet keyword is written for it at all -
+                # is exactly the PMC (zero tangential H) condition. The mesh already carries a
+                # physical group named 'PMC_boundary' for these faces (see util_simulation_setup.py),
+                # so an explicit-but-empty block here is enough; Elmer applies the natural BC to it.
+                n = n+1
+                name = 'PMC_boundary'
+                item = f'Boundary Condition {n+1}\n'
+                item = item + f'   Name = "{name}"\n'
+                item = item + "End\n"
+                f.write(item + '\n')
 
         f.close()   
 
