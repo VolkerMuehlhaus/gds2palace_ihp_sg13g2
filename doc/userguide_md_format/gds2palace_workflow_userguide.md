@@ -350,7 +350,7 @@ These other settings are optional:
 **settings['meshsize_max']:** Maximum mesh size limit, in addition to cells, default is 70  
 **settings['refined_cellsize_override']:** Optional per-layer override of refined_cellsize,example: settings['refined_cellsize_override']=[['Metal3',10],['Metal2',2]]  
 **settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  
-**settings['air_around']:** Other spacing of air around dielectrics, default is same as margin  
+**settings['air_around']:** Other spacing of air around dielectrics, default is same as margin. Can be a single value or a list of 6 values [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 is allowed on any side, placing the simulation boundary flush with the dielectric/metal stack on that side (e.g. a backside ground plane serving directly as the PEC/ABC boundary, with no wasted air layer below it).  
 **settings['order']:** Order of basis function for FEM solver (order 2 is more accurate,order 1 is only for quick & dirty results). Default is 2  
 **settings['substrate_refinement']:** Extra mesh refinement into substrate, usually not required, default is False  
 **settings['adaptive_sweep']:** Enable adaptive frequency sweep, default is True  
@@ -834,7 +834,7 @@ settings['ELMER_MPI_THREADS'] = 8   # partition mesh and solve using 8 MPI proce
 
 ### Boundary conditions and current limitations
 
-`settings['boundary']` (the six-sided outer simulation boundary, values ABC/PML/PEC/PMC) works the same way as for Palace, with one exception: **PMC boundaries are not supported by the Elmer EM output** and will stop model generation with an error. Use ABC (absorbing) or PEC instead.
+`settings['boundary']` (the six-sided outer simulation boundary, values ABC/PML/PEC/PMC) works the same way as for Palace, including PMC.
 
 A few other Palace features are not yet available in the Elmer EM flow:
 

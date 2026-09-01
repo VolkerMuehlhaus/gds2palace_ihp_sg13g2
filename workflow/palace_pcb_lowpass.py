@@ -83,8 +83,8 @@ settings['meshsize_max'] = 5000  # in project units, override cells_per_waveleng
 settings['adaptive_mesh_iterations'] = 0
 settings['z_thickness_factor'] = 1  
 
-# settings['nogui'] = True  # create files without showing 3D model
-# settings['nogui'] = ('nogui' in sys.argv)  # check if nogui specified on command line, then create files without showing 3D model
+# settings['no_gui'] = True  # create files without showing 3D model
+# settings['no_gui'] = ('nogui' in sys.argv)  # check if nogui specified on command line, then create files without showing 3D model
 
 
 # Ports from GDSII Data, polygon geometry from specified special layer

@@ -51,7 +51,7 @@ settings['meshsize_max'] = 100.0	# absolute limit in micron for mesh size, in ad
 settings['adaptive_mesh_iterations'] = 0  # no adaptive mesh refinement
 settings['boundary'] = ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']  # absorbing boundary condition
 settings['margin'] = 50.0  # distance in microns from GDSII geometry boundary to stackup boundary
-settings['air_around'] = 20.0  # air margin around SG13 stackup boundary up to simulation boundary, must not be 0
+settings['air_around'] = 20.0  # air margin around SG13 stackup boundary up to simulation boundary
 
 # ===================== port definitions =======================
 simulation_ports = simulation_setup.all_simulation_ports()
