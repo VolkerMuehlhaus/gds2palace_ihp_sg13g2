@@ -2327,7 +2327,8 @@ def create_model (excite_ports, settings):
             for item in physical_groups_ports:
                 layername, portname, grouptag = item.values()
 
-                portnum = int(portname.replace('P',''))           
+                portnum = int(portname.replace('P',''))
+                port = simulation_ports.get_port_by_number(portnum)
                 Elmer_port_boundary = {}
                 Elmer_port_boundary['name'] = portname
                 Elmer_port_boundary['portnum'] = portnum
