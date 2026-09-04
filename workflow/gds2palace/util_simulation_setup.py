@@ -223,7 +223,7 @@ class constanttemp:
     Returns:
         string: string representation 
     """
-    mystr = f"constant temperature boundary T= {self.temperature} K  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
+    mystr = f"constant temperature boundary T= {self.temp} K  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
     return mystr
 
 
