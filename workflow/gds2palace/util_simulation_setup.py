@@ -912,6 +912,16 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
 
 
 
+def _thermal_setup_error (message):
+    """Build a ValueError for a thermal-model XML/stackup configuration problem, with the
+    message wrapped in a "!" banner so the root cause stands out in the log even when
+    buried under gmsh "Info" lines and a multi-frame traceback (each printed as its own
+    line by setupThermal's stderr handler).
+    """
+    banner = "!" * 70
+    return ValueError(f"\n{banner}\nTHERMAL MODEL ERROR: {message}\n{banner}")
+
+
 def add_thermal_sources (allpolygons, metals_list, thermal_objects):
     """Add thermal_objects from special port layers to gmsh
 
@@ -946,8 +956,14 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
                         ymax = poly.ymax
                         
                         target_metal = metals_list.getbylayername(object.target_layername)
+                        if target_metal is None:
+                            raise _thermal_setup_error(
+                                f"Thermal source on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' not found in stackup XML file. "
+                                "Check that the stackup XML matches this layout and defines this layer name."
+                            )
                         zmin = target_metal.zmin
-                        zmax = target_metal.zmax 
+                        zmax = target_metal.zmax
 
                         box_tag = gmsh.model.occ.addBox(xmin,ymin,zmin,xmax-xmin,ymax-ymin,zmax-zmin)
                         gmsh.model.setEntityName(dim=3,tag=box_tag, name=f'source_{object.source_layernum}')
@@ -991,6 +1007,12 @@ def add_thermal_boundaries (allpolygons, metals_list, thermal_objects):
 
                         #get target layer, first match in list
                         target_metal = metals_list.getbylayername (object.target_layername)
+                        if target_metal is None:
+                            raise _thermal_setup_error(
+                                f"Constant-temperature boundary on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' not found in stackup XML file. "
+                                "Check that the stackup XML matches this layout and defines this layer name."
+                            )
                         for surfacetag_bot in create_surfaces_from_polygon (poly, target_metal.zmin, 0):
                             gmsh.model.setEntityName(dim=2,tag=surfacetag_bot, name=f'constanttemp_{object.source_layernum}')
                             surface_tags.append(surfacetag_bot)
@@ -2217,7 +2239,13 @@ def create_model (excite_ports, settings):
                     if elmer_thermal:
                         Elmer_material['density']=material.density
                         if material.thermaltablename == "":
-                            # single value 
+                            # single value
+                            if material.thermalcond == 0:
+                                raise _thermal_setup_error(
+                                    f'Material "{material.name}" has no ThermalConductivity defined in the stackup '
+                                    'XML file (defaults to 0 W/m/K). Thermal simulation results would be meaningless '
+                                    '-- add a ThermalConductivity attribute for this material in the stackup XML file.'
+                                )
                             Elmer_material['thermalcond']=material.thermalcond
                         else:
                             # table
