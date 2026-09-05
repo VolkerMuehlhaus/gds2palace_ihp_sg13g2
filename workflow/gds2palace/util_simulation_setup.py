@@ -1153,6 +1153,7 @@ def create_model (excite_ports, settings):
 
     fstart = get_optional_setting (settings, 'fstart', None)
     fstop  = get_optional_setting (settings, 'fstop', None)
+    fstep  = None
     if (fstart is not None) and (fstop is not None):
         fstep  = get_optional_setting (settings, "fstep", (fstop-fstart)/100)
 
@@ -1279,11 +1280,13 @@ def create_model (excite_ports, settings):
     print('Starting to create mesh file and config file')
 
     fmax = 0
-    if fstop is not None: 
+    if fstop is not None:
         fmax = max(fmax, fstop)
-    if len(f_discrete_list) > 0: 
-        discrete_max = max(f_discrete_list) 
+    if len(f_discrete_list) > 0:
+        discrete_max = max(f_discrete_list)
         fmax = max(fmax, discrete_max)
+    if len(f_dump_list) > 0:
+        fmax = max(fmax, max(f_dump_list))
 
     wavelength_air = 3e8/fmax / unit
     # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
@@ -2390,15 +2393,16 @@ def create_model (excite_ports, settings):
             # write *.sif file for Elmer
             elmer_physics_file = os.path.join(sim_path, 'physics.sif')
             util_elmer.write_elmer_physics_file (unit,
-                                                    elmer_physics_file, 
-                                                    num_frequencies, 
-                                                    Elmer_materials, 
+                                                    elmer_physics_file,
+                                                    num_frequencies,
+                                                    Elmer_materials,
                                                     Elmer_bodies,
                                                     Elmer_boundaries,
                                                     Elmer_ports,
                                                     PEC_boundaries,
                                                     PML_boundaries,
-                                                    PMC_boundaries)
+                                                    PMC_boundaries,
+                                                    f_dump_list=f_dump_list)
 
 
 
