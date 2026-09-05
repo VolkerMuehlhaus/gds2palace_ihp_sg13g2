@@ -2,6 +2,9 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 05-September-2026
+Elmer EM (S-parameter) simulations can now actually write field-dump data when `fdump` frequencies are set — this was silently doing nothing before. Fixed a crash when `fdump` was used without also specifying a frequency sweep (`fstart`/`fstop`), for both Palace and Elmer output. Fixed the generated Elmer run script on Windows, which used Linux-only `mpirun`/bash syntax and never actually worked there.
+
 ## 01-September-2026
 Fixed a crash in `resolve_derived_layers()`: `gdspy.boolean()` raises `IndexError` when called with an empty operand (e.g. a resistor recognition layer with no polygons in the current cell), which previously aborted the whole GDSII read. The boolean fold now short-circuits using the OR/AND/NOT identity instead whenever either operand is empty. Same fix applied to openems_ihp_sg13g2's independent copy of this reader.
 

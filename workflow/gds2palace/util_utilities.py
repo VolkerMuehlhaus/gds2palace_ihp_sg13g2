@@ -111,19 +111,31 @@ def create_elmer_run_script (destination_path, settings):
 
     ELMER_MPI_THREADS = util_elmer.get_ELMER_MPI_THREADS(settings)
 
-    if ELMER_MPI_THREADS==1:
-        txt = '#!/bin/bash\n'
-        txt = txt + 'ElmerSolver\n'
+    if platform.system() == "Windows":
+        # No mpirun on Windows - MS-MPI ships mpiexec instead (different flag: -n, not -np).
+        # Plain .bat content, no "#!/bin/bash" shebang line (that's meaningless to cmd.exe
+        # and would print a bogus "not recognized" line, though otherwise harmless there).
+        if ELMER_MPI_THREADS == 1:
+            txt = 'ElmerSolver\n'
+        else:
+            txt = f'mpiexec -n {ELMER_MPI_THREADS} ElmerSolver case.sif\n'
         txt = txt + 'combine_snp\n'
+        cmd_filename = os.path.join(destination_path, 'run_elmer.bat')
+        with open(cmd_filename, "w", newline='\r\n') as f:  # write with Windows EOL
+            f.write(txt)
     else:
-        txt = '#!/bin/bash\n'
-        txt = txt + f'mpirun -np {ELMER_MPI_THREADS} ElmerSolver case.sif\n'
-        txt = txt + 'combine_snp\n'
+        if ELMER_MPI_THREADS==1:
+            txt = '#!/bin/bash\n'
+            txt = txt + 'ElmerSolver\n'
+            txt = txt + 'combine_snp\n'
+        else:
+            txt = '#!/bin/bash\n'
+            txt = txt + f'mpirun -np {ELMER_MPI_THREADS} ElmerSolver case.sif\n'
+            txt = txt + 'combine_snp\n'
 
-    cmd_filename = os.path.join(destination_path, 'run_elmer')
-    with open(cmd_filename, "w", newline='\n') as f:  # write with UNIX EOL
-        f.write(txt)
-    f.close()       
+        cmd_filename = os.path.join(destination_path, 'run_elmer')
+        with open(cmd_filename, "w", newline='\n') as f:  # write with UNIX EOL
+            f.write(txt)
 
 
 def check_module_version(module_name, expected_version):

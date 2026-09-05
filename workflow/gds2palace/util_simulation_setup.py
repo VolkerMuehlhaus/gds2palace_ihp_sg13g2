@@ -223,7 +223,7 @@ class constanttemp:
     Returns:
         string: string representation 
     """
-    mystr = f"constant temperature boundary T= {self.temperature} K  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
+    mystr = f"constant temperature boundary T= {self.temp} K  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
     return mystr
 
 
@@ -912,6 +912,16 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
 
 
 
+def _thermal_setup_error (message):
+    """Build a ValueError for a thermal-model XML/stackup configuration problem, with the
+    message wrapped in a "!" banner so the root cause stands out in the log even when
+    buried under gmsh "Info" lines and a multi-frame traceback (each printed as its own
+    line by setupThermal's stderr handler).
+    """
+    banner = "!" * 70
+    return ValueError(f"\n{banner}\nTHERMAL MODEL ERROR: {message}\n{banner}")
+
+
 def add_thermal_sources (allpolygons, metals_list, thermal_objects):
     """Add thermal_objects from special port layers to gmsh
 
@@ -946,8 +956,14 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
                         ymax = poly.ymax
                         
                         target_metal = metals_list.getbylayername(object.target_layername)
+                        if target_metal is None:
+                            raise _thermal_setup_error(
+                                f"Thermal source on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' not found in stackup XML file. "
+                                "Check that the stackup XML matches this layout and defines this layer name."
+                            )
                         zmin = target_metal.zmin
-                        zmax = target_metal.zmax 
+                        zmax = target_metal.zmax
 
                         box_tag = gmsh.model.occ.addBox(xmin,ymin,zmin,xmax-xmin,ymax-ymin,zmax-zmin)
                         gmsh.model.setEntityName(dim=3,tag=box_tag, name=f'source_{object.source_layernum}')
@@ -991,6 +1007,12 @@ def add_thermal_boundaries (allpolygons, metals_list, thermal_objects):
 
                         #get target layer, first match in list
                         target_metal = metals_list.getbylayername (object.target_layername)
+                        if target_metal is None:
+                            raise _thermal_setup_error(
+                                f"Constant-temperature boundary on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' not found in stackup XML file. "
+                                "Check that the stackup XML matches this layout and defines this layer name."
+                            )
                         for surfacetag_bot in create_surfaces_from_polygon (poly, target_metal.zmin, 0):
                             gmsh.model.setEntityName(dim=2,tag=surfacetag_bot, name=f'constanttemp_{object.source_layernum}')
                             surface_tags.append(surfacetag_bot)
@@ -1131,6 +1153,7 @@ def create_model (excite_ports, settings):
 
     fstart = get_optional_setting (settings, 'fstart', None)
     fstop  = get_optional_setting (settings, 'fstop', None)
+    fstep  = None
     if (fstart is not None) and (fstop is not None):
         fstep  = get_optional_setting (settings, "fstep", (fstop-fstart)/100)
 
@@ -1257,11 +1280,13 @@ def create_model (excite_ports, settings):
     print('Starting to create mesh file and config file')
 
     fmax = 0
-    if fstop is not None: 
+    if fstop is not None:
         fmax = max(fmax, fstop)
-    if len(f_discrete_list) > 0: 
-        discrete_max = max(f_discrete_list) 
+    if len(f_discrete_list) > 0:
+        discrete_max = max(f_discrete_list)
         fmax = max(fmax, discrete_max)
+    if len(f_dump_list) > 0:
+        fmax = max(fmax, max(f_dump_list))
 
     wavelength_air = 3e8/fmax / unit
     # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
@@ -1808,6 +1833,21 @@ def create_model (excite_ports, settings):
 
     # refinement value controls adaptive mesh refinement
     # always write this control block, even when 0 iterations specified, because user can then edit json himself
+    #
+    # Investigated (not implemented): an HFSS-style two-stage AMR, where a first Palace run
+    # meshes cheaply at only 1-2 frequencies (SaveAdaptMesh: true) and a second run loads that
+    # adapted mesh (config["Model"]["Mesh"] pointed at the .mesh file, MaxIts: 0) for one
+    # full-band sweep on the fixed mesh, instead of paying for the full sweep on every AMR pass.
+    # The mesh hand-off mechanism works (Palace accepts SaveAdaptMesh's MFEM-native .mesh file
+    # directly as Model.Mesh input, and reproduces matching S-parameters), but on a real test
+    # case (2-port inductor, ~250k unknowns after 2 AMR passes) the two-stage total was SLOWER
+    # than the existing single-stage flow (152s vs 124s) - because AdaptiveTol's PROM-based
+    # adaptive frequency sweep already keeps "full sweep every AMR pass" cheap (only ~15-20
+    # full-order solves get interpolated across the whole band, not one solve per sample), and a
+    # fresh second Palace invocation pays its own fixed overhead (mesh preprocessing, operator
+    # construction, preconditioner setup, a final error-estimate pass) that ate up the savings
+    # from the cheaper AMR stage. Not worth the added complexity unless a future, much larger
+    # model shows the fixed per-invocation overhead becoming a small fraction of total time.
     Refinement = {
         "UniformLevels": 0,
         "Tol": 1e-2,
@@ -2202,7 +2242,13 @@ def create_model (excite_ports, settings):
                     if elmer_thermal:
                         Elmer_material['density']=material.density
                         if material.thermaltablename == "":
-                            # single value 
+                            # single value
+                            if material.thermalcond == 0:
+                                raise _thermal_setup_error(
+                                    f'Material "{material.name}" has no ThermalConductivity defined in the stackup '
+                                    'XML file (defaults to 0 W/m/K). Thermal simulation results would be meaningless '
+                                    '-- add a ThermalConductivity attribute for this material in the stackup XML file.'
+                                )
                             Elmer_material['thermalcond']=material.thermalcond
                         else:
                             # table
@@ -2312,7 +2358,8 @@ def create_model (excite_ports, settings):
             for item in physical_groups_ports:
                 layername, portname, grouptag = item.values()
 
-                portnum = int(portname.replace('P',''))           
+                portnum = int(portname.replace('P',''))
+                port = simulation_ports.get_port_by_number(portnum)
                 Elmer_port_boundary = {}
                 Elmer_port_boundary['name'] = portname
                 Elmer_port_boundary['portnum'] = portnum
@@ -2346,15 +2393,16 @@ def create_model (excite_ports, settings):
             # write *.sif file for Elmer
             elmer_physics_file = os.path.join(sim_path, 'physics.sif')
             util_elmer.write_elmer_physics_file (unit,
-                                                    elmer_physics_file, 
-                                                    num_frequencies, 
-                                                    Elmer_materials, 
+                                                    elmer_physics_file,
+                                                    num_frequencies,
+                                                    Elmer_materials,
                                                     Elmer_bodies,
                                                     Elmer_boundaries,
                                                     Elmer_ports,
                                                     PEC_boundaries,
                                                     PML_boundaries,
-                                                    PMC_boundaries)
+                                                    PMC_boundaries,
+                                                    f_dump_list=f_dump_list)
 
 
 

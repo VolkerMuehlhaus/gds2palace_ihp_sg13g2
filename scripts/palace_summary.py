@@ -28,7 +28,14 @@ import sys
 import json
 import csv
 import re
+import math
+import cmath
 import argparse
+
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+from combine_extend_snp import parse_palace_csv
 
 __version__ = "1.0"
 
@@ -85,12 +92,74 @@ def _read_error_indicators(dir_path):
     try:
         return {
             'norm': float(fields['Norm']),
-            'minimum': float(fields['Minimum']),
             'maximum': float(fields['Maximum']),
-            'mean': float(fields['Mean']),
         }
     except (KeyError, ValueError):
         return None
+
+
+def _read_port_s_data(dir_path):
+    """Parse dir_path/port-S.csv (if present) into (freq_list, S_dB_list,
+    S_arg_list, num_ports) using combine_extend_snp's CSV parser, or None if
+    the file is missing, unfinished, or malformed (e.g. a still-running pass).
+    """
+    path = os.path.join(dir_path, 'port-S.csv')
+    if not os.path.isfile(path):
+        return None
+    freq, S_dB, S_arg = [], [], []
+    try:
+        num_ports, _freq_unit = parse_palace_csv(path, freq, S_dB, S_arg)
+    except (OSError, ValueError, IndexError, KeyError):
+        return None
+    if not freq:
+        return None
+    return freq, S_dB, S_arg, num_ports
+
+
+def _max_delta_s(prev_data, curr_data):
+    """Max |S_curr - S_prev| across all ports and frequencies common to both
+    passes, mirroring HFSS's per-pass Max Delta S. Returns None if either
+    pass has no port-S data, or the two use different port counts.
+    """
+    if prev_data is None or curr_data is None:
+        return None
+    freq_p, dB_p, arg_p, ports_p = prev_data
+    freq_c, dB_c, arg_c, ports_c = curr_data
+    if ports_p != ports_c:
+        return None
+
+    max_delta = 0.0
+    found_any = False
+    for idx in range(min(len(freq_p), len(freq_c))):
+        for key in set(dB_p[idx]) & set(dB_c[idx]):
+            try:
+                Sp = cmath.rect(10 ** (float(dB_p[idx][key]) / 20.0), math.radians(float(arg_p[idx][key])))
+                Sc = cmath.rect(10 ** (float(dB_c[idx][key]) / 20.0), math.radians(float(arg_c[idx][key])))
+            except ValueError:
+                continue
+            found_any = True
+            max_delta = max(max_delta, abs(Sc - Sp))
+    return max_delta if found_any else None
+
+
+def _collect_amr_rows(output_dir, iteration_dirs):
+    """One row per AMR iteration subfolder, plus the root output_dir as
+    'Final': (label, palace_json_dict_or_None, error_indicators_dict_or_None,
+    max_delta_s_vs_previous_row_or_None).
+    """
+    dirs_in_order = list(iteration_dirs) + [output_dir]
+    labels = [os.path.basename(d) for d in iteration_dirs] + ["Final"]
+
+    rows = []
+    prev_port_s = None
+    for label, d in zip(labels, dirs_in_order):
+        summary = _read_palace_json(d)
+        errors = _read_error_indicators(d)
+        port_s = _read_port_s_data(d)
+        delta_s = _max_delta_s(prev_port_s, port_s)
+        rows.append((label, summary, errors, delta_s))
+        prev_port_s = port_s
+    return rows
 
 
 def _find_run_dirs(search_root):
@@ -156,14 +225,32 @@ def _format_sci(x):
     return 'n/a' if x is None else f"{x:.3e}"
 
 
+def _format_delta(x):
+    return 'n/a' if x is None else f"{x:.4f}"
+
+
+def _save_convergence_summary(run_path, summary_text):
+    """Save the AMR summary table alongside the run's config.json /
+    port_information.json, so it's available on disk without re-running the
+    simulation or scrolling back through this script's console output.
+    """
+    try:
+        with open(os.path.join(run_path, "mesh_convergence_summary.txt"), "w", encoding="utf-8") as f:
+            f.write(summary_text + "\n")
+    except OSError:
+        pass
+
+
 def build_results_summary(run_path, model_basename):
-    """Return a formatted multi-line summary of Palace results found under run_path,
-    or an explanatory message if nothing is there yet.
+    """Return (text, rows) for the Palace results found under run_path: a
+    formatted multi-line summary (or an explanatory message if nothing is
+    there yet), and the AMR rows from _collect_amr_rows() if this run used
+    adaptive mesh refinement, else None.
     """
     output_dir = _find_output_dir(run_path, model_basename)
     if not os.path.isdir(output_dir):
         return (f"No Palace results found yet (expected output directory: {output_dir}) "
-                 "-- has the simulation finished?")
+                 "-- has the simulation finished?"), None
 
     iteration_dirs = _list_iteration_dirs(output_dir)
 
@@ -172,7 +259,7 @@ def build_results_summary(run_path, model_basename):
         errors = _read_error_indicators(output_dir)
         if summary is None:
             return (f"No palace.json found yet in {output_dir} "
-                     "-- has the simulation finished?")
+                     "-- has the simulation finished?"), None
         lines = [
             f"=== Simulation results: {model_basename} ===",
             f"Degrees of freedom : {_format_int(summary['dof'])}",
@@ -183,19 +270,18 @@ def build_results_summary(run_path, model_basename):
         if errors:
             lines.append(
                 f"Error indicator    : Norm={_format_sci(errors['norm'])}  "
-                f"Max={_format_sci(errors['maximum'])}  Mean={_format_sci(errors['mean'])}"
+                f"Max={_format_sci(errors['maximum'])}"
             )
         lines.append("=" * 40)
-        return "\n".join(lines)
+        return "\n".join(lines), None
 
     # Adaptive mesh refinement: one row per iteration subfolder, plus the root as "Final"
-    rows = [(os.path.basename(it_dir), _read_palace_json(it_dir), _read_error_indicators(it_dir))
-            for it_dir in iteration_dirs]
-    rows.append(("Final", _read_palace_json(output_dir), _read_error_indicators(output_dir)))
+    rows = _collect_amr_rows(output_dir, iteration_dirs)
 
-    headers = ["Iteration", "DOF", "Mesh elems", "Error Norm", "Error Max", "Error Mean", "Time", "Peak RAM"]
+    headers = ["Iteration", "DOF", "Mesh elems", "Error Norm", "Error Max",
+               "Max dS", "Time", "Peak RAM"]
     table_rows = []
-    for label, summary, errors in rows:
+    for label, summary, errors, delta_s in rows:
         summary = summary or {}
         errors = errors or {}
         table_rows.append([
@@ -204,7 +290,7 @@ def build_results_summary(run_path, model_basename):
             _format_int(summary.get('mesh_elements')),
             _format_sci(errors.get('norm')),
             _format_sci(errors.get('maximum')),
-            _format_sci(errors.get('mean')),
+            _format_delta(delta_s),
             _format_duration(summary.get('duration_s')),
             _format_ram(summary.get('peak_ram_mb')),
         ])
@@ -224,7 +310,57 @@ def build_results_summary(run_path, model_basename):
     for row in table_rows:
         lines.append(fmt_row(row))
     lines.append("=" * len(header_line))
-    return "\n".join(lines)
+    summary_text = "\n".join(lines)
+    _save_convergence_summary(run_path, summary_text)
+    return summary_text, rows
+
+
+def plot_convergence(rows, model_basename, out_path):
+    """Render an HFSS-style convergence chart (error-indicator norm and max
+    delta-S vs. AMR iteration, log-y) for the rows built by
+    _collect_amr_rows(), and save it to out_path. Returns out_path.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    indices = list(range(len(rows)))
+    labels = [label for label, _summary, _errors, _delta_s in rows]
+
+    norm_x, norm_y = [], []
+    for i, (_label, _summary, errors, _delta_s) in zip(indices, rows):
+        if errors and errors.get('norm') is not None:
+            norm_x.append(i)
+            norm_y.append(errors['norm'])
+
+    delta_x, delta_y = [], []
+    for i, (_label, _summary, _errors, delta_s) in zip(indices, rows):
+        if delta_s is not None:
+            delta_x.append(i)
+            delta_y.append(delta_s)
+
+    fig, ax1 = plt.subplots(figsize=(7, 4.5))
+    ax1.set_xlabel("AMR iteration")
+    ax1.set_xticks(indices)
+    ax1.set_xticklabels(labels, rotation=45, ha='right')
+
+    ax1.set_ylabel("Error indicator norm", color='tab:blue')
+    ax1.set_yscale("log")
+    line1, = ax1.plot(norm_x, norm_y, marker='o', color='tab:blue', label='Error norm')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel("Max |ΔS|", color='tab:red')
+    ax2.set_yscale("log")
+    line2, = ax2.plot(delta_x, delta_y, marker='s', color='tab:red', label='Max ΔS')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+
+    ax1.legend(handles=[line1, line2], loc='upper right')
+    fig.suptitle(f"AMR convergence: {model_basename}")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
 
 
 # --------------------------
@@ -270,6 +406,13 @@ def main():
              "(default: derived from the run directory name by stripping a "
              "trailing '_data' suffix)"
     )
+    parser.add_argument(
+        "--plot", action="store_true",
+        help="for each run that used adaptive mesh refinement, also render a "
+             "convergence chart (error-indicator norm and max delta-S vs. "
+             "AMR iteration, HFSS-style) and save it as convergence.png in "
+             "that run's directory (requires matplotlib)"
+    )
     args = parser.parse_args()
 
     search_path = os.path.abspath(args.search_path)
@@ -303,11 +446,19 @@ def main():
     for run_path, model_basename in zip(run_dirs, basenames):
         if len(run_dirs) > 1:
             print(f"----- {run_path} -----")
-        summary = build_results_summary(run_path, model_basename)
+        summary, rows = build_results_summary(run_path, model_basename)
         print(summary)
         print()
         if summary.startswith("No Palace results found yet") or summary.startswith("No palace.json found yet"):
             any_incomplete = True
+
+        if args.plot:
+            if rows:
+                out_path = os.path.join(run_path, "convergence.png")
+                plot_convergence(rows, model_basename, out_path)
+                print(f"Convergence plot saved to: {out_path}\n")
+            else:
+                print(f"--plot requested but no AMR iterations found for {model_basename}, skipping.\n")
 
     sys.exit(1 if any_incomplete else 0)
 

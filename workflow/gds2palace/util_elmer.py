@@ -62,21 +62,28 @@ def write_elmer_frequencies (elmer_freq_file,
         return num_frequencies  
 
 def write_elmer_physics_file (unit,
-                              elmer_physics_file, 
-                              num_frequencies, 
-                              Elmer_materials, 
+                              elmer_physics_file,
+                              num_frequencies,
+                              Elmer_materials,
                               Elmer_bodies,
                               Elmer_boundaries,
                               Elmer_ports,
                               PEC_boundaries,
                               PML_boundaries,
-                              PMC_boundaries):
-        
-        with open(elmer_physics_file, "w") as f:  
-            
-            # specify storage of dump files
-            item = '! Dont save vtu files (other options: "after timestep", "after all")\n'
-            item = item + 'Solver 3 :: Exec Solver = String "never"\n\n'
+                              PMC_boundaries,
+                              f_dump_list=None):
+
+        with open(elmer_physics_file, "w") as f:
+
+            # specify storage of dump files: only when fdump frequencies were requested,
+            # since Elmer's "Scanning" simulation has no per-sample SaveStep like Palace -
+            # this dumps fields at every solved frequency, not just the fdump-selected ones
+            dump_requested = bool(f_dump_list)
+            if dump_requested:
+                item = '! Save vtu field dump files at every solved frequency (other options: "after timestep", "after all")\n'
+            else:
+                item = '! Dont save vtu files (other options: "after timestep", "after all")\n'
+            item = item + f'Solver 3 :: Exec Solver = String "{"Always" if dump_requested else "never"}"\n\n'
             f.write(item + '\n')
 
             # frequency block that references output file frequencies.dat
