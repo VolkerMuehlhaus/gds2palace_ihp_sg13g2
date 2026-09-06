@@ -52,6 +52,24 @@ def write_elmer_frequencies (elmer_freq_file,
 
             # sort and write to file
             frequency_list.sort()
+
+            # De-duplicate: Elmer's "Scanning" simulation solves one full pass per
+            # line of frequencies.dat, addressed by index - a duplicate value on two
+            # lines (whether bit-identical, or merely rounding to the same text
+            # below) means Elmer silently re-solves the same physical frequency
+            # twice. Coincidental overlap between the sweep, fpoint, and fdump (or
+            # float drift from repeated "f = f + fstep" additions landing next to a
+            # user-specified value) is common, so dedupe on the same 3-significant-
+            # digit text written below rather than exact float equality.
+            deduped = []
+            seen = set()
+            for freq in frequency_list:
+                key = f"{freq:.3e}"
+                if key not in seen:
+                    seen.add(key)
+                    deduped.append(freq)
+            frequency_list = deduped
+
             for n, freq in enumerate(frequency_list):
                 freqfile.write(f"{n+1}  {freq:.3e}\n")
 
