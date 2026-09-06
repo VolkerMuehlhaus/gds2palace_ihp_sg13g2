@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 import os
 import sys
@@ -1111,7 +1111,11 @@ def create_model (excite_ports, settings):
         # Get the boundary of the surface
         boundary_lines  = gmsh.model.getBoundary([(2, s)], oriented=True)
 
-        # Get points from these lines
+        # Get all points from these lines (not just the first 3): a face rebuilt by an
+        # OpenCASCADE boolean fragment/union can have two of its first few boundary
+        # vertices nearly coincident (a tiny sliver edge left over from the operation),
+        # and a plain 3-point cross product on a near-degenerate triple gives a
+        # near-random normal direction instead of the face's true orientation.
         points = []
         seen_points = set()
 
@@ -1122,26 +1126,46 @@ def create_model (excite_ports, settings):
                     coord = gmsh.model.getValue(0, ptag, [])
                     points.append(np.array(coord))
                     seen_points.add(ptag)
-                if len(points) == 3:
-                    break
-            if len(points) == 3:
-                break
 
-        # Compute surface normal using cross product
-        v1 = points[1] - points[0]
-        v2 = points[2] - points[0]
-        normal = np.cross(v1, v2)
-        normal = normal / np.linalg.norm(normal)
-        return normal
+        if len(points) < 3:
+            # Degenerate/sliver face left over from an OpenCASCADE boolean
+            # operation (e.g. a zero-width bridge from a self-touching
+            # "keyhole" polygon) - it has no meaningful orientation. Return
+            # NaN so the caller (is_vertical_surface) treats it as planar
+            # instead of crashing.
+            return np.array([np.nan, np.nan, np.nan])
+
+        # Newell's method: uses every boundary vertex, so a handful of
+        # near-collinear/near-duplicate ones (see above) get outvoted by the
+        # dominant planar signal from the rest of the polygon, instead of
+        # single-handedly determining the result the way 3 arbitrary points would.
+        normal = np.zeros(3)
+        n = len(points)
+        for i in range(n):
+            p1 = points[i]
+            p2 = points[(i + 1) % n]
+            normal[0] += (p1[1] - p2[1]) * (p1[2] + p2[2])
+            normal[1] += (p1[2] - p2[2]) * (p1[0] + p2[0])
+            normal[2] += (p1[0] - p2[0]) * (p1[1] + p2[1])
+
+        norm = np.linalg.norm(normal)
+        if norm == 0:
+            return np.array([np.nan, np.nan, np.nan])
+        return normal / norm
     
     def is_vertical_surface (s):
         # check if surface is not in xy plane
-        normal = get_surface_orientation(s)   
+        normal = get_surface_orientation(s)
         n = normal[2]
         if not np.isnan(n):
-            is_vertical = int(abs(n)) == 0
-        else:    
-            is_vertical = False    
+            # a horizontal (xy-plane) face has |n_z| close to 1; a vertical face has
+            # |n_z| close to 0. After OCC fragments/unions rebuild a face, its normal
+            # is rarely bit-exact, so compare against a threshold instead of using
+            # int(abs(n))==0, which was only ever False for a perfectly exact 1.0 and
+            # so misclassified almost every reconstructed horizontal face as vertical
+            is_vertical = abs(n) < 0.5
+        else:
+            is_vertical = False
         return is_vertical
     
    
@@ -1227,6 +1251,9 @@ def create_model (excite_ports, settings):
     # solver choice
     elmer = get_optional_setting(settings, 'elmer', False)
     elmer_thermal = get_optional_setting (settings, "elmer_thermal", False)
+    # thermal solve defaults to iterative (BiCGStabl); set settings['iterative']=False for
+    # a direct solver instead (UMFPACK - MUMPS is not available on Windows Elmer builds)
+    elmer_thermal_iterative = get_optional_setting (settings, "iterative", True)
     if elmer_thermal:
         elmer = True
         filled_metals = True # solid metal volumes for thermal
@@ -1582,8 +1609,16 @@ def create_model (excite_ports, settings):
 
     # dictionary of boundary tags (for refinement) per layer, also used for port. Key is layername or port name.
     boundary_line_tags_dict = {}
-    
-    geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]     
+
+    # via lateral (vertical) surfaces get collected separately from metal_surface_dict
+    # while iterating below, then merged in afterwards - if a via's name were added to
+    # metal_surface_dict mid-loop, any *later* volume instance of that same via layer
+    # would hit the "if name in metal_surface_dict.keys()" branch below instead of the
+    # via-specific one, and get its full unfiltered surface set (including the
+    # horizontal mating faces this filtering is specifically meant to exclude)
+    via_surface_dict = {}
+
+    geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]
     for dim, tag in geom_dimtags:
         name = gmsh.model.getEntityName(dim=3,tag=tag)
         if name in metal_surface_dict.keys():
@@ -1597,6 +1632,20 @@ def create_model (excite_ports, settings):
              
         elif name in metal_volume_dict.keys():
             metal_volume_dict[name].append(tag)
+
+            # vias are volume-only above, but also register their lateral (vertical)
+            # side surfaces as a physical group, for meshing/visualization. Top/bottom
+            # mating faces stay attributed to the metal layers the via connects to (they
+            # are already picked up by those layers' own surface registration above), so
+            # only keep the vertical faces here - including the mating faces would trip
+            # the "conductor layers touch" duplicate-surface check below as a false
+            # positive, since a via touching the metals above/below it is by design.
+            via_metal = metals_list.getbylayername(name)
+            if via_metal is not None and via_metal.is_via:
+                _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+                vertical_faces = [t for loop in surfaceloops for t in loop if is_vertical_surface(t)]
+                if vertical_faces:
+                    via_surface_dict.setdefault(name, []).append([vertical_faces])
         elif name in dielectric_volume_dict.keys():
             dielectric_volume_dict[name].append(tag)
         elif name == "airbox":
@@ -1618,7 +1667,12 @@ def create_model (excite_ports, settings):
             if 'unknown' not in metal_volume_dict:
                 metal_volume_dict['unknown'] = []
             metal_volume_dict['unknown'].append(tag)
-            # exit(2)            
+            # exit(2)
+
+    # merge in via lateral surfaces now that the loop above is done (see comment
+    # where via_surface_dict is created for why this can't be merged in mid-loop)
+    for key, value in via_surface_dict.items():
+        metal_surface_dict[key] = value
 
 
     # create lists where we store dictionaries with material name, physical group tag and physical group name
@@ -1639,7 +1693,7 @@ def create_model (excite_ports, settings):
     # create physical group for metal surfaces
 
     already_assigned_tags = [] # list to check duplicates from two metals overlapping
-    
+
     for key in metal_surface_dict.keys():
         surfaces_list = metal_surface_dict[key]
         if len(surfaces_list)>0:
@@ -1659,12 +1713,12 @@ def create_model (excite_ports, settings):
                     else:
                         new_tags_planar.append(tag)     
 
-                    # we should not have this in list    
-                    if tag not in already_assigned_tags:    
-                        already_assigned_tags.append(tag)    
+                    # we should not have this in list
+                    if tag not in already_assigned_tags:
+                        already_assigned_tags.append(tag)
                     else:
                         print("ERROR in XML stackup definition:")
-                        print(f"   Polygon on conductor layer {key} touches another conductor layer (overlapping surface), this is invalid.")    
+                        print(f"   Polygon on conductor layer {key} touches another conductor layer (overlapping surface), this is invalid.")
                         print("   Make sure different 'conductor' layers never touch directly, use 'via' layer for connecting to metal layers!")
                         exit(101)
 
@@ -2416,11 +2470,12 @@ def create_model (excite_ports, settings):
             elmer_thermal_file = os.path.join(sim_path, 'case.sif')
             util_elmer.write_elmer_thermal_file (unit,
                                                     elmer_thermal_file,
-                                                    Elmer_materials, 
+                                                    Elmer_materials,
                                                     Elmer_bodies,
                                                     Elmer_boundaries,
                                                     Elmer_body_forces,
-                                                    Elmer_thermal_boundaryconditions)
+                                                    Elmer_thermal_boundaryconditions,
+                                                    iterative=elmer_thermal_iterative)
 
 
 
