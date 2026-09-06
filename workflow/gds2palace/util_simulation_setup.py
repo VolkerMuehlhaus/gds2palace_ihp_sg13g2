@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 import os
 import sys
@@ -223,7 +223,7 @@ class constanttemp:
     Returns:
         string: string representation 
     """
-    mystr = f"constant temperature boundary T= {self.temperature} K  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
+    mystr = f"constant temperature boundary T= {self.temp} K  GDS source layer = {self.source_layernum}  target layer = {self.target_layername}"
     return mystr
 
 
@@ -912,6 +912,16 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
 
 
 
+def _thermal_setup_error (message):
+    """Build a ValueError for a thermal-model XML/stackup configuration problem, with the
+    message wrapped in a "!" banner so the root cause stands out in the log even when
+    buried under gmsh "Info" lines and a multi-frame traceback (each printed as its own
+    line by setupThermal's stderr handler).
+    """
+    banner = "!" * 70
+    return ValueError(f"\n{banner}\nTHERMAL MODEL ERROR: {message}\n{banner}")
+
+
 def add_thermal_sources (allpolygons, metals_list, thermal_objects):
     """Add thermal_objects from special port layers to gmsh
 
@@ -946,8 +956,14 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
                         ymax = poly.ymax
                         
                         target_metal = metals_list.getbylayername(object.target_layername)
+                        if target_metal is None:
+                            raise _thermal_setup_error(
+                                f"Thermal source on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' not found in stackup XML file. "
+                                "Check that the stackup XML matches this layout and defines this layer name."
+                            )
                         zmin = target_metal.zmin
-                        zmax = target_metal.zmax 
+                        zmax = target_metal.zmax
 
                         box_tag = gmsh.model.occ.addBox(xmin,ymin,zmin,xmax-xmin,ymax-ymin,zmax-zmin)
                         gmsh.model.setEntityName(dim=3,tag=box_tag, name=f'source_{object.source_layernum}')
@@ -991,6 +1007,12 @@ def add_thermal_boundaries (allpolygons, metals_list, thermal_objects):
 
                         #get target layer, first match in list
                         target_metal = metals_list.getbylayername (object.target_layername)
+                        if target_metal is None:
+                            raise _thermal_setup_error(
+                                f"Constant-temperature boundary on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' not found in stackup XML file. "
+                                "Check that the stackup XML matches this layout and defines this layer name."
+                            )
                         for surfacetag_bot in create_surfaces_from_polygon (poly, target_metal.zmin, 0):
                             gmsh.model.setEntityName(dim=2,tag=surfacetag_bot, name=f'constanttemp_{object.source_layernum}')
                             surface_tags.append(surfacetag_bot)
@@ -1089,7 +1111,11 @@ def create_model (excite_ports, settings):
         # Get the boundary of the surface
         boundary_lines  = gmsh.model.getBoundary([(2, s)], oriented=True)
 
-        # Get points from these lines
+        # Get all points from these lines (not just the first 3): a face rebuilt by an
+        # OpenCASCADE boolean fragment/union can have two of its first few boundary
+        # vertices nearly coincident (a tiny sliver edge left over from the operation),
+        # and a plain 3-point cross product on a near-degenerate triple gives a
+        # near-random normal direction instead of the face's true orientation.
         points = []
         seen_points = set()
 
@@ -1100,26 +1126,46 @@ def create_model (excite_ports, settings):
                     coord = gmsh.model.getValue(0, ptag, [])
                     points.append(np.array(coord))
                     seen_points.add(ptag)
-                if len(points) == 3:
-                    break
-            if len(points) == 3:
-                break
 
-        # Compute surface normal using cross product
-        v1 = points[1] - points[0]
-        v2 = points[2] - points[0]
-        normal = np.cross(v1, v2)
-        normal = normal / np.linalg.norm(normal)
-        return normal
+        if len(points) < 3:
+            # Degenerate/sliver face left over from an OpenCASCADE boolean
+            # operation (e.g. a zero-width bridge from a self-touching
+            # "keyhole" polygon) - it has no meaningful orientation. Return
+            # NaN so the caller (is_vertical_surface) treats it as planar
+            # instead of crashing.
+            return np.array([np.nan, np.nan, np.nan])
+
+        # Newell's method: uses every boundary vertex, so a handful of
+        # near-collinear/near-duplicate ones (see above) get outvoted by the
+        # dominant planar signal from the rest of the polygon, instead of
+        # single-handedly determining the result the way 3 arbitrary points would.
+        normal = np.zeros(3)
+        n = len(points)
+        for i in range(n):
+            p1 = points[i]
+            p2 = points[(i + 1) % n]
+            normal[0] += (p1[1] - p2[1]) * (p1[2] + p2[2])
+            normal[1] += (p1[2] - p2[2]) * (p1[0] + p2[0])
+            normal[2] += (p1[0] - p2[0]) * (p1[1] + p2[1])
+
+        norm = np.linalg.norm(normal)
+        if norm == 0:
+            return np.array([np.nan, np.nan, np.nan])
+        return normal / norm
     
     def is_vertical_surface (s):
         # check if surface is not in xy plane
-        normal = get_surface_orientation(s)   
+        normal = get_surface_orientation(s)
         n = normal[2]
         if not np.isnan(n):
-            is_vertical = int(abs(n)) == 0
-        else:    
-            is_vertical = False    
+            # a horizontal (xy-plane) face has |n_z| close to 1; a vertical face has
+            # |n_z| close to 0. After OCC fragments/unions rebuild a face, its normal
+            # is rarely bit-exact, so compare against a threshold instead of using
+            # int(abs(n))==0, which was only ever False for a perfectly exact 1.0 and
+            # so misclassified almost every reconstructed horizontal face as vertical
+            is_vertical = abs(n) < 0.5
+        else:
+            is_vertical = False
         return is_vertical
     
    
@@ -1131,6 +1177,7 @@ def create_model (excite_ports, settings):
 
     fstart = get_optional_setting (settings, 'fstart', None)
     fstop  = get_optional_setting (settings, 'fstop', None)
+    fstep  = None
     if (fstart is not None) and (fstop is not None):
         fstep  = get_optional_setting (settings, "fstep", (fstop-fstart)/100)
 
@@ -1204,6 +1251,9 @@ def create_model (excite_ports, settings):
     # solver choice
     elmer = get_optional_setting(settings, 'elmer', False)
     elmer_thermal = get_optional_setting (settings, "elmer_thermal", False)
+    # thermal solve defaults to iterative (BiCGStabl); set settings['iterative']=False for
+    # a direct solver instead (UMFPACK - MUMPS is not available on Windows Elmer builds)
+    elmer_thermal_iterative = get_optional_setting (settings, "iterative", True)
     if elmer_thermal:
         elmer = True
         filled_metals = True # solid metal volumes for thermal
@@ -1257,11 +1307,13 @@ def create_model (excite_ports, settings):
     print('Starting to create mesh file and config file')
 
     fmax = 0
-    if fstop is not None: 
+    if fstop is not None:
         fmax = max(fmax, fstop)
-    if len(f_discrete_list) > 0: 
-        discrete_max = max(f_discrete_list) 
+    if len(f_discrete_list) > 0:
+        discrete_max = max(f_discrete_list)
         fmax = max(fmax, discrete_max)
+    if len(f_dump_list) > 0:
+        fmax = max(fmax, max(f_dump_list))
 
     wavelength_air = 3e8/fmax / unit
     # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
@@ -1557,8 +1609,16 @@ def create_model (excite_ports, settings):
 
     # dictionary of boundary tags (for refinement) per layer, also used for port. Key is layername or port name.
     boundary_line_tags_dict = {}
-    
-    geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]     
+
+    # via lateral (vertical) surfaces get collected separately from metal_surface_dict
+    # while iterating below, then merged in afterwards - if a via's name were added to
+    # metal_surface_dict mid-loop, any *later* volume instance of that same via layer
+    # would hit the "if name in metal_surface_dict.keys()" branch below instead of the
+    # via-specific one, and get its full unfiltered surface set (including the
+    # horizontal mating faces this filtering is specifically meant to exclude)
+    via_surface_dict = {}
+
+    geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]
     for dim, tag in geom_dimtags:
         name = gmsh.model.getEntityName(dim=3,tag=tag)
         if name in metal_surface_dict.keys():
@@ -1572,6 +1632,20 @@ def create_model (excite_ports, settings):
              
         elif name in metal_volume_dict.keys():
             metal_volume_dict[name].append(tag)
+
+            # vias are volume-only above, but also register their lateral (vertical)
+            # side surfaces as a physical group, for meshing/visualization. Top/bottom
+            # mating faces stay attributed to the metal layers the via connects to (they
+            # are already picked up by those layers' own surface registration above), so
+            # only keep the vertical faces here - including the mating faces would trip
+            # the "conductor layers touch" duplicate-surface check below as a false
+            # positive, since a via touching the metals above/below it is by design.
+            via_metal = metals_list.getbylayername(name)
+            if via_metal is not None and via_metal.is_via:
+                _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+                vertical_faces = [t for loop in surfaceloops for t in loop if is_vertical_surface(t)]
+                if vertical_faces:
+                    via_surface_dict.setdefault(name, []).append([vertical_faces])
         elif name in dielectric_volume_dict.keys():
             dielectric_volume_dict[name].append(tag)
         elif name == "airbox":
@@ -1593,7 +1667,12 @@ def create_model (excite_ports, settings):
             if 'unknown' not in metal_volume_dict:
                 metal_volume_dict['unknown'] = []
             metal_volume_dict['unknown'].append(tag)
-            # exit(2)            
+            # exit(2)
+
+    # merge in via lateral surfaces now that the loop above is done (see comment
+    # where via_surface_dict is created for why this can't be merged in mid-loop)
+    for key, value in via_surface_dict.items():
+        metal_surface_dict[key] = value
 
 
     # create lists where we store dictionaries with material name, physical group tag and physical group name
@@ -1614,7 +1693,7 @@ def create_model (excite_ports, settings):
     # create physical group for metal surfaces
 
     already_assigned_tags = [] # list to check duplicates from two metals overlapping
-    
+
     for key in metal_surface_dict.keys():
         surfaces_list = metal_surface_dict[key]
         if len(surfaces_list)>0:
@@ -1634,12 +1713,12 @@ def create_model (excite_ports, settings):
                     else:
                         new_tags_planar.append(tag)     
 
-                    # we should not have this in list    
-                    if tag not in already_assigned_tags:    
-                        already_assigned_tags.append(tag)    
+                    # we should not have this in list
+                    if tag not in already_assigned_tags:
+                        already_assigned_tags.append(tag)
                     else:
                         print("ERROR in XML stackup definition:")
-                        print(f"   Polygon on conductor layer {key} touches another conductor layer (overlapping surface), this is invalid.")    
+                        print(f"   Polygon on conductor layer {key} touches another conductor layer (overlapping surface), this is invalid.")
                         print("   Make sure different 'conductor' layers never touch directly, use 'via' layer for connecting to metal layers!")
                         exit(101)
 
@@ -1808,6 +1887,21 @@ def create_model (excite_ports, settings):
 
     # refinement value controls adaptive mesh refinement
     # always write this control block, even when 0 iterations specified, because user can then edit json himself
+    #
+    # Investigated (not implemented): an HFSS-style two-stage AMR, where a first Palace run
+    # meshes cheaply at only 1-2 frequencies (SaveAdaptMesh: true) and a second run loads that
+    # adapted mesh (config["Model"]["Mesh"] pointed at the .mesh file, MaxIts: 0) for one
+    # full-band sweep on the fixed mesh, instead of paying for the full sweep on every AMR pass.
+    # The mesh hand-off mechanism works (Palace accepts SaveAdaptMesh's MFEM-native .mesh file
+    # directly as Model.Mesh input, and reproduces matching S-parameters), but on a real test
+    # case (2-port inductor, ~250k unknowns after 2 AMR passes) the two-stage total was SLOWER
+    # than the existing single-stage flow (152s vs 124s) - because AdaptiveTol's PROM-based
+    # adaptive frequency sweep already keeps "full sweep every AMR pass" cheap (only ~15-20
+    # full-order solves get interpolated across the whole band, not one solve per sample), and a
+    # fresh second Palace invocation pays its own fixed overhead (mesh preprocessing, operator
+    # construction, preconditioner setup, a final error-estimate pass) that ate up the savings
+    # from the cheaper AMR stage. Not worth the added complexity unless a future, much larger
+    # model shows the fixed per-invocation overhead becoming a small fraction of total time.
     Refinement = {
         "UniformLevels": 0,
         "Tol": 1e-2,
@@ -2202,7 +2296,13 @@ def create_model (excite_ports, settings):
                     if elmer_thermal:
                         Elmer_material['density']=material.density
                         if material.thermaltablename == "":
-                            # single value 
+                            # single value
+                            if material.thermalcond == 0:
+                                raise _thermal_setup_error(
+                                    f'Material "{material.name}" has no ThermalConductivity defined in the stackup '
+                                    'XML file (defaults to 0 W/m/K). Thermal simulation results would be meaningless '
+                                    '-- add a ThermalConductivity attribute for this material in the stackup XML file.'
+                                )
                             Elmer_material['thermalcond']=material.thermalcond
                         else:
                             # table
@@ -2312,7 +2412,8 @@ def create_model (excite_ports, settings):
             for item in physical_groups_ports:
                 layername, portname, grouptag = item.values()
 
-                portnum = int(portname.replace('P',''))           
+                portnum = int(portname.replace('P',''))
+                port = simulation_ports.get_port_by_number(portnum)
                 Elmer_port_boundary = {}
                 Elmer_port_boundary['name'] = portname
                 Elmer_port_boundary['portnum'] = portnum
@@ -2346,15 +2447,16 @@ def create_model (excite_ports, settings):
             # write *.sif file for Elmer
             elmer_physics_file = os.path.join(sim_path, 'physics.sif')
             util_elmer.write_elmer_physics_file (unit,
-                                                    elmer_physics_file, 
-                                                    num_frequencies, 
-                                                    Elmer_materials, 
+                                                    elmer_physics_file,
+                                                    num_frequencies,
+                                                    Elmer_materials,
                                                     Elmer_bodies,
                                                     Elmer_boundaries,
                                                     Elmer_ports,
                                                     PEC_boundaries,
                                                     PML_boundaries,
-                                                    PMC_boundaries)
+                                                    PMC_boundaries,
+                                                    f_dump_list=f_dump_list)
 
 
 
@@ -2368,11 +2470,12 @@ def create_model (excite_ports, settings):
             elmer_thermal_file = os.path.join(sim_path, 'case.sif')
             util_elmer.write_elmer_thermal_file (unit,
                                                     elmer_thermal_file,
-                                                    Elmer_materials, 
+                                                    Elmer_materials,
                                                     Elmer_bodies,
                                                     Elmer_boundaries,
                                                     Elmer_body_forces,
-                                                    Elmer_thermal_boundaryconditions)
+                                                    Elmer_thermal_boundaryconditions,
+                                                    iterative=elmer_thermal_iterative)
 
 
 

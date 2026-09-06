@@ -34,6 +34,11 @@ In addition to Palace that is required for simulation of the output files, these
 - matplotlib (for the inductor synthesis example scripts)
 - scikit-rf (for the script that converts Palace output to Touchstone SnP format)
 
+Two external tools are needed for parts of the workflow, but are not Python modules and must be installed separately:
+
+- [ParaView](https://www.paraview.org/) — to view field-dump output (Palace/Elmer EM) and Elmer thermal result files.
+- An MPI implementation — only needed for multi-process Elmer runs (`settings['ELMER_MPI_THREADS']`). Use OpenMPI or MPICH on Linux/macOS; on Windows, install [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi).
+
 Documentation assumes that you have created a Python venv named "palace" in ~/venv/palace and installed the modules there.
 
 ## Installing Palace

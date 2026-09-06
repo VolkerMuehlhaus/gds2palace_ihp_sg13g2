@@ -11,6 +11,7 @@ Document version: 2026-08-17
 [Required software and Python modules](#required-software-and-python-modules)  
 &ensp;[Recommended installation of gds2palace as Python module](#recommended-installation-of-gds2palace-as-python-module)  
 &ensp;[Alternative, no longer recommended: local gds2palace directory](#alternative-no-longer-recommended-local-gds2palace-directory)  
+&ensp;[External tools (not Python modules)](#external-tools-not-python-modules)  
 [Installing AWS Palace](#installing-aws-palace)  
 &ensp;[Installing the Palace solver using Apptainer](#installing-the-palace-solver-using-apptainer)  
 &ensp;[Installing the Palace solver using spack package manager](#installing-the-palace-solver-using-spack-package-manager)  
@@ -135,6 +136,13 @@ This virtual environment with installed dependencies can be used to run gds2pala
 ```
 source ~/venv/palace/bin/activate
 ```
+
+### External tools (not Python modules)
+
+Two more tools are needed for parts of the workflow, but are not installed via pip:
+
+- [ParaView](https://www.paraview.org/) — to view field-dump output (Palace/Elmer EM) and Elmer thermal result files.
+- An MPI implementation — only needed for multi-process Elmer runs (`settings['ELMER_MPI_THREADS']`, see chapter "Installing Elmer FEM"). Use OpenMPI or MPICH on Linux/macOS; on Windows, install [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi).
 
 ## Installing AWS Palace 
 
@@ -786,6 +794,8 @@ Elmer FEM is not distributed with gds2palace and must be installed separately, s
 
 - **Windows:** set the environment variable `ELMER_HOME` to your Elmer install directory. gds2palace looks for `%ELMER_HOME%\bin\ElmerGrid.exe`.
 - **Linux/macOS:** make sure `ElmerGrid` and `ElmerSolver` are available on your `PATH`.
+
+If you use `settings['ELMER_MPI_THREADS']` to run Elmer across multiple processes, you also need an MPI implementation installed (see "External tools (not Python modules)" above) — on Windows this is Microsoft MPI, providing the `mpiexec`/`mpirun` launcher the generated `run_elmer` script uses.
 
 ### From a Palace model to an Elmer model
 
