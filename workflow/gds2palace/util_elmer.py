@@ -392,15 +392,28 @@ def write_case_and_solver_files (targetdir, order, iterative, ELMER_MPI_THREADS=
 
 def write_elmer_thermal_file (unit,
                                 elmer_thermal_file,
-                                Elmer_materials, 
+                                Elmer_materials,
                                 Elmer_bodies,
                                 Elmer_boundaries,
                                 Elmer_body_forces,
-                                Elmer_thermal_boundaryconditions):
-    
+                                Elmer_thermal_boundaryconditions,
+                                iterative=True):
+
     with open(elmer_thermal_file, "w") as f:
 
         vtu_file = '../thermal_results.vtu'
+
+        if iterative:
+            linear_system_block = '''Linear System Solver = Iterative
+Linear System Iterative Method = BiCGStabl
+Linear System Max Iterations = 100000
+Linear System Convergence Tolerance = 1.0e-7
+Linear System Preconditioning = ILU1'''
+        else:
+            # MUMPS is not available in the Windows Elmer build - UMFPACK ships
+            # with Elmer on all platforms and needs no extra solver-specific options
+            linear_system_block = '''Linear System Solver = Direct
+Linear System Direct Method = umfpack'''
 
         header1=f'''
 Check Keywords "warn"
@@ -430,11 +443,7 @@ Solver 1
 Equation = Heat Equation
 Procedure = "HeatSolve" "HeatSolver"
 Variable = Temperature
-Linear System Solver = Iterative
-Linear System Iterative Method = BiCGStabl
-Linear System Max Iterations = 2500
-Linear System Convergence Tolerance = 1.0e-10
-Linear System Preconditioning = ILU1
+{linear_system_block}
 Steady State Convergence Tolerance = 1.0e-5
 End        
 
