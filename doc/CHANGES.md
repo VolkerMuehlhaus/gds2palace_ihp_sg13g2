@@ -2,6 +2,9 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 09-September-2026
+Added `more_examples/mesh_convergence/`: five worked mesh convergence studies (how fine to mesh, whether adaptive mesh refinement helps) on real IHP SG13G2 structures — see the [overview](../more_examples/mesh_convergence/README.md) for what we found. Examples: [spiral inductor](../more_examples/mesh_convergence/mesh_convergence_inductor/mesh_convergence_report.md), [transformer](../more_examples/mesh_convergence/mesh_convergence_transformer/mesh_convergence_report.md), [D-band balun](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/mesh_convergence_report.md), [2:1 edge-coupled balun](../more_examples/mesh_convergence/mesh_convergence_balun2x1/mesh_convergence_report.md), [MIM-loaded balun](../more_examples/mesh_convergence/mesh_convergence_balun_mim/mesh_convergence_report.md).
+
 ## 08-September-2026
 Fixed a false-positive `Invalid surface found` print for via layers (e.g. `TopVia2`), introduced by the 06-September via lateral-surface change: those surfaces were being fed into the same boundary-condition builder used for regular conductor/sheet layers, which doesn't have a case for vias (they're already handled as domain conductors, not surface boundaries) and fell through to an "should never happen" branch. Via lateral surface physical groups are now only created for Elmer thermal models (their only real use, for Paraview visualization); the boundary-condition builder also now explicitly skips via layers instead of misreporting them as invalid.
 
