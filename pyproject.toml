@@ -21,6 +21,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2"
 Repository = "https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2"
+Changelog = "https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/doc/CHANGES.md"
 
 [tool.setuptools.dynamic]
 version = {attr = "gds2palace.__version__"}

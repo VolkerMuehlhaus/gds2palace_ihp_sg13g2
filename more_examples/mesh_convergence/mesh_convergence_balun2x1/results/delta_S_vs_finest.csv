@@ -1,0 +1,10 @@
+Param,Mesh,Max|dS| vs. 1 um (uniform) (linear),|dS_dB| at 1GHz,|dS_dB| at 25GHz,|dS_dB| at 50GHz
+Sdd11,5 um (uniform),0.1559,0.0005,0.9688,0.5664
+Sdd11,2 um (uniform),0.0322,0.0001,0.1758,0.1148
+Sdd11,"AMR (5 um start, 2 it.)",0.0149,0.0004,0.0755,0.0623
+Sdd21,5 um (uniform),0.0740,0.0152,0.2320,0.5008
+Sdd21,2 um (uniform),0.0153,0.0008,0.0456,0.0967
+Sdd21,"AMR (5 um start, 2 it.)",0.0076,0.0049,0.0123,0.0541
+Sdd22,5 um (uniform),0.0694,0.0005,0.8566,0.3739
+Sdd22,2 um (uniform),0.0134,0.0000,0.1556,0.0711
+Sdd22,"AMR (5 um start, 2 it.)",0.0061,0.0002,0.0604,0.0559

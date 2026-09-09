@@ -1,0 +1,3 @@
+# Generated meshes and raw Palace solver output (regenerate by re-running the
+# model scripts / results/*.py analysis scripts against the archived .snp files)
+palace_model/

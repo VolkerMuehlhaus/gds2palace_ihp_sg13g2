@@ -1,0 +1,10 @@
+Param,Comparison,Max|dS| (linear),|dS_dB| at 17GHz,|dS_dB| at 19.5GHz,|dS_dB| at 22GHz
+Sss11,"3 um (uniform, initial check) -> 2 um (uniform)",0.0084,0.6045,0.8353,0.4094
+Sss11,2 um (uniform) -> 1 um (uniform),0.0203,1.7191,2.5373,1.1098
+Sss11,"1 um (uniform) -> AMR (2 um start, 2 it.)",0.0025,0.3115,0.3742,0.0884
+Sds21,"3 um (uniform, initial check) -> 2 um (uniform)",0.0088,0.0022,0.0047,0.0133
+Sds21,2 um (uniform) -> 1 um (uniform),0.0228,0.0031,0.0146,0.0352
+Sds21,"1 um (uniform) -> AMR (2 um start, 2 it.)",0.0021,0.0181,0.0134,0.0108
+Sdd22,"3 um (uniform, initial check) -> 2 um (uniform)",0.0077,0.3752,0.3739,0.5064
+Sdd22,2 um (uniform) -> 1 um (uniform),0.0191,1.2448,0.5548,1.2464
+Sdd22,"1 um (uniform) -> AMR (2 um start, 2 it.)",0.0034,0.1101,0.4204,0.3089

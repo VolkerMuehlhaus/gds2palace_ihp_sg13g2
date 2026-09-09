@@ -1,0 +1,10 @@
+Param,Mesh,"Max|dS| vs. AMR (2 um start, 2 it.) (linear)",|dS_dB| at 17GHz,|dS_dB| at 19.5GHz,|dS_dB| at 22GHz
+Sss11,"3 um (uniform, initial check)",0.0268,2.0121,2.9985,1.4308
+Sss11,2 um (uniform),0.0185,1.4076,2.1632,1.0214
+Sss11,1 um (uniform),0.0025,0.3115,0.3742,0.0884
+Sds21,"3 um (uniform, initial check)",0.0331,0.0128,0.0328,0.0593
+Sds21,2 um (uniform),0.0244,0.0150,0.0281,0.0460
+Sds21,1 um (uniform),0.0021,0.0181,0.0134,0.0108
+Sdd22,"3 um (uniform, initial check)",0.0260,1.5099,0.5083,1.4438
+Sdd22,2 um (uniform),0.0184,1.1347,0.1344,0.9374
+Sdd22,1 um (uniform),0.0034,0.1101,0.4204,0.3089

@@ -1,0 +1,13 @@
+Param,Mesh,17 GHz |S| (dB),19.5 GHz |S| (dB),22 GHz |S| (dB)
+Sss11,"3 um (uniform, initial check)",-25.521,-22.659,-15.453
+Sss11,2 um (uniform),-24.917,-23.495,-15.862
+Sss11,1 um (uniform),-23.197,-26.032,-16.972
+Sss11,"AMR (2 um start, 2 it.)",-23.509,-25.658,-16.883
+Sds21,"3 um (uniform, initial check)",-1.220,-1.200,-1.319
+Sds21,2 um (uniform),-1.223,-1.195,-1.306
+Sds21,1 um (uniform),-1.226,-1.181,-1.271
+Sds21,"AMR (2 um start, 2 it.)",-1.208,-1.167,-1.260
+Sdd22,"3 um (uniform, initial check)",-23.892,-23.643,-19.596
+Sdd22,2 um (uniform),-23.517,-24.017,-20.102
+Sdd22,1 um (uniform),-22.272,-24.572,-21.348
+Sdd22,"AMR (2 um start, 2 it.)",-22.382,-24.152,-21.039
