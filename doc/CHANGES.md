@@ -2,6 +2,9 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 12-September-2026
+Added two reserved stackup materials that need no `<Materials>` entry: `PEC` (ideal conductor, on conductor/via/sheet Layers) and `AIR` (built-in default dielectric, overridable).
+
 ## 09-September-2026
 Added `more_examples/mesh_convergence/`: five worked mesh convergence studies (how fine to mesh, whether adaptive mesh refinement helps) on real IHP SG13G2 structures — see the [overview](../more_examples/mesh_convergence/README.md) for what we found. Examples: [spiral inductor](../more_examples/mesh_convergence/mesh_convergence_inductor/mesh_convergence_report.md), [transformer](../more_examples/mesh_convergence/mesh_convergence_transformer/mesh_convergence_report.md), [D-band balun](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/mesh_convergence_report.md), [2:1 edge-coupled balun](../more_examples/mesh_convergence/mesh_convergence_balun2x1/mesh_convergence_report.md), [MIM-loaded balun](../more_examples/mesh_convergence/mesh_convergence_balun_mim/mesh_convergence_report.md).
 

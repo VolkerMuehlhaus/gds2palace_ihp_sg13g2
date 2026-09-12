@@ -85,6 +85,7 @@ def write_elmer_physics_file (unit,
                               Elmer_materials,
                               Elmer_bodies,
                               Elmer_boundaries,
+                              Elmer_boundaries_PEC,
                               Elmer_ports,
                               PEC_boundaries,
                               PML_boundaries,
@@ -169,6 +170,19 @@ def write_elmer_physics_file (unit,
                 item = item + f'   Port Type = String "rectangular"\n'
                 item = item + f'   Port Impedance = Real {portZ0}\n'
                 item = item + f'   Port Direction = Integer {direction}\n'
+                item = item + "End\n"
+                f.write(item + '\n')
+
+            # write per-layer PEC boundaries section: a conductor/via/sheet layer that used the
+            # reserved "PEC" material gets its own ideal-conductor boundary condition here, using
+            # the exact same literal zero-tangential-E construct as the outer airbox PEC boundary
+            # below - just scoped to this layer's own physical group instead of the shared one
+            for name in Elmer_boundaries_PEC:
+                n = n+1 # continue number range started in metal boundaries
+                item = f'Boundary Condition {n+1}\n'
+                item = item + f'   Name = "{name}"\n'
+                item = item +  '   E re {e} = Real 0\n'
+                item = item +  '   E im {e} = Real 0\n'
                 item = item + "End\n"
                 f.write(item + '\n')
 

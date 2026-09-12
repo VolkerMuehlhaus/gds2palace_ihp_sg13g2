@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.5.1"
+__version__ = "1.6.0"
 
 import os
 import sys
@@ -27,7 +27,26 @@ import math
 import numpy as np
 import json
 
-from . import util_elmer 
+from . import util_elmer
+from .util_stackup_reader import PEC_MATERIAL_NAME
+
+# Neither Palace nor Elmer (both FEM continuum solvers) can represent a literal ideal-conductor
+# 3D volume - a PEC via is instead approximated with this fixed, very high but finite
+# conductivity domain material. Matches the ad hoc "LOWLOSS" workaround already used in
+# test_data/zeromargin/SG13G2_PEC_at_M1.xml. (openEMS, being FDTD, has no such limitation and
+# uses a literal ideal-conductor volume for a PEC via instead - see gds2openEMS.)
+PEC_VIA_EQUIVALENT_CONDUCTIVITY = 1e10
+
+
+def _is_pec_material (materialname):
+  """True if materialname is the reserved PEC_MATERIAL_NAME (case-insensitive), i.e. a
+     Layer Material="..." that should bypass normal materials_list lookup entirely.
+  Args:
+      materialname (string): raw metal_layer.material value
+  Returns:
+      bool
+  """
+  return materialname is not None and materialname.strip().upper() == PEC_MATERIAL_NAME.upper()
 
 
 class simulation_port:
@@ -1229,6 +1248,8 @@ def create_model (excite_ports, settings):
     refined_cellsize = settings['refined_cellsize']  # mesh cell size in conductor region
     meshsize_max = get_optional_setting (settings, "meshsize_max", 70)
     adaptive_mesh_iterations = get_optional_setting (settings, "adaptive_mesh_iterations", 0)
+    amr_tol = get_optional_setting (settings, "amr_tol", 1e-2)  # AMR goal: relative error tolerance
+    amr_max_dof = get_optional_setting (settings, "amr_max_dof", 2e6)  # AMR maximum number of unknowns
     save_adaptive_mesh = get_optional_setting (settings, "save_adaptive_mesh", False)
     save_gmsh_geometry =  get_optional_setting (settings, "save_gmsh_unrolled", False)
     substrate_refinement = get_optional_setting (settings, "substrate_refinement", False)
@@ -1906,12 +1927,12 @@ def create_model (excite_ports, settings):
     # model shows the fixed per-invocation overhead becoming a small fraction of total time.
     Refinement = {
         "UniformLevels": 0,
-        "Tol": 1e-2,
+        "Tol": amr_tol,
         "MaxIts": adaptive_mesh_iterations,
-        "MaxSize": 2e6,
+        "MaxSize": amr_max_dof,
         "Nonconformal": True,
         "UpdateFraction": 0.7,
-        "SaveAdaptMesh": save_adaptive_mesh        	
+        "SaveAdaptMesh": save_adaptive_mesh
     }
 
     model =  {
@@ -1991,9 +2012,35 @@ def create_model (excite_ports, settings):
     Palace_materials = []
 
     for item in physical_groups_3D:
-        # items can be from via layer or from dielectric stackup
+        # items can be from via layer, filled/solid metal volume, or dielectric stackup
 
         layername, groupname, grouptag = item.values()
+        metal = metals_list.getbylayername(layername)
+
+        if metal is not None and _is_pec_material(metal.material):
+            if elmer_thermal:
+                raise _thermal_setup_error(
+                    f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
+                    'electromagnetic-only construct, not valid for thermal simulation -- assign '
+                    'a real Conductor material with ThermalConductivity for this layer instead.'
+                )
+            # PEC via or filled/solid metal: Palace has no ideal-conductor volume, approximate
+            # with a fixed very high but finite conductivity domain instead
+            print(f'Layer "{metal.name}" uses the reserved "PEC" material - approximated as a '
+                  f'{PEC_VIA_EQUIVALENT_CONDUCTIVITY:.0e} S/m conductivity domain, since Palace '
+                  f'has no ideal-conductor volume.')
+            Palace_material = {}
+            Palace_material['Attributes'] = [grouptag]
+            Palace_material['Permittivity'] = 1.0
+            if metal.is_via:
+                # anisotropic conductivity so that merged via array don't carry (much) xy current
+                xy_sigma = PEC_VIA_EQUIVALENT_CONDUCTIVITY/10
+                Palace_material['Conductivity'] = [xy_sigma, xy_sigma, PEC_VIA_EQUIVALENT_CONDUCTIVITY]
+            else:
+                Palace_material['Conductivity'] = PEC_VIA_EQUIVALENT_CONDUCTIVITY
+            Palace_materials.append(Palace_material)
+            continue
+
         material = get_material_from_layer_or_dielectric_name(layername)
 
         if material is not None:
@@ -2001,8 +2048,7 @@ def create_model (excite_ports, settings):
             Palace_material['Attributes'] = [grouptag]
             Palace_material['Permittivity'] = material.eps
 
-            metal = metals_list.getbylayername(layername)
-            if metal is not None:        
+            if metal is not None:
                 if metal.is_via:
                     # anisotropic conductivity so that merged via array don't carry (much) xy current
                     xy_sigma = material.sigma/10
@@ -2043,23 +2089,38 @@ def create_model (excite_ports, settings):
     boundaries = {}
     Palace_conductors = []
     Palace_impedances = []
+    Palace_PEC_layer_grouptags = []
 
     for item in physical_groups_2D:
         # items can be from surface of metal conductor
         internal_layername, groupname, grouptag = item.values()
         is_vertical = '_z' in internal_layername
 
-        # strip suffix _xy and _z 
+        # strip suffix _xy and _z
         layername = internal_layername.replace('_xy','')
         layername = layername.replace('_z','')
+
+        metal = metals_list.getbylayername(layername)
+
+        if metal is not None and _is_pec_material(metal.material):
+            if elmer_thermal:
+                raise _thermal_setup_error(
+                    f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
+                    'electromagnetic-only construct, not valid for thermal simulation -- assign '
+                    'a real Conductor material with ThermalConductivity for this layer instead.'
+                )
+            if metal.is_metal or metal.is_sheet:
+                # ideal conductor: goes into the Boundaries.PEC group instead of
+                # Conductivity/Impedance - merged in below with the airbox PEC faces
+                Palace_PEC_layer_grouptags.append(grouptag)
+            # metal.is_via: no boundary needed, same as a regular via lateral surface below
+            continue
 
         material = get_material_from_layer_or_dielectric_name(layername)
 
         if material is not None:
-           
-            # we also need to check metal definition
-            metal = metals_list.getbylayername(layername)
-            if metal is not None:   
+
+            if metal is not None:
 
                 # check that use of conductor or sheet matches material definition
                 if material.type == "CONDUCTOR" and metal.is_sheet:
@@ -2229,9 +2290,12 @@ def create_model (excite_ports, settings):
         Palace_absorbing_boundaries['Attributes']=[phys_group_PML] # absorbing simulation_boundary
         Palace_absorbing_boundaries['Order']=2 
 
-        # config file entry for PEC simulation boundary
+        # config file entry for PEC simulation boundary - merges the outer airbox PEC faces
+        # with any conductor/sheet layer surfaces that used the reserved "PEC" material
+        # (Palace's "Attributes" is just a list of mesh attribute IDs sharing this one
+        # boundary type, so per-layer physical groups don't need to be merged at the gmsh level)
         Palace_PEC_boundaries = {}
-        Palace_PEC_boundaries['Attributes']=[phys_group_PEC] # PEC simulation_boundary
+        Palace_PEC_boundaries['Attributes']=[phys_group_PEC] + Palace_PEC_layer_grouptags # PEC simulation_boundary
 
         # config file entry for PEC simulation boundary
         Palace_PMC_boundaries = {}
@@ -2244,7 +2308,7 @@ def create_model (excite_ports, settings):
             boundaries['Impedance']   = Palace_impedances
         if len(PML_boundaries) > 0:
             boundaries['Absorbing']   = Palace_absorbing_boundaries
-        if len(PEC_boundaries) > 0:
+        if len(PEC_boundaries) > 0 or len(Palace_PEC_layer_grouptags) > 0:
             boundaries['PEC']   = Palace_PEC_boundaries
         if len(PMC_boundaries) > 0:
             boundaries['PMC']   = Palace_PMC_boundaries
@@ -2271,6 +2335,7 @@ def create_model (excite_ports, settings):
         Elmer_materials  = []
         Elmer_bodies     = []
         Elmer_boundaries = []
+        Elmer_boundaries_PEC = []
 
         if elmer_thermal:
             # thermal sources
@@ -2279,9 +2344,31 @@ def create_model (excite_ports, settings):
 
 
         for item in physical_groups_3D:
-            # items can be from via layer or from dielectric stackup
+            # items can be from via layer, filled/solid metal volume, or dielectric stackup
 
             layername, groupname, grouptag = item.values()
+            metal = metals_list.getbylayername(layername)
+
+            if metal is not None and _is_pec_material(metal.material):
+                if elmer_thermal:
+                    raise _thermal_setup_error(
+                        f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
+                        'electromagnetic-only construct, not valid for thermal simulation -- assign '
+                        'a real Conductor material with ThermalConductivity for this layer instead.'
+                    )
+                # PEC via or filled/solid metal: Elmer has no ideal-conductor volume either,
+                # approximate with the same fixed very high conductivity domain as Palace output
+                print(f'Layer "{metal.name}" uses the reserved "PEC" material - approximated as a '
+                      f'{PEC_VIA_EQUIVALENT_CONDUCTIVITY:.0e} S/m conductivity domain, since Elmer '
+                      f'has no ideal-conductor volume.')
+                Elmer_material = {'name': PEC_MATERIAL_NAME, 'permittivity': 1.0,
+                                   'conductivity': PEC_VIA_EQUIVALENT_CONDUCTIVITY}
+                if Elmer_material not in Elmer_materials:
+                    Elmer_materials.append(Elmer_material)
+                material_index = Elmer_materials.index(Elmer_material)
+                Elmer_bodies.append({'name': layername, 'material': material_index+1})
+                continue
+
             material = get_material_from_layer_or_dielectric_name(layername)
 
             if (material is not None) or (layername == 'airbox'):
@@ -2361,19 +2448,33 @@ def create_model (excite_ports, settings):
             internal_layername, groupname, grouptag = item.values()
             is_vertical = '_z' in internal_layername
 
-            # strip suffix _xy and _z 
+            # strip suffix _xy and _z
             layername = internal_layername.replace('_xy','')
             layername = layername.replace('_z','')
+
+            metal = metals_list.getbylayername(layername)
+
+            if metal is not None and _is_pec_material(metal.material):
+                if elmer_thermal:
+                    raise _thermal_setup_error(
+                        f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
+                        'electromagnetic-only construct, not valid for thermal simulation -- assign '
+                        'a real Conductor material with ThermalConductivity for this layer instead.'
+                    )
+                if metal.is_metal or metal.is_sheet:
+                    # ideal conductor: literal PEC boundary, same "E re/im {e} = Real 0"
+                    # construct already used for the outer airbox faces
+                    Elmer_boundaries_PEC.append(gmsh.model.getPhysicalName(2, grouptag))
+                # metal.is_via: no boundary needed, same as a regular via lateral surface below
+                continue
 
             material = get_material_from_layer_or_dielectric_name(layername)
 
             if not elmer_thermal:
                 #regular RF EM
                 if material is not None:
-                
-                    # we also need to check metal definition
-                    metal = metals_list.getbylayername(layername)
-                    if metal is not None:   
+
+                    if metal is not None:
 
                         if metal.is_metal:
                             # regular metal
@@ -2464,6 +2565,7 @@ def create_model (excite_ports, settings):
                                                     Elmer_materials,
                                                     Elmer_bodies,
                                                     Elmer_boundaries,
+                                                    Elmer_boundaries_PEC,
                                                     Elmer_ports,
                                                     PEC_boundaries,
                                                     PML_boundaries,

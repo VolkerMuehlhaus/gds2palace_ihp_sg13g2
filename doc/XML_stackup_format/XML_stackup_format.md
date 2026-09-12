@@ -65,6 +65,12 @@ elements later in the file.
 | `ThermalConductivityTable`   | no       | —       | Name of a `<Table>` (see [Tables](#tables-thermal-conductivity) below) to use instead of a constant value, for temperature-dependent conductivity. |
 | `Color`                     | no       | —       | Hex RGB color (no `#`), used for 3D preview / GUI display. |
 
+> **Built-in default `"AIR"`:** if the file has no `<Material Name="AIR">` entry, one is added
+> automatically (`Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0"
+> Conductivity="0" Color="d0d0d0"` — the same values used across the example stackups in this
+> repo), so `Material="AIR"` just works on a `<Dielectric>`/`<Layer>` without declaring it
+> explicitly. Defining your own `<Material Name="AIR">` overrides this default.
+
 ```xml
 <Materials>
   <Material Name="Metal1" Type="Conductor" Permittivity="1" DielectricLossTangent="0"
@@ -170,7 +176,7 @@ that is itself modeled with negative z).
 |-----------|----------|---------|--------------|
 | `Name`    | yes      | —       | Layer name, used for lookups (`getbylayername`) and in port definitions (`from_layername`/`to_layername` etc. elsewhere in the pipeline). Must be unique across `<Layers>`, and must not collide with a `<Dielectric>` name (see `Reference` below). |
 | `Type`    | yes      | —       | `conductor`, `via`, `dielectric`, or `sheet` (see below). |
-| `Material`| yes      | —       | References a `<Material>` by name. |
+| `Material`| yes      | —       | References a `<Material>` by name, or the reserved keyword `"PEC"` (see below). |
 | `Zmin`    | yes      | —       | Bottom z-position — absolute, or an offset from `Reference`'s edge if `Reference` is set (see below). |
 | `Zmax`    | yes      | —       | Top z-position, same absolute-vs-offset rule as `Zmin`. Equal to `Zmin` forces `Type` to `sheet` regardless of the stated `Type`. |
 | `Layer`   | yes      | —       | GDSII layer number. Also used as the target layer number for a [derived layer](#derivedlayers-boolean-operations-on-layers), in which case its geometry does not need to exist directly in the GDSII file. |
@@ -185,6 +191,16 @@ Layer `Type` meanings:
   stack in `<Dielectrics>`.
 - **`sheet`** — zero-thickness layer (`Zmin == Zmax`), typically paired with a `Resistor`
   material for sheet-resistance elements.
+
+> **Reserved keyword `Material="PEC"`:** valid on a `conductor`, `via`, or `sheet` layer with no
+> matching `<Material>` entry at all — it bypasses the `<Materials>` list entirely and is
+> emitted as an ideal conductor (ideal Palace `Boundaries.PEC` / Elmer zero-tangential-E
+> boundary for `conductor`/`sheet`; for `via`, both are FEM solvers with no ideal-conductor
+> *volume*, so it's approximated there as a fixed, very high conductivity domain instead).
+> Use this instead of an ad hoc zero-Ohm/near-infinite-conductivity material - a `Resistor`
+> material with `Rs="0"` is rejected by Palace (all of `Rs`/`Ls`/`Cs` zero is invalid). Not
+> valid together with Elmer thermal output (`elmer_thermal`/`setupThermal`), which has no
+> electromagnetic concept of PEC.
 
 ```xml
 <Layers>
