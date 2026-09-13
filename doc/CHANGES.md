@@ -2,7 +2,9 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 12-September-2026
+## 12-13-September-2026
+Added an example ([`more_examples/EM_temperature_coefficient`](../more_examples/EM_temperature_coefficient/README.md)) for temperature-dependent conductivity in the XML stackup, to simulate loss vs. temperature. The corresponding .py simulation model loops over temperature and must be run from command line (not setupEM).
+
 Added two reserved stackup materials that need no `<Materials>` entry: `PEC` (ideal conductor, on conductor/via/sheet Layers) and `AIR` (built-in default dielectric, overridable).
 
 ## 09-September-2026
