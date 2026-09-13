@@ -1,0 +1,101 @@
+{
+    "application": "setupEM",
+    "data_format": "1.0",
+    "saved_values": {
+        "unit": 1e-06,
+        "purpose": [
+            0
+        ],
+        "GdsFile": "P:/IHP/Palace_EM/testcases_gds2palace/core_mpa_bce_ports/50_ghz_mpa_core_bce_ports.gds",
+        "SubstrateFile": "P:/IHP/Palace_EM/testcases_gds2palace/core_mpa_bce_ports/SG13G2_100um_bce_ports.xml",
+        "preprocess_gds": true,
+        "merge_polygon_size": 1.2,
+        "margin": 30.0,
+        "fstart": 1.0,
+        "fstop": 350.0,
+        "fstep": 5.0,
+        "refined_cellsize": 1.0,
+        "cells_per_wavelength": 10.0,
+        "meshsize_max": 30.0,
+        "adaptive_mesh_iterations": 0,
+        "order": 2,
+        "boundary": [
+            "ABC",
+            "ABC",
+            "ABC",
+            "ABC",
+            "ABC",
+            "ABC"
+        ],
+        "air_around": 10.0,
+        "sim_path": "P:/IHP/Palace_EM/testcases_gds2palace/core_mpa_bce_ports",
+        "model_basename": "50_ghz_mpa_core_bce_ports",
+        "cellname": "",
+        "variable_overrides": {
+            "air_thickness": 80.0,
+            "total_thickness": 100.0
+        },
+        "refined_cellsize_override": [
+            [
+                "Metal3",
+                2.0
+            ]
+        ],
+        "amr_tol": 0.01,
+        "amr_max_dof": 2000000,
+        "iterative": false
+    },
+    "ports": [
+        {
+            "portnumber": 1,
+            "source_layernum": 201,
+            "target_layername": null,
+            "from_layername": "Metal3",
+            "to_layername": "TopMetal2",
+            "direction": "Z",
+            "port_Z0": 50.0,
+            "voltage": 1.0
+        },
+        {
+            "portnumber": 2,
+            "source_layernum": 202,
+            "target_layername": null,
+            "from_layername": "Metal3",
+            "to_layername": "TopMetal2",
+            "direction": "Z",
+            "port_Z0": 50.0,
+            "voltage": 1.0
+        },
+        {
+            "portnumber": 3,
+            "source_layernum": 203,
+            "target_layername": null,
+            "from_layername": "Metal2",
+            "to_layername": "REF_FOR_TRANSISTOR",
+            "direction": "Z",
+            "port_Z0": 50.0,
+            "voltage": 1.0
+        },
+        {
+            "portnumber": 4,
+            "source_layernum": 204,
+            "target_layername": null,
+            "from_layername": "Metal2",
+            "to_layername": "REF_FOR_TRANSISTOR",
+            "direction": "Z",
+            "port_Z0": 50.0,
+            "voltage": 1.0
+        },
+        {
+            "portnumber": 5,
+            "source_layernum": 205,
+            "target_layername": null,
+            "from_layername": "Metal2",
+            "to_layername": "REF_FOR_TRANSISTOR",
+            "direction": "Z",
+            "port_Z0": 50.0,
+            "voltage": 1.0
+        }
+    ],
+    "elmer_mode": false
+}
