@@ -22,7 +22,7 @@ its real-world usage example.
 ## Usage
 
 ```bash
-source /d/venv/palace/Scripts/activate
+source ~/venv/palace/Scripts/activate
 python palace_resistors_rsil.py
 ```
 
