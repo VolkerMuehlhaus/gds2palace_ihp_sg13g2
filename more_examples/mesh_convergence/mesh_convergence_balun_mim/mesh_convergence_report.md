@@ -20,11 +20,11 @@ All 3 ports were simulated at `port_Z0 = 50 Ω`; the true external system impeda
 
 ## 2. Mesh sweep — results
 
-| Mesh | DOF | Mesh elements | Solve time | Peak RAM | Error indicator norm | Error indicator max |
-|---|---:|---:|---:|---:|---:|---:|
-| 3 µm (initial check) | 696,908 | 99,773 | 9m 6s | 7.02 GB | 1.968e-01 | 1.130e-02 |
-| 2 µm | 948,860 | 134,844 | 13m 19s | 9.30 GB | 1.724e-01 | 8.151e-03 |
-| 1 µm | 1,951,380 | 274,919 | 25m 42s | 17.52 GB | 1.243e-01 | 5.033e-03 |
+| Mesh | DOF | Mesh elements | Solve time | Peak RAM |
+|---|---:|---:|---:|---:|
+| 3 µm (initial check) | 696,908 | 99,773 | 9m 6s | 7.02 GB |
+| 2 µm | 948,860 | 134,844 | 13m 19s | 9.30 GB |
+| 1 µm | 1,951,380 | 274,919 | 25m 42s | 17.52 GB |
 
 No crashes or fatal mesh-quality failures anywhere in this range; gmsh flagged a handful of non-fatal "ill-shaped tets" warnings at every setting (4-8 out of >100k elements), consistent with the small MIM-via geometry rather than a config issue.
 
@@ -32,13 +32,13 @@ No crashes or fatal mesh-quality failures anywhere in this range; gmsh flagged a
 
 Starting mesh: 2 µm. Requested `adaptive_mesh_iterations=2`.
 
-| Iteration | DOF | Mesh elements | Error Norm | Error Max | Max \|ΔS\| vs. prev. | Time (cumulative) | Peak RAM |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 948,860 | 134,844 | 1.724e-01 | 8.151e-03 | n/a | 13m 42s | 9.92 GB |
-| 2 | 1,304,880 | 206,468 | 1.327e-01 | 4.005e-03 | 0.0112 | 38m 8s | 13.54 GB |
-| **Final** | **3,112,276** | **537,603** | **9.665e-02** | **1.929e-03** | **0.0066** | **1h 54m 12s** | **29.99 GB** |
+| Iteration | DOF | Mesh elements | Max \|ΔS\| vs. prev. | Time (cumulative) | Peak RAM |
+|---|---:|---:|---:|---:|---:|
+| 1 | 948,860 | 134,844 | n/a | 13m 42s | 9.92 GB |
+| 2 | 1,304,880 | 206,468 | 0.0112 | 38m 8s | 13.54 GB |
+| **Final** | **3,112,276** | **537,603** | **0.0066** | **1h 54m 12s** | **29.99 GB** |
 
-Iteration 1 matches the 2 µm uniform mesh exactly, as expected. Both the error indicator and Max|ΔS| keep improving through the final iteration — Max|ΔS| roughly halves from 0.0112 to 0.0066, no plateau within this 2-iteration budget.
+Iteration 1 matches the 2 µm uniform mesh exactly, as expected. Max|ΔS| keeps improving through the final iteration — it roughly halves from 0.0112 to 0.0066, no plateau within this 2-iteration budget.
 
 ## 3. Mixed-mode S-parameters at the true system impedance (80 Ω SE / 100 Ω differential)
 
@@ -81,17 +81,29 @@ Both ports are well matched at their true impedances (Sss11, Sdd22 below -15 dB 
 
 ### 3a. Convergence vs. finest (AMR final)
 
-| Param | Mesh | Max\|ΔS\| vs. AMR final (linear) |
-|---|---|---:|
-| Sss11 | 3 µm | 0.0268 |
-| Sss11 | 2 µm | 0.0185 |
-| Sss11 | 1 µm | 0.0025 |
-| Sds21 | 3 µm | 0.0331 |
-| Sds21 | 2 µm | 0.0244 |
-| Sds21 | 1 µm | 0.0021 |
-| Sdd22 | 3 µm | 0.0260 |
-| Sdd22 | 2 µm | 0.0184 |
-| Sdd22 | 1 µm | 0.0034 |
+#### Sss11
+
+| Mesh | Max\|ΔS\| vs. AMR final (linear) |
+|---|---:|
+| 3 µm | 0.0268 |
+| 2 µm | 0.0185 |
+| 1 µm | 0.0025 |
+
+#### Sds21
+
+| Mesh | Max\|ΔS\| vs. AMR final (linear) |
+|---|---:|
+| 3 µm | 0.0331 |
+| 2 µm | 0.0244 |
+| 1 µm | 0.0021 |
+
+#### Sdd22
+
+| Mesh | Max\|ΔS\| vs. AMR final (linear) |
+|---|---:|
+| 3 µm | 0.0260 |
+| 2 µm | 0.0184 |
+| 1 µm | 0.0034 |
 
 Monotonic convergence toward the AMR final result at every mesh step. The 1 µm uniform mesh alone already comes within ~0.003 of the AMR final answer — AMR mainly buys a cross-check here rather than a materially different result.
 

@@ -16,6 +16,7 @@ dependencies = [
     "gdspy>1.6.0",
     "gmsh",
     "numpy",
+    "shapely>=2.0",
 ]
 
 [project.urls]

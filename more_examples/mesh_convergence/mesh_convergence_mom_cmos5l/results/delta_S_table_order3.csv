@@ -1,0 +1,7 @@
+Param,Comparison,|dS| (linear),|dS_dB| at 1GHz
+S11,"0.2 um, order 3 -> 0.1 um, order 3",0.000136,0.0000
+S11,"0.1 um, order 3 -> 0.05 um, order 3",0.000092,0.0000
+S21,"0.2 um, order 3 -> 0.1 um, order 3",0.000134,0.0764
+S21,"0.1 um, order 3 -> 0.05 um, order 3",0.000093,0.0531
+S22,"0.2 um, order 3 -> 0.1 um, order 3",0.000136,0.0000
+S22,"0.1 um, order 3 -> 0.05 um, order 3",0.000092,0.0000
