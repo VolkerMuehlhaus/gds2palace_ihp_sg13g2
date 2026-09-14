@@ -2,20 +2,25 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 12-13-September-2026
+## 12-14-September-2026
 Added an example ([`more_examples/EM_temperature_coefficient`](../more_examples/EM_temperature_coefficient/README.md)) for temperature-dependent conductivity in the XML stackup, to simulate loss vs. temperature. The corresponding .py simulation model loops over temperature and must be run from command line (not setupEM).
 
 Added two reserved stackup materials that need no `<Materials>` entry: `PEC` (ideal conductor, on conductor/via/sheet Layers) and `AIR` (built-in default dielectric, overridable).
 
+Fixed inductor synthesis spiral polygon vertices not landing exactly on the grid in the [inductor synthesis example](../more_examples/inductor_synthesis_no_external_library/synthesize_ihp_inductor_v4.py).
+
+`read_gds()` now silently repairs self-intersecting GDSII "keyhole" polygons instead of failing much later with an opaque `assert dielectric_tags_unchanged` deep inside meshing.
+
+Detect and fix overlap of lumped ports with metals on the same layer. Port wins now, this fixes the previous Palace/MFEM error ("a non-periodic face cannot have multiple boundary elements").
+
 ## 09-September-2026
 Added `more_examples/mesh_convergence/`: five worked mesh convergence studies (how fine to mesh, whether adaptive mesh refinement helps) on real IHP SG13G2 structures — see the [overview](../more_examples/mesh_convergence/README.md) for what we found. Examples: [spiral inductor](../more_examples/mesh_convergence/mesh_convergence_inductor/mesh_convergence_report.md), [transformer](../more_examples/mesh_convergence/mesh_convergence_transformer/mesh_convergence_report.md), [D-band balun](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/mesh_convergence_report.md), [2:1 edge-coupled balun](../more_examples/mesh_convergence/mesh_convergence_balun2x1/mesh_convergence_report.md), [MIM-loaded balun](../more_examples/mesh_convergence/mesh_convergence_balun_mim/mesh_convergence_report.md).
 
-## 08-September-2026
+## 01-08-September-2026
 Fixed a false-positive `Invalid surface found` print for via layers (e.g. `TopVia2`), introduced by the 06-September via lateral-surface change: those surfaces were being fed into the same boundary-condition builder used for regular conductor/sheet layers, which doesn't have a case for vias (they're already handled as domain conductors, not surface boundaries) and fell through to an "should never happen" branch. Via lateral surface physical groups are now only created for Elmer thermal models (their only real use, for Paraview visualization); the boundary-condition builder also now explicitly skips via layers instead of misreporting them as invalid.
 
 Unified the Palace installation documentation: `doc/building-palace-spack.md` and `doc/building-palace-apptainer.md` are now the sole maintained, up-to-date step-by-step guides (targeting Palace 0.17.0, including the gds2palace `run_palace`/`combine_snp` integration and, for Apptainer, a Windows/WSL note and the prebuilt-0.16-image quick-start). The old `doc/Installing_Palace_using_Spack.pdf` and `doc/Installing_Palace_using_Apptainer.pdf` were removed — README.md, README_pypi.md, ARCHITECTURE.md and the userguide now link the Markdown guides directly instead.
 
-## 06-September-2026
 Elmer thermal simulations can now use a direct linear solver (UMFPACK) instead of the iterative BiCGStabl solver, via `settings['iterative']=False` — useful when the iterative solver fails to converge on a large conductivity contrast between materials. Loosened the default iterative solver's convergence tolerance and raised its iteration cap, since the previous defaults could fail to converge on some models.
 
 Fixed two related bugs in mesh generation that caused `IndexError`/`Could not create line` crashes on complex geometry involving OpenCASCADE boolean fragments: `is_vertical_surface()` used a threshold check (`int(abs(n))==0`) that misclassified almost every reconstructed horizontal face as vertical, and `get_surface_orientation()` computed a face's normal from only its first 3 boundary vertices, which could be near-collinear after a boolean fragment/union rebuilt the face. Both are now more robust (proper threshold, and Newell's method over all boundary vertices).
@@ -24,10 +29,8 @@ Vias now also get surface physical groups for their lateral (vertical) side face
 
 Fixed Elmer EM simulations silently re-solving the same frequency twice: `write_elmer_frequencies()` combined the swept range with `fpoint`/`fdump` values without checking for overlap, so a frequency that happened to appear in both the sweep and `fpoint`/`fdump` landed on two separate lines of `frequencies.dat` — and Elmer's "Scanning" simulation solves every line as an independent full simulation task, addressed by index, not by value. The combined list is now de-duplicated before being written.
 
-## 05-September-2026
 Elmer EM (S-parameter) simulations can now actually write field-dump data when `fdump` frequencies are set — this was silently doing nothing before. Fixed a crash when `fdump` was used without also specifying a frequency sweep (`fstart`/`fstop`), for both Palace and Elmer output. Fixed the generated Elmer run script on Windows, which used Linux-only `mpirun`/bash syntax and never actually worked there.
 
-## 01-September-2026
 Fixed a crash in `resolve_derived_layers()`: `gdspy.boolean()` raises `IndexError` when called with an empty operand (e.g. a resistor recognition layer with no polygons in the current cell), which previously aborted the whole GDSII read. The boolean fold now short-circuits using the OR/AND/NOT identity instead whenever either operand is empty. Same fix applied to openems_ihp_sg13g2's independent copy of this reader.
 
 ## 21-August-2026
