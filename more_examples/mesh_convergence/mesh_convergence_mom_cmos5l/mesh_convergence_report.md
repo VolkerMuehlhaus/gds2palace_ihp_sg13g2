@@ -6,7 +6,7 @@
 - **Ports:** 2 via ports (Metal1→Metal4), Z0 = 50 Ω. **Raw S/Y-parameters only — no de-embedding applied**, unlike the other studies on this page.
 - **Execution:** remote solve on `hpz2`, Spack-built Palace 0.16.0 (`run_palace_spack`, `mpirun -n 16` of 32 cores, 109 GB RAM), jobs run sequentially
 
-Per the study brief, this report evaluates **C12** (the port1-port2 mutual/coupling capacitance) and **delta-S** convergence only. Palace's internal mesh-quality error indicators (DOF, error-indicator norm/max) are not reported — see the [top-level README](../README.md#norm--max-the-dirty-details-of-palaces-error-indicator) for why those numbers don't map onto S-parameter or capacitance accuracy anyway. Solve time is included in §2 since it's directly useful for judging the mesh/order trade-off.
+Per the study brief, this report evaluates **C12** (the port1-port2 mutual/coupling capacitance) and **delta-S** convergence only. Palace's internal error-indicator Norm/Max is not reported — see the [top-level README](../README.md) for why. Solve time is included in §2 since it's directly useful for judging the mesh/order trade-off.
 
 ## 0. Layout
 

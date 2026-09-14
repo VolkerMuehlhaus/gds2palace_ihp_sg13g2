@@ -429,12 +429,18 @@ Match the structure used by the existing reports (each one's opening
    rendered.
 3. **Method** — which variants were generated and why.
 4. **Uniform mesh sweep results** — a table with DOF, mesh elements,
-   solve time, peak RAM, and error indicator norm/max per mesh size (all
-   read straight from `palace.json` — see `palace_summary.py`'s field
-   names if unsure which JSON keys these are).
-5. **AMR results** — the same fields per iteration, plus the
-   `amr*_convergence.png` chart, plus Max|ΔS| between successive
-   iterations.
+   solve time, and peak RAM per mesh size (all read straight from
+   `palace.json` — see `palace_summary.py`'s field names if unsure which
+   JSON keys these are). Don't include Palace's own error-indicator
+   Norm/Max (`error-indicators.csv`) in the report — it's a relative,
+   energy-normalized FEM residual, not a mesh-quality score or Delta-S-like
+   convergence criterion, and showing it alongside S-parameter/derived-
+   quantity results has caused more confusion than it resolved for users
+   coming from other solvers. Judge convergence from `Max|ΔS|` (§2.6) and
+   the structure's own target quantity instead.
+5. **AMR results** — the same fields (DOF, mesh elements, solve time, peak
+   RAM) per iteration, plus the `amr*_convergence.png` chart, plus
+   Max|ΔS| between successive iterations.
 6. **S-parameter overlays + delta-S tables** (§2.6).
 7. Any structure-specific results section (§2.6).
 8. **Discussion/recommendation** — state a concrete, numbers-grounded
