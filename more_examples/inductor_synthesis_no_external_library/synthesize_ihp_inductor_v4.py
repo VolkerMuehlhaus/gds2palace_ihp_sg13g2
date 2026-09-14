@@ -20,8 +20,12 @@
 
 # Changes:
 # 07-April-2026: New version with built-in geometry code, does not require external pclab library. This new version is not limited in number of turns
-# 13-June-2026: Fixed bug in output name of final model 
+# 13-June-2026: Fixed bug in output name of final model
 # 14-July-2026: Fixed bug with port 3 at center tap going to wrong layer (open circuit)
+# 14-September-2026: Fixed bug where spiral polygon vertices were not exactly on the 0.01um grid;
+#                     FlexPath miter joins at 45-degree bends introduce sqrt(2)-based offsets that
+#                     gridsnap() on the centerline points alone did not catch, so vertices are now
+#                     snapped again after path-to-polygon conversion (see snap_geometry_to_grid())
 
 # Specify the target frequency, target value and geometry limits in the parameters below.
 # Settings for gds2palace FEM simulation are defined in the script below.
@@ -142,9 +146,26 @@ MU0 = 4*math.pi*1e-7
 def gridsnap(x):
     grid = 0.01   # grid in micron
     return round(x/grid)*grid
-    
+
 def is_even(x):
     return x % 2 == 0
+
+def snap_geometry_to_grid(geometry):
+    # Snap all vertices of a gdspy geometry to the gridsnap() grid.
+    # gridsnap() is applied to path centerlines and box/polygon corners as they are
+    # constructed, but that is not enough: FlexPath miter joins (e.g. at the 45-degree
+    # bends built from segment_length/sqrt(2)) compute offset vertices that involve
+    # irrational factors like sqrt(2), so the actual polygon boundary coming out of
+    # FlexPath generally does NOT land on the grid even though the input centerline
+    # points do. So we snap again here, after path-to-polygon conversion.
+    polygonset = geometry.to_polygonset() if isinstance(geometry, gdspy.FlexPath) else geometry
+
+    snapped = gdspy.PolygonSet(
+        [[(gridsnap(x), gridsnap(y)) for x, y in poly] for poly in polygonset.polygons]
+    )
+    snapped.layers = list(polygonset.layers)
+    snapped.datatypes = list(polygonset.datatypes)
+    return snapped
 
 # --- GDSII drawing functions ---
 
@@ -712,9 +733,9 @@ def symmetric_octa_IHP(N, D, w, s, includeCenterTap=False, LBE=False, forEM=Fals
                     p2=(x0+feedline_spacing/2+w, ymax_frame_inner))
 
 
-    # add all created shapes to cell now
+    # add all created shapes to cell now, snapping polygon vertices to the design grid
     for geometry in all_geometries_list:
-        cell.add(geometry)
+        cell.add(snap_geometry_to_grid(geometry))
 
     lib.write_gds(filename)
 
