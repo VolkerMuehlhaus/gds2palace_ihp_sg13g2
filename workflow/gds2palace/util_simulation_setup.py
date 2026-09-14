@@ -1717,6 +1717,19 @@ def create_model (excite_ports, settings):
 
     already_assigned_tags = [] # list to check duplicates from two metals overlapping
 
+    # A port surface is deliberately drawn flush against its target conductor (zero
+    # thickness, same z), so that the fragment() calls above merge the two into one
+    # shared mesh face - required for FEM continuity, since the port's boundary
+    # condition needs to sit right where current enters/leaves the conductor. That
+    # shared face is still part of the conductor volume's own boundary loop
+    # (collected below via getSurfaceLoops on the volume), so without this
+    # exclusion it would end up in both the port's physical group AND a conductor
+    # "Conductivity" physical group - which Palace/MFEM rejects outright ("A
+    # non-periodic face cannot have multiple boundary elements!"). The port's own
+    # boundary condition already covers that face electrically, so it's excluded
+    # here rather than also being tagged as a generic conductor surface.
+    port_surface_tags = {tag for tags in port_dimtags_created_2D.values() for tag in tags}
+
     for key in metal_surface_dict.keys():
         surfaces_list = metal_surface_dict[key]
         if len(surfaces_list)>0:
@@ -1725,16 +1738,21 @@ def create_model (excite_ports, settings):
             for surfaces in surfaces_list:
                 i=i+1
 
-                # we want to separate surfaces into planar (xy) and vertical (z) 
+                # we want to separate surfaces into planar (xy) and vertical (z)
                 new_tags_planar = []
                 new_tags_vertical = []
 
                 all_tags = surfaces[0]
                 for tag in all_tags:
+                    if tag in port_surface_tags:
+                        # this face belongs to a port, not a generic conductor
+                        # surface - see port_surface_tags comment above
+                        continue
+
                     if is_vertical_surface(tag):
                         new_tags_vertical.append(tag)
                     else:
-                        new_tags_planar.append(tag)     
+                        new_tags_planar.append(tag)
 
                     # we should not have this in list
                     if tag not in already_assigned_tags:
