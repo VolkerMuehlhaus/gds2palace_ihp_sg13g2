@@ -23,6 +23,8 @@ __version__ = "1.1.0"
 import gdspy
 import numpy as np
 import os
+from shapely.geometry import Polygon as ShapelyPolygon
+from shapely.validation import explain_validity, make_valid
 
 # check that we have gdspy version 1.6.x or later
 # gdspy 1.4.2 is known for issues with our geometries
@@ -497,6 +499,147 @@ def merge_via_array (polygons, maxspacing):
 
 
 
+def _is_benign_single_keyhole (shapely_poly):
+  """A self-intersecting polygon is not automatically a problem for
+  gds2palace's solid-body mesher: the single-hole "keyhole" bridge encoding
+  (an outer boundary that dips in, traces one hole, and comes back out
+  through the same slit) is the universal, standard way GDSII represents a
+  hole, and gmsh/OpenCASCADE tolerate it fine - confirmed against several
+  real, working example layouts in this repo (mesh_convergence_balun_mim,
+  mesh_convergence_inductor, mesh_convergence_transformer). What actually
+  breaks meshing (confirmed against a real failure, see
+  test_data/T582_len280_gsgport) is multiple overlapping/crossing bridges
+  tangled together on one ring, not a single clean touch point.
+
+  shapely's make_valid() distinguishes the two structurally: repairing a
+  single clean bridge leaves behind exactly one simple Polygon plus one
+  LineString "slit" artifact (a GeometryCollection of exactly those two
+  parts); a polygon with multiple tangled/crossing bridges instead leaves
+  behind more parts, a MultiLineString, and/or more than one hole - checked
+  empirically against both the safe and the broken real examples above.
+  """
+  fixed = make_valid(shapely_poly)
+  return (
+    fixed.geom_type == "GeometryCollection"
+    and len(fixed.geoms) == 2
+    and sum(g.geom_type == "Polygon" for g in fixed.geoms) == 1
+    and sum(g.geom_type == "LineString" for g in fixed.geoms) == 1
+    and next(g for g in fixed.geoms if g.geom_type == "Polygon").interiors.__len__() == 1
+  )
+
+
+def _fracture_valid_pieces (points, max_points_candidates=(8, 6, 5)):
+  """Resolve a possibly self-intersecting "keyhole" polygon boundary (`points`)
+  into a list of simple, non-self-intersecting point loops representing the
+  same shape (any holes preserved, not filled in) - or None if that isn't
+  possible for this shape.
+
+  Repairs via shapely's make_valid() to get a clean exterior + hole rings,
+  then cuts the holes out with gdspy's own boolean 'not' operation. gdspy's
+  *default* output for a polygon-with-holes is itself a single self-touching
+  "keyhole" bridge ring - the same style of encoding causing the problem in
+  the first place, and confirmed (on a real multi-hole cutout) to still be
+  self-intersecting per shapely even after going through gdspy's own boolean
+  engine. Forcing gdspy's `max_points` fracturing (splitting any result over
+  that many vertices into several simple pieces instead of one bridged ring)
+  with a low enough value reliably produces valid, non-self-intersecting
+  pieces instead - so each candidate is tried in turn (least material change
+  first) and validated with shapely before being accepted, since the "right"
+  threshold isn't knowable in advance and depends on the hole layout.
+  """
+  raw = ShapelyPolygon(points)
+  fixed = raw if raw.is_valid else make_valid(raw)
+
+  if fixed.geom_type == "GeometryCollection":
+    # a repaired "bridge" polygon typically comes back as the resolved
+    # Polygon-with-hole alongside a degenerate LineString/MultiLineString for
+    # the slit itself - keep the polygon part, ignore the lower-dimensional
+    # artifacts
+    polygon_parts = [g for g in fixed.geoms if g.geom_type == "Polygon" and g.area > 0]
+    if len(polygon_parts) != 1:
+      return None  # zero or multiple real polygon parts - too ambiguous to handle generically
+    fixed = polygon_parts[0]
+  elif fixed.geom_type != "Polygon":
+    return None  # e.g. a bowtie that resolves into disjoint parts - too ambiguous
+
+  if not fixed.interiors:
+    return [list(fixed.exterior.coords)[:-1]]
+
+  exterior_coords = list(fixed.exterior.coords)[:-1]
+  hole_coords = [list(ring.coords) for ring in fixed.interiors]
+
+  for max_points in max_points_candidates:
+    result = gdspy.boolean([exterior_coords], hole_coords, 'not', max_points=max_points)
+    if result is None:
+      continue
+    pieces = [list(map(tuple, p)) for p in result.polygons]
+    if all(ShapelyPolygon(p).is_valid for p in pieces):
+      return pieces
+  return None
+
+
+def _repair_malformed_polygons (all_polygons):
+  """Silently repair any polygon that's geometrically invalid (self-intersecting)
+  beyond the benign single-hole "keyhole" case gmsh/OpenCASCADE already tolerates
+  fine (see _is_benign_single_keyhole()) - what actually breaks meshing (confirmed
+  against a real failure, see test_data/T582_len280_gsgport) is multiple
+  overlapping/crossing bridges tangled together on one ring, which otherwise
+  only surfaces much later as an opaque "assert dielectric_tags_unchanged" deep
+  inside meshing (see util_simulation_setup.py's create_model()), with no
+  indication of which polygon or layer was actually at fault.
+
+  Mutates all_polygons.polygons in place: an invalid polygon is replaced by one
+  or more valid, non-self-intersecting pieces representing the same shape
+  (holes preserved, not filled in) - see _fracture_valid_pieces(). A polygon
+  that can't be resolved this way (e.g. a plain self-crossing bowtie with no
+  hole structure at all) is left untouched and printed as a warning, rather
+  than guessing at a fix or silently discarding geometry.
+
+  This runs transparently every time a GDSII file is read - a file that
+  needed no repair looks the same as before, and a file that did gets fixed
+  automatically instead of failing (or silently meshing wrong).
+  """
+  repaired_layers = set()
+  unresolved = []
+  new_polygons = []
+
+  for poly in all_polygons.polygons:
+    if len(poly.pts_x) < 3:
+      new_polygons.append(poly)
+      continue
+
+    shapely_poly = ShapelyPolygon(zip(poly.pts_x, poly.pts_y))
+    if shapely_poly.is_valid or _is_benign_single_keyhole(shapely_poly):
+      new_polygons.append(poly)
+      continue
+
+    pieces = _fracture_valid_pieces(list(zip(poly.pts_x, poly.pts_y)))
+    if pieces is None:
+      unresolved.append((poly.layernum, explain_validity(shapely_poly)))
+      new_polygons.append(poly)
+      continue
+
+    repaired_layers.add(poly.layernum)
+    for piece_points in pieces:
+      new_poly = gds_polygon(poly.layernum)
+      for x, y in piece_points:
+        new_poly.add_vertex(x, y)
+      new_poly.process_pts()
+      new_poly.is_port = poly.is_port
+      new_poly.is_via = poly.is_via
+      new_polygons.append(new_poly)
+
+  if repaired_layers:
+    print('Repaired self-intersecting polygon(s) (unresolved GDSII "keyhole" '
+          'hole/cutout encoding) on layer(s):', sorted(repaired_layers))
+  if unresolved:
+    print('WARNING: could not auto-repair', len(unresolved), 'invalid polygon(s), left as-is:')
+    for layer, reason in unresolved:
+      print(f'  layer {layer}: {reason}')
+
+  all_polygons.polygons = new_polygons
+
+
 # ----------- read GDSII file, return openEMS polygon list object -----------
 
 def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, merge_polygon_size=0, mirror=False, offset_x=0, offset_y=0, gds_boundary_layers=[], layernumber_offset=0, cellname="", derived_layers=None):
@@ -657,7 +800,12 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
 
 
     # all_polygons.set_bounding_box (xmin,xmax,ymin,ymax)
-    
+
+    # silently repair a malformed (self-intersecting) polygon here, right after
+    # reading, instead of letting it surface as an opaque meshing failure much
+    # later (or, for the benign single-keyhole case, doing nothing at all)
+    _repair_malformed_polygons(all_polygons)
+
     # done!
     return all_polygons
   
