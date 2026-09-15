@@ -1,0 +1,10 @@
+Freq (GHz),Variant,L (nH),Q,Rseries (Ohm)
+1.0,"Surface, 2 um (baseline)",1.6521,6.9344,1.4969
+1.0,"filled_metals, 2 um",1.6798,6.2038,1.7013
+1.0,"filled_metals, 1 um",1.6808,6.2086,1.7010
+7.0,"Surface, 2 um (baseline)",1.7763,26.6209,2.9348
+7.0,"filled_metals, 2 um",1.7874,19.8113,3.9682
+7.0,"filled_metals, 1 um",1.7859,20.2666,3.8758
+20.0,"Surface, 2 um (baseline)",6.0273,6.8566,110.4652
+20.0,"filled_metals, 2 um",5.9842,5.6347,133.4571
+20.0,"filled_metals, 1 um",5.6874,6.1759,115.7238

@@ -1,0 +1,7 @@
+Param,Comparison,What changes,Max|dS| (linear),|dS_dB| at 1.0GHz,|dS_dB| at 7.0GHz,|dS_dB| at 20.0GHz
+S11,"Surface, 2 um (baseline) -> filled_metals, 2 um",conductor modeling only (matched 2um mesh),0.0077,0.1617,0.0137,0.0340
+S11,"filled_metals, 2 um -> filled_metals, 1 um",mesh refinement only (filled_metals),0.0165,0.0102,0.0027,0.0080
+S11,"Surface, 2 um (baseline) -> filled_metals, 1 um",combined (baseline vs. filled_metals as used),0.0195,0.1719,0.0110,0.0420
+S21,"Surface, 2 um (baseline) -> filled_metals, 2 um",conductor modeling only (matched 2um mesh),0.0068,0.0188,0.0739,0.0427
+S21,"filled_metals, 2 um -> filled_metals, 1 um",mesh refinement only (filled_metals),0.0149,0.0003,0.0062,0.2207
+S21,"Surface, 2 um (baseline) -> filled_metals, 1 um",combined (baseline vs. filled_metals as used),0.0178,0.0184,0.0677,0.1780
