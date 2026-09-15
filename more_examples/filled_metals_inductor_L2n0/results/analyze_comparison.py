@@ -201,25 +201,31 @@ def main():
     srf_note = f" (SRF~{srf_hz/1e9:.1f} GHz)" if srf_hz else ""
 
     param_info = {
-        "L": ("Diff. Inductance (nH)", "Differential inductance", 1e9),
-        "Q": ("Diff. Q factor", "Differential Q factor", 1),
-        "R": ("Diff. series resistance (Ohm)", "Differential series resistance", 1),
+        "L": ("Diff. Inductance (nH)", "Differential inductance", 1e9, None, None),
+        "Q": ("Diff. Q factor", "Differential Q factor", 1, None, None),
+        # zoomed to the low-frequency detail (full range to SRF makes R>100 Ohm near
+        # resonance dominate the axis and hides the 0-8 GHz behavior)
+        "R": ("Diff. series resistance (Ohm)", "Differential series resistance", 1, 8.0, (0, 5)),
     }
-    for pname, (ylabel, title, scale) in param_info.items():
+    for pname, (ylabel, title, scale, xmax_override, ylim_override) in param_info.items():
+        plot_fmax_ghz = xmax_override if xmax_override is not None else fmax_ghz
         fig, ax = plt.subplots(figsize=(7, 5.5))
         for key, _label, _fname in SERIES:
             if key not in diff_traces:
                 continue
             tr = diff_traces[key]
             freq_ghz = tr["freq"] / 1e9
-            mask = freq_ghz <= fmax_ghz
+            mask = freq_ghz <= plot_fmax_ghz
             ax.plot(freq_ghz[mask], (tr[pname] * scale)[mask], color=colors[key], linestyle=styles[key], label=tr["label"])
         ax.set_xlabel("Frequency (GHz)")
         ax.set_ylabel(ylabel)
-        ax.set_xlim(0, fmax_ghz)
+        ax.set_xlim(0, plot_fmax_ghz)
+        if ylim_override is not None:
+            ax.set_ylim(*ylim_override)
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=8)
-        ax.set_title(f"{title}: surface-impedance vs. filled_metals{srf_note}")
+        title_suffix = srf_note if xmax_override is None else ""
+        ax.set_title(f"{title}: surface-impedance vs. filled_metals{title_suffix}")
         fig.tight_layout()
         out_path = os.path.join(PLOT_DIR, f"inductor_LQR_{pname.lower()}.png")
         fig.savefig(out_path, dpi=150)

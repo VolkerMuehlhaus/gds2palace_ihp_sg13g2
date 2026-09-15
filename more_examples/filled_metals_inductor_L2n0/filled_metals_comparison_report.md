@@ -101,8 +101,11 @@ reasonably mesh-converged at 7 GHz; the bigger factor is the conductor model, no
 
 Self-resonant frequency (Ldiff crossing zero) is ~23.1–23.3 GHz for all three variants —
 consistent across conductor models and mesh sizes, a good cross-check of the extraction itself.
-Plots are cut off at 1.2×SRF; the 20 GHz table row sits close enough to resonance that L/Q swing
-quickly there and shouldn't be read as "the" inductance in the same sense as the 1/7 GHz rows.
+L and Q are plotted out to 1.2×SRF; the 20 GHz table row sits close enough to resonance that
+L/Q swing quickly there and shouldn't be read as "the" inductance in the same sense as the
+1/7 GHz rows. Rseries is instead plotted only to 8 GHz (y-axis capped at 5 Ω) to keep the
+low-frequency divergence between conductor models visible — the same data zoomed out to SRF
+would be dominated by the >100 Ω climb near resonance (see the 20 GHz table row).
 
 | Freq (GHz) | Variant | L (nH) | Q | Rseries (Ω) |
 |---:|---|---:|---:|---:|
@@ -123,16 +126,24 @@ model, essentially independent of mesh (volume_2um and volume_1um agree with eac
 ~2.5% on both, at 1 µm and 2 µm mesh) — this is a real, mesh-converged difference between the
 two *models*, not a `filled_metals` mesh-resolution artifact at this frequency.
 
-**Why might this be:** in TopMetal2 (σ=30.3×10⁶ S/m), skin depth is 2.89 µm at 1 GHz and 1.09 µm
-at 7 GHz, against a 3 µm metal thickness — thin enough that skin effect matters, but not so thin
-that either 1 µm or 2 µm mesh should badly under-resolve it (unlike the much larger high-frequency
-under-resolution seen in `test_data/filled_metals_comparison`'s simple line study). A more likely
-contributor here: this is a tightly-wound coil with a ~3 µm gap at the underpass bridge and
-conductor sections running close to each other and to the SUBGND return — a surface-impedance
-boundary condition computes loss from the local field at each point, independent of nearby
-conductors, whereas a volume-meshed model can in principle resolve proximity-effect current
-crowding between adjacent conductor sections that a local BC can't capture. This is a plausible
-explanation, not a proven one — it would take an independent check (e.g. an even finer mesh, or
+**Why might this be:** the zoomed Rseries plot (0–8 GHz, 0–5 Ω) shows the gap between models is
+already present near DC (~1.2 Ω surface vs. ~1.5 Ω `filled_metals` as f→0) and grows roughly
+linearly out to 8 GHz — a frequency-*independent* offset plus a frequency-*dependent* one, not a
+single skin-effect story. Skin effect alone can't explain the DC-ish portion (it vanishes as
+f→0), so something else is contributing there — possibly how each model discretizes the current
+path through the TopVia2/TopMetal1 lead junctions, or a genuine difference in effective
+conductor cross-section between a meshed volume and an analytic surface-impedance sheet. The
+frequency-dependent growth on top of that is more consistent with skin/proximity effect: in
+TopMetal2 (σ=30.3×10⁶ S/m), skin depth is 2.89 µm at 1 GHz and 1.09 µm at 7 GHz against a 3 µm
+metal thickness — thin enough to matter, but not so thin that either 1 µm or 2 µm mesh should
+badly under-resolve it (unlike the much larger high-frequency under-resolution seen in
+`test_data/filled_metals_comparison`'s simple line study). This is a tightly-wound coil with a
+~3 µm gap at the underpass bridge and conductor sections running close to each other and to the
+SUBGND return — a surface-impedance boundary condition computes loss from the local field at
+each point, independent of nearby conductors, whereas a volume-meshed model can in principle
+resolve proximity-effect current crowding between adjacent conductor sections that a local BC
+can't capture. Both of these are plausible contributors, not proven ones — it would take an
+independent check (e.g. an even finer mesh, or
 comparison against another tool) to confirm which model is closer to physical reality here rather
 than just noting they disagree.
 
