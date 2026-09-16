@@ -27,7 +27,7 @@ settings['fstop'] = 50.0e9
 settings['fstep'] = 0.5e9
 settings['fdump'] = [15.0e9]
 
-settings['refined_cellsize'] = 2.0
+settings['refined_cellsize'] = 5.0
 settings['filled_metals'] = True
 
 settings['cells_per_wavelength'] = 10.0
@@ -54,15 +54,15 @@ layernumbers = metals_list.getlayernumbers()
 layernumbers.extend(simulation_ports.portlayers)
 
 # read geometries from GDSII
-allpolygons = gds_reader.read_gds(settings['GdsFile'], 
+allpolygons = gds_reader.read_gds(settings['GdsFile'],
 	layernumbers,
-	cellname=settings['cellname'], 
-	purposelist=settings['purpose'], 
-	metals_list=metals_list, 
-	preprocess=settings['preprocess_gds'], 
+	cellname=settings['cellname'],
+	purposelist=settings['purpose'],
+	metals_list=metals_list,
+	preprocess=settings['preprocess_gds'],
 	merge_polygon_size=settings['merge_polygon_size'],
 	gds_boundary_layers=dielectrics_list.get_boundary_layers(),
-	mirror=False, 
+	mirror=False,
 	offset_x=0, offset_y=0,
 	layernumber_offset=0)
 

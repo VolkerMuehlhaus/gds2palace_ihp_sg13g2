@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Surface-impedance vs. filled_metals (bulk-conductivity volume) conductor
 modeling comparison for the L_2n0_twoport differential inductor (IHP
-SG13G2), at matched (surface_2/volume_2, 2um) and finer (volume_1, 1um)
-mesh.
+SG13G2), at matched (surface_2/volume_2, 2um) and finer (volume_1, 1um) or
+coarser (volume_5, 5um) mesh.
 
 Reads RAW (not de-embedded) 2-port Touchstone files from results/snp/,
 following the repo's mesh-convergence-study convention
@@ -32,13 +32,15 @@ PLOT_DIR = os.path.join(HERE, "plots")
 
 SERIES = [
     ("surface_2um", "Surface, 2 um (baseline)", "surface_2um.s2p"),
+    ("volume_5um", "filled_metals, 5 um", "volume_5um.s2p"),
     ("volume_2um", "filled_metals, 2 um", "volume_2um.s2p"),
     ("volume_1um", "filled_metals, 1 um", "volume_1um.s2p"),
 ]
 
 COMPARISONS = [
     ("surface_2um", "volume_2um", "conductor modeling only (matched 2um mesh)"),
-    ("volume_2um", "volume_1um", "mesh refinement only (filled_metals)"),
+    ("volume_5um", "volume_2um", "mesh refinement only (filled_metals, 5um -> 2um)"),
+    ("volume_2um", "volume_1um", "mesh refinement only (filled_metals, 2um -> 1um)"),
     ("surface_2um", "volume_1um", "combined (baseline vs. filled_metals as used)"),
 ]
 
@@ -162,8 +164,8 @@ def main():
     print(f"Wrote delta-S table: {csv_path}")
 
     # ---------- S-parameter overlay plots ----------
-    colors = {"surface_2um": "#4c72b0", "volume_2um": "#dd8452", "volume_1um": "#c44e52"}
-    styles = {"surface_2um": "-", "volume_2um": "--", "volume_1um": "-"}
+    colors = {"surface_2um": "#4c72b0", "volume_5um": "#55a868", "volume_2um": "#dd8452", "volume_1um": "#c44e52"}
+    styles = {"surface_2um": "-", "volume_5um": ":", "volume_2um": "--", "volume_1um": "-"}
 
     for pname in PARAMS:
         fig, (ax_mag, ax_phase) = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
