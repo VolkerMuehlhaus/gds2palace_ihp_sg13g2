@@ -18,12 +18,7 @@ This is not a mesh-convergence study in the usual sense (see
 `settings['filled_metals']` conductor model (conductors as solid bulk-conductivity volumes)
 against the existing default (thin surface-impedance sheets) on a real, previously-designed
 inductor, at a matched mesh size (2 µm) and both a finer (1 µm) and a coarser (5 µm) one for
-`filled_metals`. The first three model variants (`surface_2um`, `volume_2um`, `volume_1um`) and
-their raw simulation results already existed (`filled_metal_L2n0/` in `test_data/`, generated
-and solved by the user); this report moved them into `more_examples/` and analyzed the results.
-The fourth variant, `volume_5um`, was added later (model and completed simulation staged in
-`test_data/filled_metals_comparison/`, also generated and solved by the user) to extend the
-mesh-refinement comparison with a coarser `filled_metals` mesh point.
+`filled_metals`.  
 
 ## 1. Layout
 
@@ -32,7 +27,8 @@ mesh-refinement comparison with a coarser `filled_metals` mesh point.
 Measured directly from the GDS (KLayout batch mode): a single-turn octagonal coil on
 **TopMetal2** (layer 134, 3 µm thick, σ = 30.3×10⁶ S/m), ~254×254 µm bounding box (X ±127 µm,
 Y 30–284 µm), ~12 µm trace width, ~3 µm minimum internal gap (at the top-side underpass bridge,
-connected through two **TopVia2** crossings, layer 133). The coil's two ends drop down through
+connected through two **TopVia2** crossings, layer 133).  
+The coil's two ends drop down through
 short **TopMetal1** (layer 126, 2 µm thick, σ = 27.8×10⁶ S/m) leads to the two via ports (P1,
 P2), which connect down to **SUBGND**, 12 µm wide, spaced 56.4 µm center-to-center (X = ∓28.2
 µm). Overall drawn footprint (including the ground return under the ports) is ~298×298 µm.
@@ -66,11 +62,15 @@ effect (baseline vs. `filled_metals` as actually used for this design).
 
 At matched 2 µm mesh, `filled_metals` costs ~19% more DOF and ~72% more solve time than the
 surface-impedance model — the conductor interior is now meshed and solved as real FEM unknowns
-instead of a boundary condition. Refining `filled_metals` from 2 µm to 1 µm more than doubles
+instead of a boundary condition.  
+
+Refining `filled_metals` from 2 µm to 1 µm more than doubles
 DOF again (2.15×) and roughly doubles solve time and RAM, consistent with the known cost of the
 current implementation, which has no automatic near-surface mesh grading (see
 `doc/ARCHITECTURE.md`'s `filled_metals` entry) — the whole conductor volume gets uniformly
-refined, not just the region near skin depth. Coarsening `filled_metals` from 2 µm to 5 µm goes
+refined, not just the region near skin depth.  
+
+Coarsening `filled_metals` from 2 µm to 5 µm goes
 the other way, cutting DOF by ~2.6× and solve time by ~3.4× — cheap enough that `volume_5um`
 actually costs less than the `surface_2um` baseline on every metric (fewer DOF, fewer mesh
 elements, faster solve, less RAM), even though it meshes the conductor interior and the
@@ -106,7 +106,9 @@ At 7 GHz, the conductor-modeling effect (surface → volume) dominates S21's del
 2um→1um mesh-refinement effect by more than 10×, while `volume_2um` and `volume_1um` agree
 closely with each other — the `filled_metals` result is itself already reasonably
 mesh-converged at 7 GHz between 2 µm and 1 µm; the bigger factor is the conductor model, not
-mesh size. Coarsening further to 5 µm breaks that near-convergence, though: `volume_5um` →
+mesh size.  
+
+Coarsening further to 5 µm breaks that near-convergence, though: `volume_5um` →
 `volume_2um` shows a noticeably larger delta than either finer-mesh step, most strikingly at
 20 GHz where S21 moves by 0.62 dB — 5 µm is simply too coarse relative to this structure's
 ~3 µm minimum gap to resolve it reliably, especially as resonance is approached.
@@ -144,14 +146,17 @@ would be dominated by the >100 Ω climb near resonance (see the 20 GHz table row
 
 At the 7 GHz design frequency: **L still agrees closely** across all four variants (1.776–1.787
 nH, <0.7% spread even including the 5 µm mesh) — the inductance itself is robust to both
-conductor model and mesh size here. **Q and Rseries are more mesh-sensitive than the 2 µm/1 µm
+conductor model and mesh size here.  
+ **Q and Rseries are more mesh-sensitive than the 2 µm/1 µm
 pair alone suggested**: `volume_2um` and `volume_1um` agree with each other to ~2.5% on both
 (the mesh-converged `filled_metals` behavior noted below), but `volume_5um` sits clearly outside
 that agreement — Rseries ~8% higher and Q ~10% lower than `volume_2um` at 7 GHz, and the gap
 widens sharply near SRF (20 GHz: `volume_5um`'s Rseries is 195 Ω vs. 133 Ω for `volume_2um`,
 and L itself has visibly diverged, 6.95 nH vs. 5.98 nH). 5 µm is too coarse to trust for Q/R
 work on this structure; 2 µm and 1 µm remain the mesh-converged pair the rest of this discussion
-refers to as "`filled_metals`" below. Independent of mesh, `filled_metals` (at 2 µm/1 µm) shows
+refers to as "`filled_metals`" below.  
+
+Independent of mesh, `filled_metals` (at 2 µm/1 µm) shows
 ~30–35% higher Rseries and ~24–26% lower Q than the surface-impedance model at 7 GHz — a real,
 mesh-converged difference between the two *models*, not a `filled_metals` mesh-resolution
 artifact at this frequency.
@@ -159,15 +164,20 @@ artifact at this frequency.
 **Why might this be:** the zoomed Rseries plot (0–8 GHz, 0–5 Ω) shows the gap between models is
 already present near DC (~1.2 Ω surface vs. ~1.5 Ω `filled_metals` as f→0) and grows roughly
 linearly out to 8 GHz — a frequency-*independent* offset plus a frequency-*dependent* one, not a
-single skin-effect story. This is due to the over-estimated total cross section in the sheet model 
+single skin-effect story.  
+This is due to the **over-estimated total cross section** in the sheet model 
 with all 4 sides width multiplied by half the metal layer thickness - a genuine difference in effective
-conductor cross-section between a meshed volume and an analytic surface-impedance sheet. The
+conductor cross-section between a meshed volume and an analytic surface-impedance sheet.  
+
+The
 frequency-dependent growth on top of that is consistent with skin/proximity effect: in
 TopMetal2 (σ=30.3×10⁶ S/m), skin depth is 2.89 µm at 1 GHz and 1.09 µm at 7 GHz against a 3 µm
 metal thickness — thin enough to matter, but not so thin that either 1 µm or 2 µm mesh should
-badly under-resolve it. A 5 µm mesh is a different story: it's coarser than the metal thickness
+badly under-resolve it.  
+A 5 µm mesh is a different story: it's coarser than the metal thickness
 itself and well above the 7 GHz skin depth, which is consistent with `volume_5um` being the
-outlier above rather than sitting on the same converged trend as `volume_2um`/`volume_1um`.
+outlier above rather than sitting on the same converged trend as `volume_2um`/`volume_1um`.  
+
 This is a tightly-wound coil with a
 ~3 µm gap at the underpass bridge and conductor sections running close to each other and to the
 SUBGND return — a surface-impedance boundary condition computes loss from the local field at
@@ -202,7 +212,7 @@ step not repeated when this variant was added — see §8's regeneration note).
 
 ## 7. Discussion
 
-- **Inductance (L)** is robust to conductor modeling choice for this structure at 7 GHz — use
+- **Inductance (L) is robust to conductor modeling** surface vs. filled for this structure at 7 GHz — use
   either model if L alone is the target quantity, at any of the tested mesh sizes down to 5 µm.
 - **Q and series resistance are not** — `filled_metals` predicts meaningfully more loss than the
   surface-impedance default here, and this shows up consistently at both mesh-converged sizes
@@ -216,8 +226,9 @@ step not repeated when this variant was added — see §8's regeneration note).
   a 3 µm metal thickness and ~3 µm minimum gap) diverges from the 2 µm/1 µm agreement by ~8-10%
   on Q/R at 7 GHz, growing much worse near self-resonance. 5 µm is cheap (see cost below) but not
   trustworthy for loss/Q work on this structure; 2 µm is the practical floor here.
-- **Cost**: `filled_metals` at matched (2 µm) mesh already costs ~70% more solve time than
-  surface impedance; refining further to 1 µm roughly doubles cost again. Coarsening to 5 µm
+- **Cost**: `filled_metals` at 2 µm mesh already costs ~70% more solve time than
+  surface impedance at the same refined_cellsize value; refining further to 1 µm roughly doubles cost again.  
+  Coarsening to 5 µm
   goes the other way and is actually cheaper than the surface-impedance baseline — but per the
   point above, that cheap result isn't accurate enough to use for anything but a quick sanity
   check. For routine differential-L extraction where surface and volume models agree, the
