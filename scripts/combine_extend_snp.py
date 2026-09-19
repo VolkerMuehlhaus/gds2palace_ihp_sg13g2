@@ -235,7 +235,13 @@ def extrapolate_to_DC (snp_filename):
                 # extrapolate to DC
                 extrapolated = nw.extrapolate_to_dc(points=None, dc_sparam=None,  kind='cubic', coords='polar')
                 filename, file_extension = os.path.splitext(snp_filename)
-                out_filename = filename + '_dc' # without extension
+                # keep the original .sNp extension explicitly, rather than relying on
+                # write_touchstone() to re-append it - it only does that when its own
+                # get_extn() finds no dot at all in the name, and a model name containing
+                # a literal '.' (e.g. a dimension "do82.41" or temperature "T125.0C")
+                # makes it mistake that trailing fragment for an existing extension,
+                # silently writing the file with no extension at all
+                out_filename = filename + '_dc' + file_extension
                 extrapolated.write_touchstone(out_filename, skrf_comment='DC point added by extrapolation', form='db', write_noise=True)
                 returnval = out_filename
                 print('Created file with DC extrapolation: ', out_filename,'\n')
@@ -302,7 +308,10 @@ def port_deembedding (snp_filename, port_info_available, port_info_data):
 
 
         filename, file_extension = os.path.splitext(snp_filename)
-        out_filename = filename + '_deembedded' # without extension
+        # keep the original .sNp extension explicitly - see the matching comment in
+        # extrapolate_to_DC() for why relying on write_touchstone()'s own extension
+        # auto-detection is unsafe here
+        out_filename = filename + '_deembedded' + file_extension
         ntwk.write_touchstone(out_filename, skrf_comment='De-embedded by adding negative series L at ports', form='db', write_noise=True)
         print('Created file with de-embedding (cascaded negative port L): ', out_filename,'\n')
     else:
@@ -467,10 +476,9 @@ def _process_datafile(found_filename):
     if port_info_available: 
         port_deembedding (output_filename, port_info_available, port_info_data)
         if dc_extrapolated_filename != '':
-            # we need to add file extension
-            fn = dc_extrapolated_filename + '.s' + str(num_ports) + 'p'
-            if os.path.isfile(fn):
-                port_deembedding (fn, port_info_available, port_info_data)
+            # dc_extrapolated_filename already includes the .sNp extension now
+            if os.path.isfile(dc_extrapolated_filename):
+                port_deembedding (dc_extrapolated_filename, port_info_available, port_info_data)
 
 
 if __name__ == "__main__":
