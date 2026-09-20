@@ -1,4 +1,13 @@
-These scripts support the workflow when using gds2palace with the AWS Palace solver. Include the script folder to your PATH.
+This directory contains installation scripts for installation on Linux and for a mixed installation with Windows + WSL (Windows Subsystem for Linux). It also contains some utility scripts that are required for a purely manual installation.
+
+## For the installers listed below, do you need this whole repo cloned to install?
+
+No. Both installers are designed to be downloaded (or `curl`'d) on their own, with **no repo checkout required** - they fetch everything else they need (Python packages from PyPI, helper scripts from this repo's raw GitHub URLs) themselves:
+
+- **install_gds2palace.sh** for Linux is fully self-contained: download that one file and run it (or `curl -fsSL <raw-url> | bash`). It never needs any other file from this repo to be present locally.
+- **install_gds2palace.bat** for Windows is also a single downloadable file. It looks for its companion **install_palace_wsl.sh** next to itself first (e.g. if you cloned the repo or downloaded the whole `scripts/` folder); if that's not there, it automatically downloads it into `%TEMP%` and runs it from there via WSL - so a bare, on-its-own copy of `install_gds2palace.bat` works too.
+
+Both scripts pull `setupEM`/`gds2palace` from PyPI, so you always get those from the public package index either way, not from any local checkout.
 
 ## Installing on Windows
 
@@ -7,6 +16,8 @@ These scripts support the workflow when using gds2palace with the AWS Palace sol
 It also generates a set of launcher `.bat` files (default `%USERPROFILE%\scripts`, added to your permanent user `PATH`) so none of these need the venv activated first or a full path typed out: `setupEM`, `setupThermal`, `stackupEditor`, `resultViewer`, `fieldViewer` (each just launches that entry point from the Windows-native venv), `activate_palace` (activates the venv in your current terminal), and Windows-side `run_palace`/`combine_snp` wrappers that forward into WSL against the current directory - the same way setupEM's own "Start Simulation" button does internally - so both work whether typed at a plain Windows prompt or from inside WSL.
 
 install_palace_wsl.sh can also be run by hand inside an existing WSL/Linux terminal (`bash install_palace_wsl.sh`) if you just want to (re)install the Palace side on its own.
+
+> **Note (temporary):** as of this writing, `install_gds2palace.bat`/`.sh` and `install_palace_wsl.sh` only exist on this fork's `dev` branch, not yet on the upstream `VolkerMuehlhaus/gds2palace_ihp_sg13g2` repo - so the `.bat`'s self-download fallback above currently points at the fork, not upstream (see the `INSTALL_HELPER_REPO_RAW` comment near the top of the script). Once these three files are merged upstream, that should switch back to the same upstream URL every other download in these scripts already uses.
 
 **Before you run it**, you need:
 
@@ -46,7 +57,9 @@ install_palace_wsl.sh can also be run by hand inside an existing WSL/Linux termi
 - [KLayout](https://www.klayout.de/) itself, if you want to draw ports or edit layouts in it - same as on Windows, `--with-klayout` only fetches the integration *script*, not KLayout.
 - An MPI implementation (OpenMPI or MPICH), only if you plan to use **Elmer's** multi-thread option - not needed for Palace itself.
 
-## Running Palace
+___
+
+## Utility scripts in this directory (already included by installer)
 
 **combine_extend_snp.py** is a script to search for Palace S-parameter result files (port-S.csv) and convert them to the standard Touchstone SnP file format. The script will start searching at the current directory, and search through all directory levels below. If S-parameters include low frequency data, it will also run DC data extrapolation to provide a 0 Hz result, and save that into another file with suffix "_dc.snp"
 If port geometry information is available, as created by the latest version of gds2palace, an additional file with de-embedded results is created. This is an experimental feature, it adds port de-embedding for lumped ports by cascading negative series L at each port.
