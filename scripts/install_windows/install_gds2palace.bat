@@ -21,7 +21,7 @@ REM anyway. This stub only does the two things that were never actually
 REM buggy in the old version: checking Python exists, and one curl download.
 REM =============================================================================
 
-set "INSTALL_HELPER_REPO_RAW=https://raw.githubusercontent.com/volkermuehlhaus-claude/gds2palace_ihp_sg13g2/dev"
+set "GDS2PALACE_REPO_RAW=https://raw.githubusercontent.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/main"
 
 set "PYRUN="
 where py >nul 2>&1
@@ -51,7 +51,7 @@ if not exist "!SCRIPT_DIR!\install_gds2palace.py" (
         exit /b 1
     )
     echo Downloading install_gds2palace.py ...
-    curl -fsSL -o "!SCRIPT_DIR!\install_gds2palace.py" "!INSTALL_HELPER_REPO_RAW!/scripts/install_windows/install_gds2palace.py"
+    curl -fsSL -o "!SCRIPT_DIR!\install_gds2palace.py" "!GDS2PALACE_REPO_RAW!/scripts/install_windows/install_gds2palace.py"
     if errorlevel 1 (
         echo ERROR: Could not download install_gds2palace.py. Check your internet connection. 1>&2
         endlocal
