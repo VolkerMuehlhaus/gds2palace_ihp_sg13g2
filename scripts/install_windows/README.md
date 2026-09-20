@@ -16,8 +16,6 @@ It also generates a set of launcher `.bat` files (default `%USERPROFILE%\scripts
 
 install_palace_wsl.sh can also be run by hand inside an existing WSL/Linux terminal (`bash install_palace_wsl.sh`) if you just want to (re)install the Palace side on its own.
 
-> **Note (temporary):** as of this writing, `install_gds2palace.bat`/`.py` and `install_palace_wsl.sh` only exist on this fork's `dev` branch, not yet on the upstream `VolkerMuehlhaus/gds2palace_ihp_sg13g2` repo - so the `.bat`'s and `.py`'s self-download fallbacks above currently point at the fork, not upstream (see the `INSTALL_HELPER_REPO_RAW` constant near the top of each script). Once these files are merged upstream, that should switch back to the same upstream URL every other download in these scripts already uses.
-
 **Before you run it**, you need:
 
 - **Python 3.9+ installed and on PATH.** The script only *checks* for `py`/`python` - it does not install Python itself. If missing, it stops with a link to [python.org](https://www.python.org/downloads/windows/) and a reminder to check "Add python.exe to PATH" during that install, then re-run this script.

@@ -91,11 +91,6 @@ def fail(msg: str) -> None:
 
 GDS2PALACE_REPO_RAW = "https://raw.githubusercontent.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/main"
 SETUPEM_REPO_RAW = "https://raw.githubusercontent.com/VolkerMuehlhaus/setupEM/main"
-# install_gds2palace.py/.bat and install_palace_wsl.sh are new (added this
-# session) and only exist on the fork's dev branch so far - NOT yet on
-# VolkerMuehlhaus/gds2palace_ihp_sg13g2's main. Once merged upstream, switch
-# this back to GDS2PALACE_REPO_RAW like everything else and delete this.
-INSTALL_HELPER_REPO_RAW = "https://raw.githubusercontent.com/volkermuehlhaus-claude/gds2palace_ihp_sg13g2/dev"
 
 
 def download(url: str, dest: Path) -> None:
@@ -432,7 +427,7 @@ def setup_palace_in_wsl(args: argparse.Namespace, script_dir: Path) -> bool:
         helper_dir = Path(os.environ.get("TEMP", "."))
         helper_path = helper_dir / "install_palace_wsl.sh"
         try:
-            download(f"{INSTALL_HELPER_REPO_RAW}/scripts/install_windows/install_palace_wsl.sh", helper_path)
+            download(f"{GDS2PALACE_REPO_RAW}/scripts/install_windows/install_palace_wsl.sh", helper_path)
         except Exception as e:
             fail(f"Could not download install_palace_wsl.sh: {e}")
 
