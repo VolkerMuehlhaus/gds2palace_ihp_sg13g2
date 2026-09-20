@@ -79,6 +79,45 @@ confirm() {
   esac
 }
 
+require_sudo() {
+  # Validates (and caches) sudo credentials ONCE, so the "sudo apt-get ..."
+  # calls that follow in the same step don't each prompt for a password
+  # separately. Returns 1 with a clear, specific message if this account has
+  # no sudo access at all - instead of silently retrying apt-get two or three
+  # times in a row, each one prompting again and failing the same way, then
+  # ending on a generic "install it manually" message that's actually
+  # useless advice when the real problem is "this account can't install
+  # anything, with or without a manual command".
+  [ "$(id -u)" = "0" ] && return 0
+  if ! command -v sudo >/dev/null 2>&1; then
+    warn "No sudo found, and this isn't running as root. Ask whoever administers this system to install the needed packages."
+    return 1
+  fi
+  if [ -t 0 ]; then
+    # Real terminal attached: let sudo prompt normally (once, then cached
+    # for this step's remaining sudo calls). Fails fast with sudo's own
+    # "not in sudoers" message if this account has no rights at all - no
+    # hang risk, since sudo can actually show/read a real prompt here.
+    if ! sudo -v; then
+      warn "This account doesn't have sudo access, so packages can't be installed automatically. Ask your system administrator to install them, or re-run this script from an account that has sudo access."
+      return 1
+    fi
+  else
+    # No terminal (e.g. piped through curl | bash): sudo -v here can HANG
+    # indefinitely instead of failing, on systems where it still tries some
+    # other prompt mechanism despite stdin not being a TTY (confirmed by
+    # testing). "-n" makes sudo never attempt to prompt at all, so this only
+    # succeeds if credentials are already cached or passwordless sudo is
+    # configured - failing immediately otherwise, rather than risking a
+    # silent, indefinite hang waiting for input that can never arrive.
+    if ! sudo -n -v 2>/dev/null; then
+      warn "No terminal available to prompt for a sudo password (this looks like a piped/non-interactive run), and no cached sudo credentials were found. Run 'sudo -v' yourself first, or run this script interactively instead."
+      return 1
+    fi
+  fi
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # Step 0: sanity check - this must run inside a real Linux/WSL shell
 # ---------------------------------------------------------------------------
@@ -116,10 +155,11 @@ ok "python3 found: $(python3 --version)"
 if ! command -v curl >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     step "Installing curl (needed to download helper scripts)"
+    require_sudo || fail "Install curl yourself (as an account with sudo/root access): sudo apt-get update && sudo apt-get install -y curl - then re-run this script."
     sudo apt-get update -y || warn "apt-get update reported errors (continuing anyway)"
-    sudo apt-get install -y curl || fail "Could not install curl automatically. Install it manually and re-run."
+    sudo apt-get install -y curl || fail "Could not install curl automatically. Install it manually: sudo apt-get install -y curl - then re-run this script."
   else
-    fail "curl not found and could not be auto-installed on this system (no apt-get found). Install it manually (it's needed to download helper scripts later in this script) and re-run."
+    fail "curl not found and could not be auto-installed on this system (no apt-get found). Install it manually with your distro's package manager (it's needed to download helper scripts later in this script) and re-run."
   fi
 fi
 ok "curl found: $(curl --version | head -1)"
@@ -127,10 +167,11 @@ ok "curl found: $(curl --version | head -1)"
 if ! python3 -c "import venv" >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     step "Installing python3-venv (needed to create the helper venv)"
+    require_sudo || fail "Install python3-venv yourself (as an account with sudo/root access): sudo apt-get update && sudo apt-get install -y python3-venv - then re-run this script."
     sudo apt-get update -y || warn "apt-get update reported errors (continuing anyway)"
-    sudo apt-get install -y python3-venv || fail "Could not install python3-venv automatically. Install it manually and re-run."
+    sudo apt-get install -y python3-venv || fail "Could not install python3-venv automatically. Install it manually: sudo apt-get install -y python3-venv - then re-run this script."
   else
-    fail "Python's 'venv' module is missing and could not be auto-installed on this system. Install it manually and re-run."
+    fail "Python's 'venv' module is missing and could not be auto-installed on this system. Install it manually with your distro's package manager and re-run."
   fi
 fi
 ok "python3 'venv' module available"
@@ -163,12 +204,14 @@ step "Installing AWS Palace via prebuilt Apptainer container (version $PALACE_VE
 
 if ! command -v apptainer >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
-    if confirm "Apptainer is not installed. Install it now via the Apptainer PPA?"; then
+    if confirm "Apptainer is not installed. Install it now via the Apptainer PPA?" && require_sudo; then
       sudo add-apt-repository -y ppa:apptainer/ppa
       sudo apt-get update -y
       sudo apt-get install -y apptainer
     else
-      fail "Apptainer is required. Install it manually
+      fail "Apptainer is required. Install it yourself (as an account with
+    sudo/root access): sudo add-apt-repository -y ppa:apptainer/ppa &&
+    sudo apt-get update && sudo apt-get install -y apptainer - or see
     (https://apptainer.org/docs/admin/main/installation.html) and re-run."
     fi
   else
