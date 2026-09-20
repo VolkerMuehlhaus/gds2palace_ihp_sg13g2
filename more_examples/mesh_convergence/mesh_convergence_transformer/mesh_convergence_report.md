@@ -28,13 +28,13 @@ Model files: `palace_transformer_imn_mesh5/4/3/2/1.py`, `palace_transformer_imn_
 
 ## 2. Uniform mesh sweep — results
 
-| Mesh | DOF | Mesh elements | Solve time | Peak RAM | Error indicator norm |
-|---|---:|---:|---:|---:|---:|
-| 5 µm | — | — | **crashed** (see §1) | — | — |
-| 4 µm | 171,460 | 24,752 | 4m 2s | 2.72 GB | 2.067e-01 |
-| 3 µm | 209,202 | 30,155 | 4m 50s | 3.17 GB | 1.864e-01 |
-| 2 µm | 312,234 | 44,544 | 7m 4s | 4.19 GB | 1.572e-01 |
-| 1 µm | 576,114 | 81,956 | 14m 4s | 7.51 GB | 1.310e-01 |
+| Mesh | DOF | Mesh elements | Solve time | Peak RAM |
+|---|---:|---:|---:|---:|
+| 5 µm | — | — | **crashed** (see §1) | — |
+| 4 µm | 171,460 | 24,752 | 4m 2s | 2.72 GB |
+| 3 µm | 209,202 | 30,155 | 4m 50s | 3.17 GB |
+| 2 µm | 312,234 | 44,544 | 7m 4s | 4.19 GB |
+| 1 µm | 576,114 | 81,956 | 14m 4s | 7.51 GB |
 
 DOF, time, and RAM all grow smoothly (~3.4× DOF, ~3.5× time, ~2.8× RAM from 4 µm to 1 µm) — no further instability across the working range.
 
@@ -42,15 +42,13 @@ DOF, time, and RAM all grow smoothly (~3.4× DOF, ~3.5× time, ~2.8× RAM from 4
 
 Starting mesh: 2 µm (iteration 1 numbers match the uniform 2 µm run exactly). Capped at 3 iterations.
 
-| Iteration | DOF | Mesh elements | Error norm | Max \|ΔS\| vs. prev. | Solve time | Peak RAM |
-|---|---:|---:|---:|---:|---:|---:|
-| 1 | 312,234 | 44,544 | 1.572e-01 | n/a | 7m 4s | 4.37 GB |
-| 2 | 676,780 | 116,336 | 1.205e-01 | 0.0197 | 28m 27s | 9.03 GB |
-| **Final** | **2,070,680** | **361,140** | **8.210e-02** | **0.0191** | **1h 46m 56s** | **25.13 GB** |
+| Iteration | DOF | Mesh elements | Max \|ΔS\| vs. prev. | Solve time | Peak RAM |
+|---|---:|---:|---:|---:|---:|
+| 1 | 312,234 | 44,544 | n/a | 7m 4s | 4.37 GB |
+| 2 | 676,780 | 116,336 | 0.0197 | 28m 27s | 9.03 GB |
+| **Final** | **2,070,680** | **361,140** | **0.0191** | **1h 46m 56s** | **25.13 GB** |
 
-![AMR convergence: error indicator norm and max ΔS per iteration](results/plots/amr3_convergence.png)
-
-The same pattern seen in the D-band balun study repeats here, even more starkly over just 3 iterations: **Max ΔS barely moved between iteration 2 and the final iteration (0.0197 → 0.0191)**, while DOF more than tripled (677k → 2.07M) and solve time went from 28m27s to 1h46m56s. Nearly all of the S-parameter-relevant improvement happened by iteration 2; the third iteration bought over an hour of extra compute for a ~3% further reduction in Max ΔS. (Palace's own `Tol` target compares against the error indicator norm, not against S-parameters directly — see the [top-level README](../README.md#norm--max-the-dirty-details-of-palaces-error-indicator) for what that number actually measures and why it doesn't track Max ΔS; the error indicator norm here, 0.157 → 0.121 → 0.082, never gets close to its own 0.01 target even after 3 iterations, while Max ΔS was already small after iteration 2.)
+The same pattern seen in the D-band balun study repeats here, even more starkly over just 3 iterations: **Max ΔS barely moved between iteration 2 and the final iteration (0.0197 → 0.0191)**, while DOF more than tripled (677k → 2.07M) and solve time went from 28m27s to 1h46m56s. Nearly all of the S-parameter-relevant improvement happened by iteration 2; the third iteration bought over an hour of extra compute for a ~3% further reduction in Max ΔS.
 
 ## 4. Mixed-mode S-parameters
 
@@ -78,39 +76,63 @@ All five traces (4 uniform meshes + AMR final) are visually indistinguishable in
 
 ### 5a. Successive mesh steps
 
-| Param | Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---|---:|---:|---:|---:|
-| Sdd11 | 4→3 µm | 0.0156 | 0.0002 | 0.040 | 0.009 |
-| Sdd11 | 3→2 µm | 0.0352 | 0.0067 | 0.050 | 0.015 |
-| Sdd11 | 2→1 µm | 0.0342 | 0.0002 | 0.045 | 0.017 |
-| Sdd11 | 1µm→AMR final | 0.0283 | 0.0015 | 0.034 | 0.024 |
-| Sdd21 | 4→3 µm | 0.0091 | 0.0049 | 0.029 | 0.075 |
-| Sdd21 | 3→2 µm | 0.0132 | 0.0604 | 0.037 | 0.111 |
-| Sdd21 | 2→1 µm | 0.0130 | 0.0003 | 0.034 | 0.103 |
-| Sdd21 | 1µm→AMR final | 0.0114 | 0.0173 | 0.008 | 0.184 |
-| Sdd22 | 4→3 µm | 0.0194 | 0.0005 | 0.041 | 0.006 |
-| Sdd22 | 3→2 µm | 0.0188 | 0.0042 | 0.052 | 0.002 |
-| Sdd22 | 2→1 µm | 0.0160 | 0.0005 | 0.045 | 0.011 |
-| Sdd22 | 1µm→AMR final | 0.0172 | 0.0014 | 0.035 | 0.016 |
+#### Sdd11
+
+| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
+|---|---:|---:|---:|---:|
+| 4→3 µm | 0.0156 | 0.0002 | 0.040 | 0.009 |
+| 3→2 µm | 0.0352 | 0.0067 | 0.050 | 0.015 |
+| 2→1 µm | 0.0342 | 0.0002 | 0.045 | 0.017 |
+| 1µm→AMR final | 0.0283 | 0.0015 | 0.034 | 0.024 |
+
+#### Sdd21
+
+| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
+|---|---:|---:|---:|---:|
+| 4→3 µm | 0.0091 | 0.0049 | 0.029 | 0.075 |
+| 3→2 µm | 0.0132 | 0.0604 | 0.037 | 0.111 |
+| 2→1 µm | 0.0130 | 0.0003 | 0.034 | 0.103 |
+| 1µm→AMR final | 0.0114 | 0.0173 | 0.008 | 0.184 |
+
+#### Sdd22
+
+| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
+|---|---:|---:|---:|---:|
+| 4→3 µm | 0.0194 | 0.0005 | 0.041 | 0.006 |
+| 3→2 µm | 0.0188 | 0.0042 | 0.052 | 0.002 |
+| 2→1 µm | 0.0160 | 0.0005 | 0.045 | 0.011 |
+| 1µm→AMR final | 0.0172 | 0.0014 | 0.035 | 0.016 |
 
 All linear Max\|ΔS\| values stay in a tight 0.009–0.035 band across every comparison and every parameter — no null-crossing artifacts here (unlike the balun's S11), since none of Sdd11/Sdd21/Sdd22 dips to a deep null in this band.
 
 ### 5b. Every mesh vs. the finest uniform mesh (1 µm) as reference
 
-| Param | Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---|---:|---:|---:|---:|
-| Sdd11 | 4 µm | 0.0849 | 0.0067 | 0.135 | 0.041 |
-| Sdd11 | 3 µm | 0.0693 | 0.0069 | 0.095 | 0.032 |
-| Sdd11 | 2 µm | 0.0342 | 0.0002 | 0.045 | 0.017 |
-| Sdd11 | AMR final | 0.0283 | 0.0015 | 0.034 | 0.024 |
-| Sdd21 | 4 µm | 0.0352 | 0.0552 | 0.100 | 0.289 |
-| Sdd21 | 3 µm | 0.0261 | 0.0601 | 0.071 | 0.214 |
-| Sdd21 | 2 µm | 0.0130 | 0.0003 | 0.034 | 0.103 |
-| Sdd21 | AMR final | 0.0114 | 0.0173 | 0.008 | 0.184 |
-| Sdd22 | 4 µm | 0.0542 | 0.0053 | 0.138 | 0.020 |
-| Sdd22 | 3 µm | 0.0348 | 0.0048 | 0.096 | 0.013 |
-| Sdd22 | 2 µm | 0.0160 | 0.0005 | 0.045 | 0.011 |
-| Sdd22 | AMR final | 0.0172 | 0.0014 | 0.035 | 0.016 |
+#### Sdd11
+
+| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
+|---|---:|---:|---:|---:|
+| 4 µm | 0.0849 | 0.0067 | 0.135 | 0.041 |
+| 3 µm | 0.0693 | 0.0069 | 0.095 | 0.032 |
+| 2 µm | 0.0342 | 0.0002 | 0.045 | 0.017 |
+| AMR final | 0.0283 | 0.0015 | 0.034 | 0.024 |
+
+#### Sdd21
+
+| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
+|---|---:|---:|---:|---:|
+| 4 µm | 0.0352 | 0.0552 | 0.100 | 0.289 |
+| 3 µm | 0.0261 | 0.0601 | 0.071 | 0.214 |
+| 2 µm | 0.0130 | 0.0003 | 0.034 | 0.103 |
+| AMR final | 0.0114 | 0.0173 | 0.008 | 0.184 |
+
+#### Sdd22
+
+| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
+|---|---:|---:|---:|---:|
+| 4 µm | 0.0542 | 0.0053 | 0.138 | 0.020 |
+| 3 µm | 0.0348 | 0.0048 | 0.096 | 0.013 |
+| 2 µm | 0.0160 | 0.0005 | 0.045 | 0.011 |
+| AMR final | 0.0172 | 0.0014 | 0.035 | 0.016 |
 
 Clean, monotonic convergence toward the 1 µm result as the uniform mesh refines (Sdd11: 0.085→0.069→0.034; Sdd21: 0.035→0.026→0.013; Sdd22: 0.054→0.035→0.016). The AMR final result sits at or slightly better than the 2 µm uniform mesh on Sdd11/Sdd21, and about the same on Sdd22 — for roughly **15× the runtime and 6× the RAM** of the 2 µm uniform run (§6).
 
@@ -134,7 +156,7 @@ more_examples/mesh_convergence/mesh_convergence_transformer/
 ├── palace_transformer_imn_mesh5.py … mesh1.py   # uniform mesh model scripts (mesh5 crashes, see §1)
 ├── palace_transformer_imn_amr3.py               # AMR model script
 ├── palace_model/palace_transformer_imn_<name>_data/   # generated mesh/config + full Palace output
-│     (config.json, .msh, palace.json, port-S.csv, error-indicators.csv, ...)
+│     (config.json, .msh, palace.json, port-S.csv, ...)
 └── results/
     ├── delta_S_table.csv                        # §5a
     ├── delta_S_vs_finest.csv                    # §5b
@@ -147,7 +169,6 @@ more_examples/mesh_convergence/mesh_convergence_transformer/
     └── plots/
           transformer_layout.png, transformer_layout_labeled.png   # §0
           sdd11_convergence.png, sdd21_convergence.png, sdd22_convergence.png
-          amr3_convergence.png
 ```
 
 All `.s5p` files are de-embedded (port parasitic inductance removed) unless suffixed `_raw`. Re-run `python results/analyze_convergence.py` from `more_examples/mesh_convergence/mesh_convergence_transformer/` (in the `d:\venv\palace` venv) any time to regenerate the tables and plots from the archived `.snp` files.

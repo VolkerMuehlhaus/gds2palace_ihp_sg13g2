@@ -874,7 +874,7 @@ codebase.
 
 There are **two** inductor-synthesis examples in `more_examples/`:
 
-1. `inductor_synthesis_no_external_library/synthesize_ihp_inductor_v3.py`
+1. `inductor_synthesis_no_external_library/synthesize_ihp_inductor_v4.py`
 2. `inductor_synthesis_using_pclab_library/synthesize_inductor_v11.py`
 
 **This chapter primarily analyzes #1**, which its own sibling README (in example #2's directory)

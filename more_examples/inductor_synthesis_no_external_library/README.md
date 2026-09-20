@@ -30,7 +30,7 @@ Below is an example of command line output while running the Python script:
 
 Acticate the Python venv where you can run gds2palace models. gds2palace must be installed as a Python module: pip install gds2palace. The Palace solver must be available and you must be able to run gds2palace models. If you are not familar with gds2palace, go to the gds2palace documentation [here](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2).
 
-In the `synthesize_ihp_inductor_v1.py` script, set your target L value and target frequency, and adjust the search range for w,s and number of turns. Then just run the Python script.
+In the `synthesize_ihp_inductor_v4.py` script, set your target L value and target frequency, and adjust the search range for w,s and number of turns. Then just run the Python script.
 
 ### Inductor target and geometry range
 The code snippet below shows where inductor design goals and geometry sweep range are defined
@@ -74,5 +74,7 @@ settings['adaptive_mesh_iterations'] = 0  # Palace adative mesh iterations
 ## Change history
 
 07-April-2026: New version with built-in inductor geometry code, no external geometry library required. No limit on number of turns.
+
+14-September-2026: Fixed bug where spiral polygon vertices were not exactly on the 0.01um grid. FlexPath miter joins at the 45-degree spiral bends introduce sqrt(2)-based offsets that were not caught by snapping only the path centerline points, so polygon vertices are now snapped again after path-to-polygon conversion.
 
 

@@ -316,9 +316,17 @@ def build_results_summary(run_path, model_basename):
 
 
 def plot_convergence(rows, model_basename, out_path):
-    """Render an HFSS-style convergence chart (error-indicator norm and max
-    delta-S vs. AMR iteration, log-y) for the rows built by
-    _collect_amr_rows(), and save it to out_path. Returns out_path.
+    """Render a Max|ΔS|-vs-AMR-iteration convergence chart (log-y) for the
+    rows built by _collect_amr_rows(), and save it to out_path. Returns
+    out_path.
+
+    Deliberately does not plot Palace's own error-indicator Norm/Max
+    (error-indicators.csv): it's a relative, energy-normalized FEM residual,
+    not a mesh-quality score or Delta-S-like convergence criterion, and
+    showing it alongside Max|ΔS| in mesh convergence reports caused more
+    confusion than it resolved for users coming from other EM solvers.
+    Max|ΔS|, computed directly from the S-parameters, is what these reports
+    use to judge convergence.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -327,35 +335,22 @@ def plot_convergence(rows, model_basename, out_path):
     indices = list(range(len(rows)))
     labels = [label for label, _summary, _errors, _delta_s in rows]
 
-    norm_x, norm_y = [], []
-    for i, (_label, _summary, errors, _delta_s) in zip(indices, rows):
-        if errors and errors.get('norm') is not None:
-            norm_x.append(i)
-            norm_y.append(errors['norm'])
-
     delta_x, delta_y = [], []
     for i, (_label, _summary, _errors, delta_s) in zip(indices, rows):
         if delta_s is not None:
             delta_x.append(i)
             delta_y.append(delta_s)
 
-    fig, ax1 = plt.subplots(figsize=(7, 4.5))
-    ax1.set_xlabel("AMR iteration")
-    ax1.set_xticks(indices)
-    ax1.set_xticklabels(labels, rotation=45, ha='right')
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    ax.set_xlabel("AMR iteration")
+    ax.set_xticks(indices)
+    ax.set_xticklabels(labels, rotation=45, ha='right')
 
-    ax1.set_ylabel("Error indicator norm", color='tab:blue')
-    ax1.set_yscale("log")
-    line1, = ax1.plot(norm_x, norm_y, marker='o', color='tab:blue', label='Error norm')
-    ax1.tick_params(axis='y', labelcolor='tab:blue')
+    ax.set_ylabel("Max |ΔS|")
+    ax.set_yscale("log")
+    ax.plot(delta_x, delta_y, marker='s', color='tab:red', label='Max ΔS')
+    ax.grid(True, which='both', alpha=0.3)
 
-    ax2 = ax1.twinx()
-    ax2.set_ylabel("Max |ΔS|", color='tab:red')
-    ax2.set_yscale("log")
-    line2, = ax2.plot(delta_x, delta_y, marker='s', color='tab:red', label='Max ΔS')
-    ax2.tick_params(axis='y', labelcolor='tab:red')
-
-    ax1.legend(handles=[line1, line2], loc='upper right')
     fig.suptitle(f"AMR convergence: {model_basename}")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -409,9 +404,9 @@ def main():
     parser.add_argument(
         "--plot", action="store_true",
         help="for each run that used adaptive mesh refinement, also render a "
-             "convergence chart (error-indicator norm and max delta-S vs. "
-             "AMR iteration, HFSS-style) and save it as convergence.png in "
-             "that run's directory (requires matplotlib)"
+             "convergence chart (max delta-S vs. AMR iteration) and save it "
+             "as convergence.png in that run's directory (requires "
+             "matplotlib)"
     )
     args = parser.parse_args()
 

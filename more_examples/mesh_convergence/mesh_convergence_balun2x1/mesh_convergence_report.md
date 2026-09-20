@@ -24,11 +24,11 @@ Model files: `balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}.py`, `..._amr2.py`, `
 
 ## 2. Uniform mesh sweep — results (order 2)
 
-| Mesh | DOF | Mesh elements | Solve time | Peak RAM | Error indicator norm | Error indicator max |
-|---|---:|---:|---:|---:|---:|---:|
-| 5 µm | 311,536 | 45,074 | 4m 3s | 4.36 GB | 2.412e-01 | 1.234e-02 |
-| 2 µm | 843,390 | 120,688 | 11m 18s | 11.02 GB | 1.456e-01 | 4.112e-03 |
-| 1 µm | 1,672,974 | 236,525 | 27m 5s | 24.17 GB | 1.095e-01 | 2.600e-03 |
+| Mesh | DOF | Mesh elements | Solve time | Peak RAM |
+|---|---:|---:|---:|---:|
+| 5 µm | 311,536 | 45,074 | 4m 3s | 4.36 GB |
+| 2 µm | 843,390 | 120,688 | 11m 18s | 11.02 GB |
+| 1 µm | 1,672,974 | 236,525 | 27m 5s | 24.17 GB |
 
 No crashes or mesh-quality failures anywhere in this range, though gmsh flagged 2 "ill-shaped tets" at the 5 µm setting (out of ~45k elements) — consistent with a cell size larger than the 2 µm coupled-line gap it needs to resolve.
 
@@ -36,15 +36,13 @@ No crashes or mesh-quality failures anywhere in this range, though gmsh flagged 
 
 Starting mesh: 5 µm. Requested `adaptive_mesh_iterations=2`.
 
-| Iteration | DOF | Mesh elements | Error Norm | Error Max | Max \|ΔS\| vs. prev. | Time (cumulative) | Peak RAM |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 311,536 | 45,074 | 2.412e-01 | 1.234e-02 | n/a | 4m 5s | 4.56 GB |
-| 2 | 418,314 | 66,872 | 1.795e-01 | 3.839e-03 | 0.0494 | 10m 29s | 6.35 GB |
-| **Final** | **1,084,000** | **189,855** | **1.275e-01** | **1.653e-03** | **0.0364** | **32m 36s** | **15.60 GB** |
+| Iteration | DOF | Mesh elements | Max \|ΔS\| vs. prev. | Time (cumulative) | Peak RAM |
+|---|---:|---:|---:|---:|---:|
+| 1 | 311,536 | 45,074 | n/a | 4m 5s | 4.56 GB |
+| 2 | 418,314 | 66,872 | 0.0494 | 10m 29s | 6.35 GB |
+| **Final** | **1,084,000** | **189,855** | **0.0364** | **32m 36s** | **15.60 GB** |
 
-![AMR convergence: error indicator norm and max ΔS per iteration](results/plots/amr2_convergence.png)
-
-Iteration 1 matches the 5 µm uniform mesh exactly, as expected. Both the error indicator and Max|ΔS| keep improving through the final iteration (no plateau within this 2-iteration budget) — Max|ΔS| roughly halves from 0.0494 to 0.0364.
+Iteration 1 matches the 5 µm uniform mesh exactly, as expected. Max|ΔS| keeps improving through the final iteration (no plateau within this 2-iteration budget) — it roughly halves from 0.0494 to 0.0364.
 
 ## 4. Mixed-mode S-parameters at the real system impedances (200 Ω / 50 Ω)
 
@@ -70,31 +68,55 @@ with `Z01 = 200 Ω`, `Z02 = 50 Ω`. (Setting `Z01=Z02` reduces this to the stand
 
 ### 4a. Successive mesh steps
 
-| Param | Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---|---:|---:|---:|---:|
-| Sdd11 | 5→2 µm | 0.1240 | 0.0004 | 0.7930 | 0.4517 |
-| Sdd11 | 2→1 µm | 0.0322 | 0.0001 | 0.1758 | 0.1148 |
-| Sdd11 | 1µm→AMR final | 0.0149 | 0.0004 | 0.0755 | 0.0623 |
-| Sdd21 | 5→2 µm | 0.0589 | 0.0144 | 0.1864 | 0.4041 |
-| Sdd21 | 2→1 µm | 0.0153 | 0.0008 | 0.0456 | 0.0967 |
-| Sdd21 | 1µm→AMR final | 0.0076 | 0.0049 | 0.0123 | 0.0541 |
-| Sdd22 | 5→2 µm | 0.0560 | 0.0004 | 0.7010 | 0.3028 |
-| Sdd22 | 2→1 µm | 0.0134 | 0.0000 | 0.1556 | 0.0711 |
-| Sdd22 | 1µm→AMR final | 0.0061 | 0.0002 | 0.0604 | 0.0559 |
+#### Sdd11
+
+| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
+|---|---:|---:|---:|---:|
+| 5→2 µm | 0.1240 | 0.0004 | 0.7930 | 0.4517 |
+| 2→1 µm | 0.0322 | 0.0001 | 0.1758 | 0.1148 |
+| 1µm→AMR final | 0.0149 | 0.0004 | 0.0755 | 0.0623 |
+
+#### Sdd21
+
+| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
+|---|---:|---:|---:|---:|
+| 5→2 µm | 0.0589 | 0.0144 | 0.1864 | 0.4041 |
+| 2→1 µm | 0.0153 | 0.0008 | 0.0456 | 0.0967 |
+| 1µm→AMR final | 0.0076 | 0.0049 | 0.0123 | 0.0541 |
+
+#### Sdd22
+
+| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
+|---|---:|---:|---:|---:|
+| 5→2 µm | 0.0560 | 0.0004 | 0.7010 | 0.3028 |
+| 2→1 µm | 0.0134 | 0.0000 | 0.1556 | 0.0711 |
+| 1µm→AMR final | 0.0061 | 0.0002 | 0.0604 | 0.0559 |
 
 ### 4b. Every mesh vs. the finest uniform mesh (1 µm) as reference
 
-| Param | Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---|---:|---:|---:|---:|
-| Sdd11 | 5 µm | 0.1559 | 0.0005 | 0.9688 | 0.5664 |
-| Sdd11 | 2 µm | 0.0322 | 0.0001 | 0.1758 | 0.1148 |
-| Sdd11 | AMR final | 0.0149 | 0.0004 | 0.0755 | 0.0623 |
-| Sdd21 | 5 µm | 0.0740 | 0.0152 | 0.2320 | 0.5008 |
-| Sdd21 | 2 µm | 0.0153 | 0.0008 | 0.0456 | 0.0967 |
-| Sdd21 | AMR final | 0.0076 | 0.0049 | 0.0123 | 0.0541 |
-| Sdd22 | 5 µm | 0.0694 | 0.0005 | 0.8566 | 0.3739 |
-| Sdd22 | 2 µm | 0.0134 | 0.0000 | 0.1556 | 0.0711 |
-| Sdd22 | AMR final | 0.0061 | 0.0002 | 0.0604 | 0.0559 |
+#### Sdd11
+
+| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
+|---|---:|---:|---:|---:|
+| 5 µm | 0.1559 | 0.0005 | 0.9688 | 0.5664 |
+| 2 µm | 0.0322 | 0.0001 | 0.1758 | 0.1148 |
+| AMR final | 0.0149 | 0.0004 | 0.0755 | 0.0623 |
+
+#### Sdd21
+
+| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
+|---|---:|---:|---:|---:|
+| 5 µm | 0.0740 | 0.0152 | 0.2320 | 0.5008 |
+| 2 µm | 0.0153 | 0.0008 | 0.0456 | 0.0967 |
+| AMR final | 0.0076 | 0.0049 | 0.0123 | 0.0541 |
+
+#### Sdd22
+
+| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
+|---|---:|---:|---:|---:|
+| 5 µm | 0.0694 | 0.0005 | 0.8566 | 0.3739 |
+| 2 µm | 0.0134 | 0.0000 | 0.1556 | 0.0711 |
+| AMR final | 0.0061 | 0.0002 | 0.0604 | 0.0559 |
 
 The 5 µm mesh is clearly the worst point (Max|ΔS| up to 0.16 vs. the 1 µm reference) — this structure's 2 µm coupled-line gap is smaller than the 5 µm cell size itself, so that setting can't really resolve the coupling at all. 2 µm brings all three parameters within 0.01–0.03 of the 1 µm reference. The AMR final result is closer to the 1 µm reference than the 2 µm uniform mesh on every parameter. Peak `Sdd21` (finest mesh) reaches about **−1.27 dB at 34 GHz** — a well-matched, low-loss balun.
 
@@ -145,7 +167,6 @@ more_examples/mesh_convergence/mesh_convergence_balun2x1/
     │     balun2x1_amr2_iter1.s4p, balun2x1_amr2_iter2.s4p, balun2x1_amr2_final.s4p
     └── plots/
           balun2x1_layout_labeled.png                              # §0
-          amr2_convergence.png                                     # §3
           sdd11_convergence.png, sdd21_convergence.png, sdd22_convergence.png  # §4 (200/50 ohm)
           order_comparison_time_dof.png, order_comparison_sdd.png   # §6
 ```
