@@ -258,6 +258,29 @@ fi
 ok "python3 'venv' module available"
 
 if command -v apt-get >/dev/null 2>&1; then
+  # On Debian/Ubuntu, "import venv" above can succeed even when ensurepip's
+  # bundled pip wheels are missing - those live in a SEPARATE, Python-version
+  # -specific package (e.g. python3.12-venv) that the generic python3-venv
+  # doesn't always pull in. Confirmed by testing: venv creation itself then
+  # fails with "ensurepip is not available", naming exactly this package -
+  # so ensure it's present upfront instead of waiting to hit that failure
+  # deep inside install_palace_wsl.sh. Best-effort/non-fatal: some distros
+  # don't split it out this way at all, so a missing/failed package name
+  # here isn't treated as fatal on its own - the actual venv creation below
+  # is still the real arbiter of success.
+  PYVER="$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')"
+  PYVENV_PKG="python${PYVER}-venv"
+  if ! dpkg -s "$PYVENV_PKG" >/dev/null 2>&1; then
+    step "Installing $PYVENV_PKG (the version-specific package ensurepip needs)"
+    if require_sudo; then
+      sudo apt-get install -y "$PYVENV_PKG" 2>/dev/null || warn "Could not install $PYVENV_PKG automatically (it may not exist as a separate package on this distro, or apt failed) - if venv creation fails below with an 'ensurepip is not available' error, run: sudo apt-get install -y $PYVENV_PKG"
+    else
+      warn "Skipping $PYVENV_PKG install (no sudo access) - if venv creation fails below with an 'ensurepip is not available' error, ask an administrator to run: sudo apt-get install -y $PYVENV_PKG"
+    fi
+  fi
+fi
+
+if command -v apt-get >/dev/null 2>&1; then
   # These are the Qt/XCB runtime libraries setupEM's GUI needs on Linux
   # (see setupEM README, "Missing libraries on installation").
   QT_PKGS="libxcb-cursor0 libxcb-xinerama0 libxcb-xkb1 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb-xinput0 libxcb-xv0 libxcb-util1 libxkbcommon-x11-0"

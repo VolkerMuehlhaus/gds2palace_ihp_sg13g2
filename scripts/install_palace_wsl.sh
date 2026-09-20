@@ -176,6 +176,29 @@ if ! python3 -c "import venv" >/dev/null 2>&1; then
 fi
 ok "python3 'venv' module available"
 
+if command -v apt-get >/dev/null 2>&1; then
+  # On Debian/Ubuntu, "import venv" above can succeed even when ensurepip's
+  # bundled pip wheels are missing - those live in a SEPARATE, Python-version
+  # -specific package (e.g. python3.12-venv) that the generic python3-venv
+  # doesn't always pull in. Confirmed by testing: venv creation itself then
+  # fails with "ensurepip is not available", naming exactly this package -
+  # so ensure it's present upfront instead of waiting to hit that failure
+  # inside the actual venv creation step below. Best-effort/non-fatal: some
+  # distros don't split it out this way at all, so a missing/failed package
+  # name here isn't treated as fatal on its own - the venv creation itself
+  # is still the real arbiter of success.
+  PYVER="$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')"
+  PYVENV_PKG="python${PYVER}-venv"
+  if ! dpkg -s "$PYVENV_PKG" >/dev/null 2>&1; then
+    step "Installing $PYVENV_PKG (the version-specific package ensurepip needs)"
+    if require_sudo; then
+      sudo apt-get install -y "$PYVENV_PKG" 2>/dev/null || warn "Could not install $PYVENV_PKG automatically (it may not exist as a separate package on this distro, or apt failed) - if venv creation fails below with an 'ensurepip is not available' error, run: sudo apt-get install -y $PYVENV_PKG"
+    else
+      warn "Skipping $PYVENV_PKG install (no sudo access) - if venv creation fails below with an 'ensurepip is not available' error, ask an administrator to run: sudo apt-get install -y $PYVENV_PKG"
+    fi
+  fi
+fi
+
 # ---------------------------------------------------------------------------
 # Step 2: small helper venv (only needs numpy + scikit-rf, for combine_snp)
 # ---------------------------------------------------------------------------
