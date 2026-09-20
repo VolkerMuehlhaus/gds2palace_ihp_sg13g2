@@ -66,6 +66,15 @@ set "ASSUME_YES=0"
 
 set "GDS2PALACE_REPO_RAW=https://raw.githubusercontent.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/main"
 set "SETUPEM_REPO_RAW=https://raw.githubusercontent.com/VolkerMuehlhaus/setupEM/main"
+REM install_palace_wsl.sh, install_gds2palace.bat, and install_gds2palace.sh
+REM itself are new (added this session) and only exist on the fork's dev
+REM branch so far - NOT yet on VolkerMuehlhaus/gds2palace_ihp_sg13g2's main
+REM (confirmed 404 there), unlike every other file GDS2PALACE_REPO_RAW
+REM points at below, which was already merged upstream and resolves fine.
+REM Once these three files are merged upstream (a PR the user hasn't asked
+REM for yet), switch this fallback back to "!GDS2PALACE_REPO_RAW!/scripts"
+REM like the others and delete this variable.
+set "INSTALL_HELPER_REPO_RAW=https://raw.githubusercontent.com/volkermuehlhaus-claude/gds2palace_ihp_sg13g2/dev"
 set "UC=ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 set "LC=abcdefghijklmnopqrstuvwxyz"
 
@@ -381,7 +390,7 @@ if "!SKIP_PALACE!"=="1" (
                     exit /b 1
                 )
                 set "WSL_HELPER_DIR=%TEMP%"
-                curl -fsSL -o "!WSL_HELPER_DIR!\install_palace_wsl.sh" "!GDS2PALACE_REPO_RAW!/scripts/install_palace_wsl.sh"
+                curl -fsSL -o "!WSL_HELPER_DIR!\install_palace_wsl.sh" "!INSTALL_HELPER_REPO_RAW!/scripts/install_palace_wsl.sh"
                 if errorlevel 1 (
                     call :fail "Could not download install_palace_wsl.sh. Check your internet connection."
                     endlocal
