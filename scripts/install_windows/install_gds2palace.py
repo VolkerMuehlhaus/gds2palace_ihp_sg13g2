@@ -432,7 +432,7 @@ def setup_palace_in_wsl(args: argparse.Namespace, script_dir: Path) -> bool:
         helper_dir = Path(os.environ.get("TEMP", "."))
         helper_path = helper_dir / "install_palace_wsl.sh"
         try:
-            download(f"{INSTALL_HELPER_REPO_RAW}/scripts/install_palace_wsl.sh", helper_path)
+            download(f"{INSTALL_HELPER_REPO_RAW}/scripts/install_windows/install_palace_wsl.sh", helper_path)
         except Exception as e:
             fail(f"Could not download install_palace_wsl.sh: {e}")
 
@@ -490,7 +490,7 @@ def main() -> None:
         step("Skipping Palace/WSL setup (--skip-palace)")
         warn("You'll need to set up WSL + Palace yourself before you can run "
              "simulations - re-run without --skip-palace when ready, or see "
-             "scripts/install_palace_wsl.sh.")
+             "scripts/install_windows/install_palace_wsl.sh.")
     else:
         wsl_distro_found = setup_palace_in_wsl(args, script_dir)
 

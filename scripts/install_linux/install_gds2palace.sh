@@ -20,7 +20,7 @@
 #   5. Prints a short verification report and "what to type next".
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/main/scripts/install_gds2palace.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/main/scripts/install_linux/install_gds2palace.sh | bash
 #   # or, downloaded locally:
 #   ./install_gds2palace.sh [options]
 #
@@ -264,8 +264,10 @@ if command -v apt-get >/dev/null 2>&1; then
   # doesn't always pull in. Confirmed by testing: venv creation itself then
   # fails with "ensurepip is not available", naming exactly this package -
   # so ensure it's present upfront instead of waiting to hit that failure
-  # deep inside install_palace_wsl.sh. Best-effort/non-fatal: some distros
-  # don't split it out this way at all, so a missing/failed package name
+  # deep inside install_windows/install_palace_wsl.sh (this Linux-native
+  # installer has its own separate copy of the same detection logic).
+  # Best-effort/non-fatal: some distros don't split it out this way at
+  # all, so a missing/failed package name
   # here isn't treated as fatal on its own - the actual venv creation below
   # is still the real arbiter of success.
   PYVER="$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')"

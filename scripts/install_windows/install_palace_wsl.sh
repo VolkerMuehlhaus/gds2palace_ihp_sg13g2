@@ -192,9 +192,16 @@ if command -v apt-get >/dev/null 2>&1; then
   if ! dpkg -s "$PYVENV_PKG" >/dev/null 2>&1; then
     step "Installing $PYVENV_PKG (the version-specific package ensurepip needs)"
     if require_sudo; then
-      sudo apt-get install -y "$PYVENV_PKG" 2>/dev/null || warn "Could not install $PYVENV_PKG automatically (it may not exist as a separate package on this distro, or apt failed) - if venv creation fails below with an 'ensurepip is not available' error, run: sudo apt-get install -y $PYVENV_PKG"
+      # apt's package lists may still be empty/stale on a genuinely fresh
+      # account (e.g. one where the earlier curl/python3-venv blocks above
+      # were both skipped because those were already present) - confirmed
+      # by testing: without this, "Package python3.12-venv is not available"
+      # even though it exists upstream, purely because "apt update" was
+      # never run on this system yet.
+      sudo apt-get update -y || warn "apt-get update reported errors (continuing anyway)"
+      sudo apt-get install -y "$PYVENV_PKG" 2>/dev/null || warn "Could not install $PYVENV_PKG automatically (it may not exist as a separate package on this distro, or apt failed) - if venv creation fails below with an 'ensurepip is not available' error, run: sudo apt-get update && sudo apt-get install -y $PYVENV_PKG"
     else
-      warn "Skipping $PYVENV_PKG install (no sudo access) - if venv creation fails below with an 'ensurepip is not available' error, ask an administrator to run: sudo apt-get install -y $PYVENV_PKG"
+      warn "Skipping $PYVENV_PKG install (no sudo access) - if venv creation fails below with an 'ensurepip is not available' error, ask an administrator to run: sudo apt-get update && sudo apt-get install -y $PYVENV_PKG"
     fi
   fi
 fi
