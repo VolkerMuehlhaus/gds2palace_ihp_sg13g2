@@ -194,6 +194,17 @@ step "Checking system prerequisites"
 command -v python3 >/dev/null 2>&1 || fail "python3 not found. Install Python 3.9+ first (e.g. 'sudo apt install python3 python3-venv' on Ubuntu/Debian), then re-run this script."
 ok "python3 found: $(python3 --version)"
 
+if ! command -v curl >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    step "Installing curl (needed to download helper scripts)"
+    sudo apt-get update -y || warn "apt-get update reported errors (continuing anyway)"
+    sudo apt-get install -y curl || fail "Could not install curl automatically. Install it manually and re-run."
+  else
+    fail "curl not found and could not be auto-installed on this system (no apt-get found). Install it manually (it's needed to download helper scripts later in this script) and re-run."
+  fi
+fi
+ok "curl found: $(curl --version | head -1)"
+
 if ! python3 -c "import venv" >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     step "Installing python3-venv (needed to create the venv)"
