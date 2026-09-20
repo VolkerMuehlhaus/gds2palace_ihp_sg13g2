@@ -51,7 +51,7 @@ if not exist "!SCRIPT_DIR!\install_gds2palace.py" (
         exit /b 1
     )
     echo Downloading install_gds2palace.py ...
-    curl -fsSL -o "!SCRIPT_DIR!\install_gds2palace.py" "!INSTALL_HELPER_REPO_RAW!/scripts/install_gds2palace.py"
+    curl -fsSL -o "!SCRIPT_DIR!\install_gds2palace.py" "!INSTALL_HELPER_REPO_RAW!/scripts/install_windows/install_gds2palace.py"
     if errorlevel 1 (
         echo ERROR: Could not download install_gds2palace.py. Check your internet connection. 1>&2
         endlocal

@@ -1,62 +1,11 @@
 This directory contains installation scripts for installation on Linux and for a mixed installation with Windows + WSL (Windows Subsystem for Linux). It also contains some utility scripts that are required for a purely manual installation.
 
-## For the installers listed below, do you need this whole repo cloned to install?
+## Installing
 
-No. Both installers are designed to be downloaded (or `curl`'d) on their own, with **no repo checkout required** - they fetch everything else they need (Python packages from PyPI, helper scripts from this repo's raw GitHub URLs) themselves:
+- **[install_linux/](install_linux/README.md)** - one-shot installer for native Linux (or WSL2 used as a full Linux environment): one venv, one machine, Palace runs natively there too.
+- **[install_windows/](install_windows/README.md)** - one-shot installer for Windows: setupEM/gds2palace run natively on Windows, AWS Palace itself runs inside WSL (Windows Subsystem for Linux).
 
-- **install_gds2palace.sh** for Linux is fully self-contained: download that one file and run it (or `curl -fsSL <raw-url> | bash`). It never needs any other file from this repo to be present locally.
-- **install_gds2palace.bat** for Windows is a single downloadable file too, but it's a thin stub: it only checks that Python is present, then hands off to **install_gds2palace.py** (downloading that file next to itself first if it's not already there) - all the actual installer logic lives in the `.py` file, not in batch. That in turn downloads its own companion **install_palace_wsl.sh** into `%TEMP%` and runs it via WSL for the Palace/WSL leg. So a bare, on-its-own copy of just `install_gds2palace.bat` still works - everything else it needs is fetched on demand.
-
-Both scripts pull `setupEM`/`gds2palace` from PyPI, so you always get those from the public package index either way, not from any local checkout.
-
-## Installing on Windows
-
-**install_gds2palace.bat** is a one-shot installer for Windows - a thin `.bat` stub that just checks for Python and then runs **install_gds2palace.py**, where all the actual logic lives (see that file's own module docstring for why: an earlier all-batch version kept hitting genuinely arcane cmd.exe parser bugs that don't exist in Python, which is already a hard requirement for this workflow anyway). It installs setupEM and gds2palace natively on Windows (a Python venv, default `%USERPROFILE%\venv\palace`) - the GUI itself never runs inside WSL. AWS Palace is Linux-only, so the script separately checks for WSL (Windows Subsystem for Linux); if WSL or a Linux distro isn't installed yet, it prints exactly what to run and stops, rather than assuming WSL is already there. Once WSL is ready, it automatically runs **install_palace_wsl.sh** inside it to install Palace (prebuilt Apptainer container) plus the `run_palace`/`combine_snp` helper scripts, matching what setupEM's Windows->WSL hand-off expects to find on the WSL login shell's PATH. Run `install_gds2palace.bat --help` for all options, or run it with no options at all for an interactive wizard (asks for venv/scripts locations, KLayout integration, and whether to set up Palace now, defaults shown in brackets - any option at all skips the wizard). Safe to re-run.
-
-It also generates a set of launcher `.bat` files (default `%USERPROFILE%\scripts`, added to your permanent user `PATH`) so none of these need the venv activated first or a full path typed out: `setupEM`, `setupThermal`, `stackupEditor`, `resultViewer`, `fieldViewer` (each just launches that entry point from the Windows-native venv), `activate_palace` (activates the venv in your current terminal), and Windows-side `run_palace`/`combine_snp` wrappers that forward into WSL against the current directory - the same way setupEM's own "Start Simulation" button does internally - so both work whether typed at a plain Windows prompt or from inside WSL.
-
-install_palace_wsl.sh can also be run by hand inside an existing WSL/Linux terminal (`bash install_palace_wsl.sh`) if you just want to (re)install the Palace side on its own.
-
-> **Note (temporary):** as of this writing, `install_gds2palace.bat`/`.py`/`.sh` and `install_palace_wsl.sh` only exist on this fork's `dev` branch, not yet on the upstream `VolkerMuehlhaus/gds2palace_ihp_sg13g2` repo - so the `.bat`'s and `.py`'s self-download fallbacks above currently point at the fork, not upstream (see the `INSTALL_HELPER_REPO_RAW` constant near the top of each script). Once these four files are merged upstream, that should switch back to the same upstream URL every other download in these scripts already uses.
-
-**Before you run it**, you need:
-
-- **Python 3.9+ installed and on PATH.** The script only *checks* for `py`/`python` - it does not install Python itself. If missing, it stops with a link to [python.org](https://www.python.org/downloads/windows/) and a reminder to check "Add python.exe to PATH" during that install, then re-run this script.
-- `curl.exe` (used to download helper files) ships with Windows 10 1803+/11 by default. WSL itself is *not* a prerequisite: if it's missing, the script tells you the exact commands to run (`wsl --install`, a reboot, opening the new Ubuntu app once) and stops; re-running the script afterward picks up where it left off. That one-time `wsl --install` step needs an elevated PowerShell - nothing on the Windows side of this script needs admin rights.
-- **On the WSL side**, once it hands off there: the same `sudo` requirements as the Linux installer below (for `curl`, Apptainer, etc., if any of those are missing inside that WSL distro) - not usually an issue, since the account `wsl --install` creates during first-run setup already has sudo access by default, but worth knowing if you're running this under a WSL distro/account that was locked down afterward.
-
-**What the script does, automatically:** creates the Windows venv and installs setupEM/gds2palace into it; generates the launcher `.bat` files above and adds them to your PATH; optionally downloads the KLayout integration script (`--with-klayout`); and, once WSL is ready, installs Palace inside WSL as described below, plus generates `run_palace`/`combine_snp` there.
-
-**Where Palace itself comes from:** the script installs [Apptainer](https://apptainer.org/) inside WSL via the Apptainer PPA (`sudo add-apt-repository ppa:apptainer/ppa`, apt-based distros), then runs `apptainer pull` on a **prebuilt container image published by this repo's maintainer** at `oras://ghcr.io/volkermuehlhaus/palace_016:latest` (GitHub Container Registry) - not an official AWS Palace release artifact, since Palace's own CI doesn't publish a pullable image (see [`doc/building-palace-apptainer.md`](../doc/building-palace-apptainer.md) for how that image itself gets built, and for building your own instead). It's a multi-GB download, saved to `~/palace_016.sif` inside WSL and reused on every re-run.
-
-**Left for you, to have a fully working setup:**
-
-- Open a **new** terminal window after the script finishes, so the updated PATH takes effect.
-- If WSL wasn't installed yet, you still need to run the printed `wsl --install` command yourself, reboot, and re-run the script.
-- [ParaView](https://www.paraview.org/) if you want to view field-dump results (Palace/Elmer EM field plots) - not installed by this script.
-- [KLayout](https://www.klayout.de/) itself, if you want to draw ports or edit layouts in it - `--with-klayout` only downloads the small integration *script* that wires gds2palace's port picker into an *existing* KLayout install, it does not install KLayout.
-- [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi), only if you plan to use **Elmer's** multi-thread option (`settings['ELMER_MPI_THREADS']`) - not needed for Palace itself.
-
-## Installing on Linux
-
-**install_gds2palace.sh** is the Linux equivalent - one venv, one machine, no Windows/WSL split needed since Palace runs natively there too. It creates a Python venv (default `~/venv/palace`), installs setupEM (which pulls in gds2palace, gds_prepare_for_EM, and scikit-rf), adds that venv's `bin/` to `PATH` via `~/.profile`, installs AWS Palace itself (prebuilt Apptainer container), and generates `run_palace`/`combine_snp` pointing at it - so `setupEM`, `run_palace` and `combine_snp` are all typeable directly in any new terminal afterward. Works the same on native Linux or inside WSL2. Run `install_gds2palace.sh --help` for all options, or with no options at all for the same kind of interactive wizard as the Windows installer. Safe to re-run.
-
-**Before you run it**, you need:
-
-- **Python 3.9+ (`python3`) installed.** The script only *checks* for it - it does not install Python3 itself. If missing, it stops with an install hint (e.g. `sudo apt install python3 python3-venv` on Ubuntu/Debian) and you re-run afterward.
-- **Working `sudo` access**, needed for `apt-get` (apt-based distros only) to auto-install anything from this list that's missing: `curl`, the `python3-venv` module, the Qt/XCB runtime libraries the setupEM GUI needs, and Apptainer. `curl`/`python3-venv` install straight away with no prompt beyond the sudo check itself; the Qt libraries and Apptainer ask for confirmation first (`--yes` skips those). Either way, sudo access is validated **once** before any of these run - if this account has none at all, the script fails immediately with the exact command an admin needs to run (e.g. `sudo apt-get install -y curl`). On non-apt distros, or if `sudo`/root access genuinely isn't available, it just tells you what's missing so you can install it yourself.
-- If you're piping this script (`curl ... | bash`, see above) **and** any of the above needs a password you haven't already entered recently, note that a piped run has no terminal to prompt with - the sudo check fails immediately rather than hanging, so either run `sudo -v` yourself first or download the script and run it in a normal interactive terminal instead.
-
-**What the script does, automatically:** creates the venv and installs setupEM/gds2palace/scikit-rf into it; adds `$VENV_DIR/bin` to `PATH` via `~/.profile`; installs the Qt/XCB libraries the setupEM GUI needs (apt-based distros); optionally downloads the KLayout integration script (`--with-klayout`); and, unless `--skip-palace`, installs Palace as described below, plus generates `run_palace`/`combine_snp`.
-
-**Where Palace itself comes from:** the script installs [Apptainer](https://apptainer.org/) via the Apptainer PPA (`sudo add-apt-repository ppa:apptainer/ppa`, apt-based distros), then runs `apptainer pull` on a **prebuilt container image published by this repo's maintainer** at `oras://ghcr.io/volkermuehlhaus/palace_016:latest` (GitHub Container Registry) - not an official AWS Palace release artifact, since Palace's own CI doesn't publish a pullable image (see [`doc/building-palace-apptainer.md`](../doc/building-palace-apptainer.md) for how that image itself gets built, and for building your own instead). It's a multi-GB download, saved to `~/palace_016.sif` and reused on every re-run.
-
-**Left for you, to have a fully working setup:**
-
-- Open a **new** terminal (or `source ~/.profile`) after the script finishes, so the updated PATH takes effect.
-- [ParaView](https://www.paraview.org/) if you want to view field-dump results - not installed by this script.
-- [KLayout](https://www.klayout.de/) itself, if you want to draw ports or edit layouts in it - same as on Windows, `--with-klayout` only fetches the integration *script*, not KLayout.
-- An MPI implementation (OpenMPI or MPICH), only if you plan to use **Elmer's** multi-thread option - not needed for Palace itself.
+Both installers are single downloadable files with **no repo checkout required** - see each subfolder's README for exactly what to download and run. Both pull `setupEM`/`gds2palace` from PyPI, so you always get those from the public package index, not from any local checkout.
 
 ___
 
