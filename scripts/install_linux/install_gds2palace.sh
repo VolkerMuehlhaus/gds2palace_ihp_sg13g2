@@ -65,7 +65,62 @@ ASSUME_YES=0
 GDS2PALACE_REPO_RAW="https://raw.githubusercontent.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/main"
 SETUPEM_REPO_RAW="https://raw.githubusercontent.com/VolkerMuehlhaus/setupEM/main"
 
-usage() { sed -n '2,/^set -euo pipefail/p' "$0" | sed '$d; s/^# \{0,1\}//'; }
+usage() {
+  # A literal heredoc rather than reading "$0" via sed: when this script is
+  # invoked as `curl -fsSL ... | bash -s -- --help` (the documented usage
+  # above), $0 is "bash", not this file's path, so reading "$0" silently
+  # finds nothing and --help prints no output at all.
+  cat <<'EOF'
+install_gds2palace.sh - one-shot Linux setup for the gds2palace/setupEM/
+AWS Palace workflow, for users with little or no Python experience.
+
+What this does:
+  1. Creates a Python venv (default: ~/venv/palace) and installs setupEM
+     there, which pulls in gds2palace, gds_prepare_for_EM, and every other
+     Python dependency (including scikit-rf, needed by combine_snp below) -
+     one venv holds everything, since Palace runs on this same machine.
+  2. Adds that venv's bin/ to PATH via ~/.profile, so setupEM/run_palace/
+     combine_snp are typeable directly in any new terminal - no manual
+     "source .../activate" needed.
+  3. Installs the AWS Palace FEM solver itself via a prebuilt Apptainer
+     container image, unless --skip-palace is given.
+  4. Downloads the helper scripts (combine_extend_snp.py, palace_summary.py)
+     from the gds2palace repo and generates ready-to-use wrapper scripts
+     (run_palace, combine_snp) with the correct, literal paths for THIS
+     machine already filled in - no manual template editing required.
+  5. Prints a short verification report and "what to type next".
+
+Usage:
+  curl -fsSL https://raw.githubusercontent.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/main/scripts/install_linux/install_gds2palace.sh | bash
+  # or, downloaded locally:
+  ./install_gds2palace.sh [options]
+
+Run with NO options at all for an interactive wizard instead (asks for the
+venv location, whether to add KLayout integration, and whether to set up
+Palace now, with defaults shown in brackets - just press Enter to accept).
+Any option at all (even just --yes) skips the wizard and uses the fully
+automatic, script-friendly behavior below instead.
+
+Options:
+  --venv-dir PATH     Where to create the Python venv (default: ~/venv/palace)
+  --palace-version X   Palace container tag to pull (default: 016)
+  --np N               Default core count baked into run_palace (default:
+                       number of CPU cores, minimum 4, no upper limit)
+  --skip-palace        Only set up the Python side (venv, setupEM,
+                       gds2palace); skip installing the Palace solver itself
+  --with-klayout       Also download the KLayout integration helper script
+  --yes                Non-interactive: never prompt, accept all defaults
+                       (needed when piping this script through curl | bash)
+  -h, --help            Show this help and exit
+
+Safe to re-run: every step below is idempotent (skips work that is already
+done) so you can re-run this after a partial failure, or to pick up updates.
+
+Linux only - no macOS support (Apptainer containers don't run natively on
+macOS; see doc/building-palace-spack.md if you need a from-source build
+there instead). Works the same whether run on native Linux or inside WSL2.
+EOF
+}
 
 # No options at all (e.g. just double-clicked, or `bash install_gds2palace.sh`
 # with nothing after it) drops into an interactive wizard for the handful of
@@ -275,9 +330,10 @@ if command -v apt-get >/dev/null 2>&1; then
   if ! dpkg -s "$PYVENV_PKG" >/dev/null 2>&1; then
     step "Installing $PYVENV_PKG (the version-specific package ensurepip needs)"
     if require_sudo; then
-      sudo apt-get install -y "$PYVENV_PKG" 2>/dev/null || warn "Could not install $PYVENV_PKG automatically (it may not exist as a separate package on this distro, or apt failed) - if venv creation fails below with an 'ensurepip is not available' error, run: sudo apt-get install -y $PYVENV_PKG"
+      sudo apt-get update -y || warn "apt-get update reported errors (continuing anyway)"
+      sudo apt-get install -y "$PYVENV_PKG" 2>/dev/null || warn "Could not install $PYVENV_PKG automatically (it may not exist as a separate package on this distro, or apt failed) - if venv creation fails below with an 'ensurepip is not available' error, run: sudo apt-get update && sudo apt-get install -y $PYVENV_PKG"
     else
-      warn "Skipping $PYVENV_PKG install (no sudo access) - if venv creation fails below with an 'ensurepip is not available' error, ask an administrator to run: sudo apt-get install -y $PYVENV_PKG"
+      warn "Skipping $PYVENV_PKG install (no sudo access) - if venv creation fails below with an 'ensurepip is not available' error, ask an administrator to run: sudo apt-get update && sudo apt-get install -y $PYVENV_PKG"
     fi
   fi
 fi
