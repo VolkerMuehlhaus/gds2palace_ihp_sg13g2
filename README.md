@@ -1,6 +1,6 @@
 # Create AWS Palace FEM Models from GDSII layout files
 
-![Intro](./doc/png/gds2palace_ihp_800.png)
+![Intro](./doc/png/gds2palace_banner.png)
 
 The files provided here enable RFIC FEM simulation using AWS Palace from GDSII layouts created in [IHP SG13G2](https://github.com/IHP-GmbH/IHP-Open-PDK) RFIC technology. 
 
