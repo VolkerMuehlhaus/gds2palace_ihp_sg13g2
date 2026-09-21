@@ -2,29 +2,50 @@
 
 ← back to [scripts overview](../README.md)
 
-## Do you need this whole repo cloned to install?
+## Do I need to clone/download this whole repository to install?
 
-No. **install_gds2palace.sh** is fully self-contained and designed to be downloaded (or `curl`'d) on its own, with **no repo checkout required** - it fetches everything else it needs (Python packages from PyPI, helper scripts from this repo's raw GitHub URLs) itself. Download that one file and run it (or `curl -fsSL <raw-url> | bash`). It never needs any other file from this repo to be present locally.
+No. **install_gds2palace.sh** is fully self-contained and designed to be downloaded on its own, with **no repo checkout required**. It fetches everything else it needs: Python packages from PyPI and helper scripts from this repo's raw GitHub URLs. Simply download that one file and run it. It never needs any other file from this repo to be present locally.
 
-It pulls `setupEM`/`gds2palace` from PyPI, so you always get those from the public package index, not from any local checkout.
+The installation script pulls `setupEM`/`gds2palace` from PyPI, so you always get those from the public package index, not from any local checkout.
 
 ## Installing
 
-**install_gds2palace.sh** is the Linux installer - one venv, one machine, no Windows/WSL split needed since Palace runs natively there too. It creates a Python venv (default `~/venv/palace`), installs setupEM (which pulls in gds2palace, gds_prepare_for_EM, and scikit-rf), adds that venv's `bin/` to `PATH` via `~/.profile`, installs AWS Palace itself (prebuilt Apptainer container), and generates `run_palace`/`combine_snp` pointing at it - so `setupEM`, `run_palace` and `combine_snp` are all typeable directly in any new terminal afterward. Works the same on native Linux or inside WSL2. Run `install_gds2palace.sh --help` for all options, or with no options at all for the same kind of interactive wizard as the [Windows installer](../install_windows/README.md). Safe to re-run.
+**install_gds2palace.sh** is the Linux installer, installing both the gds2palace workflow and the Palace solver.  If you have sudo access, it will install almost all missing components automatically, otherwise please read the "before you run" notes below and ask your admin to install the required components first.
 
-**Before you run it**, you need:
+- For the Python part of the workflow, it creates a Python venv (default `~/venv/palace`), installs setupEM with gds2palace, gds_prepare_for_EM, and scikit-rf
+- It adds that venv's `bin/` to `PATH` via `~/.profile`, so `setupEM`, `run_palace` and `combine_snp` are all typeable directly in any new terminal afterward  
+- It generates `run_palace`/`combine_snp` scripts to start Palace and postprocess results    
+- It installs AWS Palace itself (prebuilt Apptainer container)  
 
-- **Python 3.9+ (`python3`) installed.** The script only *checks* for it - it does not install Python3 itself. If missing, it stops with an install hint (e.g. `sudo apt install python3 python3-venv` on Ubuntu/Debian) and you re-run afterward.
-- **Working `sudo` access**, needed for `apt-get` (apt-based distros only) to auto-install anything from this list that's missing: `curl`, the `python3-venv` module, the Qt/XCB runtime libraries the setupEM GUI needs, and Apptainer. `curl`/`python3-venv` install straight away with no prompt beyond the sudo check itself; the Qt libraries and Apptainer ask for confirmation first (`--yes` skips those). Either way, sudo access is validated **once** before any of these run - if this account has none at all, the script fails immediately with the exact command an admin needs to run (e.g. `sudo apt-get install -y curl`). On non-apt distros, or if `sudo`/root access genuinely isn't available, it just tells you what's missing so you can install it yourself.
-- If you're piping this script (`curl ... | bash`, see above) **and** any of the above needs a password you haven't already entered recently, note that a piped run has no terminal to prompt with - the sudo check fails immediately rather than hanging, so either run `sudo -v` yourself first or download the script and run it in a normal interactive terminal instead.
+If you run `install_gds2palace.sh` with no options, you will be guided through the installation options, asking for target directories etc. You can stop at any time and re-run again later, existing parts of the installation will be maintained.
 
-**What the script does, automatically:** creates the venv and installs setupEM/gds2palace/scikit-rf into it; adds `$VENV_DIR/bin` to `PATH` via `~/.profile`; installs the Qt/XCB libraries the setupEM GUI needs (apt-based distros); optionally downloads the KLayout integration script (`--with-klayout`); and, unless `--skip-palace`, installs Palace as described below, plus generates `run_palace`/`combine_snp`.
+You can also run `install_gds2palace.sh --help` for all command line options, if you prefer this.
 
-**Where Palace itself comes from:** the script installs [Apptainer](https://apptainer.org/) via the Apptainer PPA (`sudo add-apt-repository ppa:apptainer/ppa`, apt-based distros), then runs `apptainer pull` on a **prebuilt container image published by this repo's maintainer** at `oras://ghcr.io/volkermuehlhaus/palace_016:latest` (GitHub Container Registry) - not an official AWS Palace release artifact, since Palace's own CI doesn't publish a pullable image (see [`doc/building-palace-apptainer.md`](../../doc/building-palace-apptainer.md) for how that image itself gets built, and for building your own instead). It's a multi-GB download, saved to `~/palace_016.sif` and reused on every re-run.
+## Requirements
+**Before you run the installer script**, you need **Python 3.9+ (`python3`) installed.** This will be checked by the installer.
 
-**Left for you, to have a fully working setup:**
+If you have **working `sudo` access**, the installation script will install the software listed below using `apt-get`, if it is missing.  
+- `curl`  
+- the `python3-venv` module
+- the Qt/XCB runtime libraries
+- [Apptainer](https://apptainer.org/)  
+
+sudo access is validated **once** before any of these run - if this account has none at all, the script fails immediately with the exact command an admin needs to run (e.g. `sudo apt-get install -y curl`). On non-apt distros, or if `sudo`/root access genuinely isn't available, it just tells you what's missing so you can install it yourself.
+
+If you do **not have working `sudo` access**, please ask your system administrator to install the required components first.
+
+## AWS Palace solver
+By default, this installation script also installs the Palace solver using an Apptainer container image.  
+
+The script installs [Apptainer](https://apptainer.org/) via the Apptainer PPA (`sudo add-apt-repository ppa:apptainer/ppa`, on apt-based distros), then runs `apptainer pull` on a **prebuilt container image published by this repo's maintainer** at `oras://ghcr.io/volkermuehlhaus/palace_016:latest`  
+
+This container image is saved to `~/palace_016.sif` (exact name depends on Palace version) and reused on every re-run. It is not an official AWS Palace release artifact, since Palace's own CI doesn't publish a pullable image. 
+
+If you wish to build a container image yourself, see [`doc/building-palace-apptainer.md`](../../doc/building-palace-apptainer.md) 
+
+## Left for you, to have a fully working setup
+When the installation script is finished, these are the remaining steps:
 
 - Open a **new** terminal (or `source ~/.profile`) after the script finishes, so the updated PATH takes effect.
-- [ParaView](https://www.paraview.org/) if you want to view field-dump results - not installed by this script.
-- [KLayout](https://www.klayout.de/) itself, if you want to draw ports or edit layouts in it - same as on Windows, `--with-klayout` only fetches the integration *script*, not KLayout.
-- An MPI implementation (OpenMPI or MPICH), only if you plan to use **Elmer's** multi-thread option - not needed for Palace itself.
+- The setupEM GUI includes a simple 3D results viewer to visualize fields. You could install the optional [ParaView](https://www.paraview.org/) tool for a full-featured 3D results viewer.
+- The installation script only installs the klayout *integration script*, not the KLayout tool itself.
