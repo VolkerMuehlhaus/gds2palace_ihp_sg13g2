@@ -23,7 +23,12 @@
 # updated 19-Oct-2025 Mue: support more than 9 ports
 # updated 08-Nov-2025 Mue: added evaluation for optional port impedance file port_information.json that is created by new gds2palace code
 # updated 13-Nov-2025 Mue: added simple de-embedding of parasitic port inductance (flat ribbon calculation)
-# updated 26-Nov-2025 Mue: also read Elmer FEM files 
+# updated 26-Nov-2025 Mue: also read Elmer FEM files
+# updated 22-Sep-2026 Mue: handle an interrupted Palace run (e.g. killed by setupEM's
+#   memory limit, or OOM-killed) - a blank/truncated trailing CSV line, or Palace's own
+#   "NULL" placeholder for an unsolved excitation, no longer crashes with an IndexError
+#   or gets silently written into the Touchstone file; affected S-parameters are set to
+#   0.0 dB / 0 deg and flagged both on stdout and in a comment line in the output file
 
 import os,re, json, math
 import skrf as rf
