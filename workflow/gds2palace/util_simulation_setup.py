@@ -1279,7 +1279,12 @@ def create_model (excite_ports, settings):
         elmer = True
         filled_metals = True # solid metal volumes for thermal
         thermal_objects = settings['thermal_objects']
-    
+
+    # filled_metals means "model conductors as solid volumes" either way, but EM and
+    # thermal need different registration: thermal keeps both volume AND surface (for
+    # Paraview visualization, existing behavior below), EM needs volume ONLY (no
+    # redundant surface-impedance BC on the same faces as the bulk-conductivity domain).
+    filled_metals_em = filled_metals and not elmer_thermal
 
     if not elmer_thermal:
         # boundary conditions default to absorbing
@@ -1376,14 +1381,19 @@ def create_model (excite_ports, settings):
         elif metal.is_sheet: # sheet layer for resistor etc
             metal_sheet_dict[metal.name] = []
         else:
-            # regular case, planar metal will be represented at surfaces of hollow volumes
-            metal_surface_dict[metal.name]=[] 
-
-            if filled_metals:
-                # special case for thermal etc: make planar metals as volumes
-                # but also keep surfaces for  visualisation of results in Paraview
+            if filled_metals_em:
+                # EM volume-conductor mode: solid bulk-conductivity domain only,
+                # no surface-impedance BC on the same faces
                 metal_volume_dict[metal.name]=[]
-                     
+            else:
+                # regular case, planar metal will be represented at surfaces of hollow volumes
+                metal_surface_dict[metal.name]=[]
+
+                if filled_metals:
+                    # special case for thermal etc: make planar metals as volumes
+                    # but also keep surfaces for  visualisation of results in Paraview
+                    metal_volume_dict[metal.name]=[]
+
 
     for dielectric in dielectrics_list.dielectrics:
         dielectric_volume_dict[dielectric.name]=[]
@@ -1479,8 +1489,26 @@ def create_model (excite_ports, settings):
 
 
     # restore names with possibly new tag numbers
-    for n, new_dimtag_list in enumerate(geom_map):
+    if filled_metals_em:
+        # EM volume-conductor mode: if a via and a regular conductor geometrically
+        # overlap (e.g. a via drawn to extend slightly into its pad, for a
+        # watertight boolean), fragment() above produces a shared piece that
+        # appears in BOTH original entities' new_dimtag_list - whichever name is
+        # written last below wins. Process vias first, then everything else, so a
+        # conductor's name always overwrites a via's for any such shared region
+        # (the conductor wins the overlap, matching regular circuit-design intent
+        # of a via making contact into, not displacing, the conductor above/below it).
+        via_indices, other_indices = [], []
+        for n, (dim, original_tag) in enumerate(geom_dimtags):
+            layer = metals_list.getbylayername(original_volume_names_dict[original_tag])
+            (via_indices if (layer is not None and layer.is_via) else other_indices).append(n)
+        name_restore_order = via_indices + other_indices
+    else:
+        name_restore_order = range(len(geom_dimtags))
+
+    for n in name_restore_order:
         # we get a list with one or more new dimtags for each the original dimtag
+        new_dimtag_list = geom_map[n]
         _, original_tag = geom_dimtags[n]
         name = original_volume_names_dict[original_tag]
         for _, newdimtag in new_dimtag_list:
@@ -1669,6 +1697,19 @@ def create_model (excite_ports, settings):
                 vertical_faces = [t for loop in surfaceloops for t in loop if is_vertical_surface(t)]
                 if vertical_faces:
                     via_surface_dict.setdefault(name, []).append([vertical_faces])
+            elif filled_metals_em and via_metal is not None and via_metal.is_metal:
+                # volumized regular conductor gets no surface physical group (pure
+                # domain conductor, like a via above), but mesh refinement near its
+                # edges should still work - collect boundary curves the same way the
+                # metal_surface_dict loop below does (see boundary_line_tags_dict).
+                _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+                face_tags = [t for loop in surfaceloops for t in loop]
+                if name not in boundary_line_tags_dict.keys():
+                    boundary_line_tags_dict[name] = []
+                for facetag in face_tags:
+                    clt, ct = gmsh.model.occ.getCurveLoops(facetag)
+                    for curvetag in ct:
+                        boundary_line_tags_dict[name].extend(curvetag)
         elif name in dielectric_volume_dict.keys():
             dielectric_volume_dict[name].append(tag)
         elif name == "airbox":
@@ -2722,7 +2763,7 @@ def create_model (excite_ports, settings):
             for key in override_dict.keys():
                 refined_cellsize_value=key
                 tags = override_dict[key]
-                i = refine_along_boundary (tags, refined_cellsize_value, i)            
+                i = refine_along_boundary (tags, refined_cellsize_value, i)
 
 
         if elmer_thermal:
@@ -2883,6 +2924,18 @@ def create_model (excite_ports, settings):
                 # hide physical volumes in viewer
                 # Step 1: Get all physical volumes
                 volume_groups = [(dim, tag) for dim, tag in gmsh.model.getPhysicalGroups() if dim == 3]
+
+                if filled_metals_em:
+                    # EM volume-conductor mode: don't hide conductor domains here -
+                    # unlike vias/dielectric/airbox, these are the model's actual
+                    # metal, and hiding them would leave nothing meaningful visible
+                    # in the post-mesh preview.
+                    kept_volume_groups = []
+                    for dim, tag in volume_groups:
+                        layer = metals_list.getbylayername(gmsh.model.getPhysicalName(dim, tag))
+                        if layer is None or not layer.is_metal:
+                            kept_volume_groups.append((dim, tag))
+                    volume_groups = kept_volume_groups
 
                 # Step 2: Collect all volume entities AND their surfaces
                 entities_to_hide = []
