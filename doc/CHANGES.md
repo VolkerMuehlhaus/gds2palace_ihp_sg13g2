@@ -2,10 +2,13 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 22-September-2026
+
+## 22-23 September-2026
 `settings['filled_metals']` is a new option for Palace, used for volume meshing of conductors instead of placing a surface impedance onto the side walls. This gives more accurate conductor loss at **low** frequency, where the skin depth is no longer small compared to conductor cross section. 
 
 Note that the new volume meshing option is **not** the recommended default for Palace: volume meshing requires more RAM and simulation time, and will become inaccurate at higher frequencies, unless you really mesh into skin effect. See the new [`filled_metals_inductor_L2n0`](../more_examples/filled_metals_inductor_L2n0) example for a comparison of conductor volume mesh against surface-impedance modeling at several mesh sizes.
+
+`settings['adaptive_mesh_conformal']` is a new experimental option (default `False`) to use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement. From the testcases tried so far, this gave good convergence behaviour, with agressive increase in mesh cell count and possibly faster simulation time for similar DOF.
 
 **Bugfixes**  
 `combine_extend_snp.py` now handles a Palace run that was interrupted before finishing (e.g. terminated by setupEM's new memory-limit kill switch, or OOM-killed by the OS): a blank/truncated trailing CSV line, or Palace's own `"NULL"` placeholder for an excitation it never got to solve, previously either crashed with an `IndexError` or got silently written into the Touchstone output where it only surfaced later as an unhandled parse error in `scikit-rf`. Affected S-parameters are now written as `0.0 dB / 0 deg` instead, with a stdout warning and a comment line in the output Touchstone file listing exactly which parameters are unreliable, so a partial run degrades visibly instead of crashing or silently producing bad data.
