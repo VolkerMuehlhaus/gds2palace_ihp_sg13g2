@@ -166,7 +166,7 @@ This view shows clean, monotonic convergence toward the 1 µm result as the unif
 
 ```
 more_examples/mesh_convergence/mesh_convergence_D-band_balun/
-├── mesh_convergence_report.md                      # this report
+├── README.md                                        # this report
 ├── palace_balun_mesh5.py … palace_balun_mesh1.py   # uniform mesh model scripts
 ├── palace_balun_amr5.py                            # AMR model script
 ├── palace_balun_mesh2_order3.py                    # p-refinement model script (§2b)

@@ -174,7 +174,7 @@ The L/Q/R plots show a small but systematic offset between order 1 and order 2 t
 
 ```
 more_examples/mesh_convergence/mesh_convergence_inductor/
-├── mesh_convergence_report.md                  # this report
+├── README.md                                    # this report
 ├── palace_ind_frame.py                         # original test case
 ├── palace_ind_frame_mesh{1,2,3,5}.py            # uniform mesh model scripts, order 2
 ├── palace_ind_frame_amr2.py                     # AMR model script, 5 um start, 2 iterations

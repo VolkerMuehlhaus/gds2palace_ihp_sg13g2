@@ -75,7 +75,7 @@ S11/S22 barely move with mesh or order at all (both near-unity magnitude — thi
 | 0.1 µm | 24.742 | 24.202 | −2.18% | 0.0001 | 0.1917 |
 | 0.05 µm | 24.351 | 24.057 | −1.21% | 0.0000 | 0.1065 |
 
-The order-2/order-3 gap in C12 shrinks as the mesh refines (4.56% → 1.21%) but does not fully close at 0.05 µm — some of the order-2 error is basis-order truncation that mesh refinement alone reduces slowly, similar to what the [inductor study](../mesh_convergence_inductor/mesh_convergence_report.md) found for order 1 vs. order 2. For a final C12 number, order 3 is the more trustworthy choice; order 2 is fine for a quick look but expect it to read a few percent high.
+The order-2/order-3 gap in C12 shrinks as the mesh refines (4.56% → 1.21%) but does not fully close at 0.05 µm — some of the order-2 error is basis-order truncation that mesh refinement alone reduces slowly, similar to what the [inductor study](../mesh_convergence_inductor/README.md) found for order 1 vs. order 2. For a final C12 number, order 3 is the more trustworthy choice; order 2 is fine for a quick look but expect it to read a few percent high.
 
 ## 5. C12 vs. frequency (documentation only)
 
@@ -94,7 +94,7 @@ Using the 0.2 µm/order 2 sweep variant (raw numbers in `results/c12_vs_frequenc
 
 ```
 more_examples/mesh_convergence/mesh_convergence_mom_cmos5l/
-├── mesh_convergence_report.md                        # this report
+├── README.md                                          # this report
 ├── c4_frame_ports.gds, SG13CMOS5L_150um.xml           # layout + stackup
 ├── c4_frame_ports.py                                  # base template
 ├── c4_frame_ports_mesh{200,100,50}nm.py               # order 2 mesh sweep, fixed 1 GHz
