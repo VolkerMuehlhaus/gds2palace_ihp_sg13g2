@@ -615,6 +615,7 @@ against the source, e.g. `get_optional_setting` defaults in `util_simulation_set
 | `substrate_refinement` | `False` | Extra mesh refinement into the substrate |
 | `adaptive_sweep` | `True` | Enable Palace's adaptive frequency sweep |
 | `adaptive_mesh_iterations` | 0 | AMR iterations — often unnecessary with a fine initial mesh |
+| `adaptive_mesh_conformal` | `False` | Use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement |
 | `save_adaptive_mesh` | `False` | Save the AMR-iteration mesh for reuse |
 | `save_gmsh_unrolled` | `False` | Also save the unmeshed gmsh geometry, for inspection |
 | `z_thickness_factor` | 1 | Factor on metal-thickness for conductor side walls (relevant when skin depth exceeds metal thickness; no effect on a layer modeled as a solid volume via `filled_metals`, since that layer has no surface-impedance boundary to apply it to) |

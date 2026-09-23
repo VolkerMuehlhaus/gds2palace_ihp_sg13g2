@@ -1248,6 +1248,7 @@ def create_model (excite_ports, settings):
     refined_cellsize = settings['refined_cellsize']  # mesh cell size in conductor region
     meshsize_max = get_optional_setting (settings, "meshsize_max", 70)
     adaptive_mesh_iterations = get_optional_setting (settings, "adaptive_mesh_iterations", 0)
+    adaptive_mesh_conformal = get_optional_setting (settings, "adaptive_mesh_conformal", False)  # False = Palace's default nonconformal (hanging-node) AMR
     amr_tol = get_optional_setting (settings, "amr_tol", 1e-2)  # AMR goal: relative error tolerance
     amr_max_dof = get_optional_setting (settings, "amr_max_dof", 2e6)  # AMR maximum number of unknowns
     save_adaptive_mesh = get_optional_setting (settings, "save_adaptive_mesh", False)
@@ -1989,7 +1990,7 @@ def create_model (excite_ports, settings):
         "Tol": amr_tol,
         "MaxIts": adaptive_mesh_iterations,
         "MaxSize": amr_max_dof,
-        "Nonconformal": True,
+        "Nonconformal": not adaptive_mesh_conformal,
         "UpdateFraction": 0.7,
         "SaveAdaptMesh": save_adaptive_mesh
     }

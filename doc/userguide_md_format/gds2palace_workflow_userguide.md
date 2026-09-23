@@ -363,6 +363,7 @@ These other settings are optional:
 **settings['substrate_refinement']:** Extra mesh refinement into substrate, usually not required, default is False  
 **settings['adaptive_sweep']:** Enable adaptive frequency sweep, default is True  
 **settings['adaptive_mesh_iterations']:** Iterations for adaptive mesh refinement, often not required when using fine initial mesh, default is 0  
+**settings['adaptive_mesh_conformal']:** Use conformal AMR refinement instead of Palace's default nonconformal (hanging-node) refinement, default is False  
 **settings['save_adaptive_mesh']:** Save mesh file from adaptive iteration for possible re-use, default is False  
 **settings['save_gmsh_unrolled']:** Also save gmsh geometry file without meshing, for later inspection, default is False  
 **settings['z_thickness_factor']:** Factor for metal thickness value on conductor side walls (see footnote), default is 1  
