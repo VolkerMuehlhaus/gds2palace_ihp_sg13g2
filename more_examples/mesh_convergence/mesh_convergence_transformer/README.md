@@ -152,7 +152,7 @@ An earlier version of this report reduced the 5-port Z-matrix under a floating 1
 
 ```
 more_examples/mesh_convergence/mesh_convergence_transformer/
-├── mesh_convergence_report.md                   # this report
+├── README.md                                     # this report
 ├── palace_transformer_imn_mesh5.py … mesh1.py   # uniform mesh model scripts (mesh5 crashes, see §1)
 ├── palace_transformer_imn_amr3.py               # AMR model script
 ├── palace_model/palace_transformer_imn_<name>_data/   # generated mesh/config + full Palace output

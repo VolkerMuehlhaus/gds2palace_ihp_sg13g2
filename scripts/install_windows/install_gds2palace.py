@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import os
+import shlex
 import subprocess
 import sys
 import urllib.request
@@ -294,6 +295,8 @@ def write_launchers(scripts_dir: Path, venv_dir: Path) -> None:
 
     run_palace_cmd = (
         'cfg = sys.argv[1] if len(sys.argv) > 1 else "config.json"\n'
+        'if os.path.splitdrive(cfg)[0]:\n'
+        '    cfg = win_to_wsl_path(cfg)\n'
         'cmd = f"run_palace \'{cfg}\'"'
     )
     combine_snp_cmd = 'cmd = "combine_snp"'
@@ -445,7 +448,7 @@ def setup_palace_in_wsl(args: argparse.Namespace, script_dir: Path) -> bool:
 
     info("This runs commands inside WSL, including 'sudo apt-get' - you may be "
          "prompted for your WSL user's password.")
-    bash_cmd = "bash ./install_palace_wsl.sh" + "".join(f" {a}" for a in wsl_args)
+    bash_cmd = "bash ./install_palace_wsl.sh" + "".join(f" {shlex.quote(a)}" for a in wsl_args)
     result = run(["wsl.exe", "--cd", wsl_script_dir, "--", "bash", "-lc", bash_cmd])
     if result.returncode != 0:
         warn("Palace/WSL setup reported an error - see the output above. Fix the "

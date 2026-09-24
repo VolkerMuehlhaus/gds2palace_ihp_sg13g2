@@ -2,11 +2,33 @@
 
 This is an (incomplete) list of changes and new features.
 
+
+## 22-23 September-2026
+`settings['filled_metals']` is a new option for Palace, used for volume meshing of conductors instead of placing a surface impedance onto the side walls. This gives more accurate conductor loss at **low** frequency, where the skin depth is no longer small compared to conductor cross section. 
+
+Note that the new volume meshing option is **not** the recommended default for Palace: volume meshing requires more RAM and simulation time, and will become inaccurate at higher frequencies, unless you really mesh into skin effect. See the new [`inductor_L6n2_filledmetals_passivation3D`](../more_examples/measured_vs_simulated/inductor_L6n2_filledmetals_passivation3D) example for a comparison of conductor volume mesh against surface-impedance modeling at several mesh sizes, checked against measurement.
+
+`settings['adaptive_mesh_conformal']` is a new experimental option (default `False`) to use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement. From the testcases tried so far, this gave good convergence behaviour, with agressive increase in mesh cell count. For the D-band balun mesh convergence testcase, with only 2 iterations, this reached a similar result as the default non-conformal AMR after 4 iterations, with simulation time cut in half.
+
+**Bugfixes**  
+`combine_extend_snp.py` now handles a Palace run that was interrupted before finishing (e.g. terminated by setupEM's new memory-limit kill switch, or OOM-killed by the OS): a blank/truncated trailing CSV line, or Palace's own `"NULL"` placeholder for an excitation it never got to solve, previously either crashed with an `IndexError` or got silently written into the Touchstone output where it only surfaced later as an unhandled parse error in `scikit-rf`. Affected S-parameters are now written as `0.0 dB / 0 deg` instead, with a stdout warning and a comment line in the output Touchstone file listing exactly which parameters are unreliable, so a partial run degrades visibly instead of crashing or silently producing bad data.
+
+## 18-September-2026
+Detect a multi-chiplet stackup (one shared interposer referenced by several chiplet dies) from the Reference graph via `detect_chiplet_groups()`, and scope metal/dielectric z-range checks to each chiplet so same-height elements from different chiplets no longer get cross-linked or wrongly registered into each other's dielectric.
+
+Added `find_z_overlap_pairs()`/`find_z_overlaps()` (overlapping same-scope dielectrics) and `find_missing_chiplet_boundaries()`/`find_missing_chiplet_boundary_warnings()` (a chiplet branch point or chiplet root Dielectric missing an explicit `Boundary=`, required once a stackup branches into chiplets).
+
+**Bugfixes**  
+Fixed a crash previewing a brand-new empty stackup, and a missing `.sNp` extension on `_dc`/`_deembedded` output when the model name itself contains a literal `.` (e.g. a dimension like `do82.41`).
+
+Fixed a metal sitting exactly at its own reference dielectric's top edge (`ReferenceEdge="Top" Zmin="0"`) falling into the wrong, often shared dielectric instead - also fixes `Interposer_Backside` being dropped from `metals_inside`.
+
 ## 12-14-September-2026
 Added an example ([`more_examples/EM_temperature_coefficient`](../more_examples/EM_temperature_coefficient/README.md)) for temperature-dependent conductivity in the XML stackup, to simulate loss vs. temperature. The corresponding .py simulation model loops over temperature and must be run from command line (not setupEM).
 
 Added two reserved stackup materials that need no `<Materials>` entry: `PEC` (ideal conductor, on conductor/via/sheet Layers) and `AIR` (built-in default dielectric, overridable).
 
+**Bugfixes**  
 Fixed inductor synthesis spiral polygon vertices not landing exactly on the grid in the [inductor synthesis example](../more_examples/inductor_synthesis_no_external_library/synthesize_ihp_inductor_v4.py).
 
 `read_gds()` now silently repairs self-intersecting GDSII "keyhole" polygons instead of failing much later with an opaque `assert dielectric_tags_unchanged` deep inside meshing.
@@ -14,7 +36,7 @@ Fixed inductor synthesis spiral polygon vertices not landing exactly on the grid
 Detect and fix overlap of lumped ports with metals on the same layer. Port wins now, this fixes the previous Palace/MFEM error ("a non-periodic face cannot have multiple boundary elements").
 
 ## 09-September-2026
-Added `more_examples/mesh_convergence/`: five worked mesh convergence studies (how fine to mesh, whether adaptive mesh refinement helps) on real IHP SG13G2 structures — see the [overview](../more_examples/mesh_convergence/README.md) for what we found. Examples: [spiral inductor](../more_examples/mesh_convergence/mesh_convergence_inductor/mesh_convergence_report.md), [transformer](../more_examples/mesh_convergence/mesh_convergence_transformer/mesh_convergence_report.md), [D-band balun](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/mesh_convergence_report.md), [2:1 edge-coupled balun](../more_examples/mesh_convergence/mesh_convergence_balun2x1/mesh_convergence_report.md), [MIM-loaded balun](../more_examples/mesh_convergence/mesh_convergence_balun_mim/mesh_convergence_report.md).
+Added `more_examples/mesh_convergence/`: five worked mesh convergence studies (how fine to mesh, whether adaptive mesh refinement helps) on real IHP SG13G2 structures — see the [overview](../more_examples/mesh_convergence/README.md) for what we found. Examples: [spiral inductor](../more_examples/mesh_convergence/mesh_convergence_inductor/README.md), [transformer](../more_examples/mesh_convergence/mesh_convergence_transformer/README.md), [D-band balun](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/README.md), [2:1 edge-coupled balun](../more_examples/mesh_convergence/mesh_convergence_balun2x1/README.md), [MIM-loaded balun](../more_examples/mesh_convergence/mesh_convergence_balun_mim/README.md).
 
 ## 01-08-September-2026
 Fixed a false-positive `Invalid surface found` print for via layers (e.g. `TopVia2`), introduced by the 06-September via lateral-surface change: those surfaces were being fed into the same boundary-condition builder used for regular conductor/sheet layers, which doesn't have a case for vias (they're already handled as domain conductors, not surface boundaries) and fell through to an "should never happen" branch. Via lateral surface physical groups are now only created for Elmer thermal models (their only real use, for Paraview visualization); the boundary-condition builder also now explicitly skips via layers instead of misreporting them as invalid.

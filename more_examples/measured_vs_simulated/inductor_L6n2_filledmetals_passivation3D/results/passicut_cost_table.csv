@@ -1,0 +1,3 @@
+Variant,Mesh,DOF,Mesh elements,Solve time,Peak RAM
+passicut + filled_metals,5 um,"397,486","62,619",9m 18s,6.39 GB
+passicut + filled_metals,2 um,"1,445,386","227,705",26m 55s,21.86 GB

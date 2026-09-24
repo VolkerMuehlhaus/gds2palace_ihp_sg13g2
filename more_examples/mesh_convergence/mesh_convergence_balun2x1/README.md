@@ -150,7 +150,7 @@ Order 1 is ~5.2× fewer DOF and roughly 9-11× faster than order 2 at the same m
 
 ```
 more_examples/mesh_convergence/mesh_convergence_balun2x1/
-├── mesh_convergence_report.md                        # this report
+├── README.md                                          # this report
 ├── balun2x1_edgecoupled_do200_w8_s2.py                # original baseline (refined_cellsize=5)
 ├── balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}.py    # uniform mesh model scripts, order 2
 ├── balun2x1_edgecoupled_do200_w8_s2_amr2.py           # AMR model script, 5 um start, 2 iterations

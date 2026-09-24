@@ -10,7 +10,9 @@ model scripts): 201/202 = primary +/-, 203 = primary center tap,
 import os
 import sys
 
-sys.path.insert(0, r"D:\github-claude\gds_viewer")
+GDS_VIEWER_PATH = os.environ.get("GDS_VIEWER_PATH", r"D:\github-claude\gds_viewer")
+if os.path.isdir(GDS_VIEWER_PATH):
+    sys.path.insert(0, GDS_VIEWER_PATH)
 import gdspy
 import matplotlib
 matplotlib.use("Agg")
@@ -18,7 +20,13 @@ import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 
-import gds_viewer as gv
+try:
+    import gds_viewer as gv
+except ImportError as exc:
+    raise ImportError(
+        "gds_viewer not found. Set the GDS_VIEWER_PATH environment variable "
+        "to your local gds_viewer checkout, or make it importable on PYTHONPATH."
+    ) from exc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GDS_FILE = os.path.join(os.path.dirname(HERE), "Transformer_IMN_ports.gds")

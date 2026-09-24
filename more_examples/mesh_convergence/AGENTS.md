@@ -57,7 +57,7 @@ this document is about *how* to produce more studies like it.
   `palace.json` yourself unless you need a field it doesn't already expose.
 - **The five existing studies are worked templates.** Before writing
   anything from scratch, look at the model scripts, `results/*.py`
-  analysis scripts, and `mesh_convergence_report.md` in whichever study is
+  analysis scripts, and `README.md` in whichever study is
   structurally closest to your new layout:
   - a single coil → `mesh_convergence_inductor/`
   - a multi-port coupled structure with a center tap → `mesh_convergence_transformer/`
@@ -416,7 +416,7 @@ generated filename). Then:
 ### 2.7 Write the report
 
 Match the structure used by the existing reports (each one's opening
-`mesh_convergence_report.md` is a directly readable template):
+`README.md` is a directly readable template):
 
 1. A bullet-list header: model/stackup filenames, solver + key settings,
    frequency sweep, port definitions, execution notes. If the structure
@@ -450,7 +450,7 @@ Match the structure used by the existing reports (each one's opening
    folder and what each file/script regenerates.
 
 Two placement details that keep the study easy to navigate: put
-`mesh_convergence_report.md` at the **study's root** (not inside
+`README.md` at the **study's root** (not inside
 `results/`, where it's easy to miss) with image links written as
 `results/plots/...` to match; and keep generated meshes/raw solver output
 (`palace_model/`) out of version control via this folder's `.gitignore`
