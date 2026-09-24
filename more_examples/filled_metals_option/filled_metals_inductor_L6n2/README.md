@@ -105,26 +105,74 @@ Full table (all 3 mesh points): [`results/accuracy_vs_measured_table.csv`](resul
 
 **IMPORTANT NOTE: The "solve inside" filled metals choice requires to mesh into skin effect, which gets harder at higher frequencies where skin depth decreases much below 1 µm. Do not misunderstand this example - it applies to this frequency range shown here.**  
 
-## 6. Where everything lives
+## 6. "Passicut" workaround: cheap approximation of the conformal stackup
+
+§3–5 found that the conformal-passivation stackup is what fixes the SRF match, but its explicit 3D sidewall geometry (`SiO2_above`/`SiO2_sides` derived layers, oversize+NOT boolean around TopMetal2) is the most expensive corner of the whole study (2.86M DOF, 1h 5m 44s, 42.09 GB at 1 µm). Since mesh refinement itself wasn't the limiting factor for *this* inductor's geometry (5.5 µm gap, 8 µm trace — coarse enough that 5 µm cells still resolve it), a cheaper workaround was tried instead: **`SG13G2_200um_passicut.xml`**.
+
+Rather than deriving separate 3D sidewall/cap geometry, this stackup just shortens the SiO2 dielectric block by TopMetal2's own thickness using reference-relative positioning (`Thickness="=15.7303-3"`) so AIR (with a thin 0.4 µm Passivation liner in the "valleys" between traces) takes over beside and above the metal, instead of solid SiO2 fully embedding it as in the plain planar stackup. No derived-layer booleans, no extra mesh-refinement geometry — SiO2 simply stops partway up TopMetal2's sides instead of wrapping it. `filled_metals` was kept (§3–5 showed conductor model, not stackup, controls the Q/R match), and only 5/2 µm mesh was tried (no 1 µm — unnecessary per the point above).
+
+### Cost
+
+| Variant | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
+|---|---:|---:|---:|---:|---:|
+| Passicut + filled_metals | 5 µm | 397,486 | 62,619 | 9m 18s | 6.39 GB |
+| Passicut + filled_metals | 2 µm | 1,445,386 | 227,705 | 26m 55s | 21.86 GB |
+| *(for reference)* Conformal + filled_metals | 1 µm | 2,861,190 | 451,199 | 1h 5m 44s | 42.09 GB |
+| *(for reference)* Planar + filled_metals | 1 µm | 2,410,314 | 379,819 | 45m 40s | 35.86 GB |
+
+Passicut at 5 µm is **~7x faster and ~6.6x less RAM** than the conformal 1 µm result it's compared against below — even cheaper than the plain planar stackup at any mesh in §2.
+
+### Accuracy vs. measurement
+
+![Passicut workaround vs. previous best/cheapest](results/plots/LQR_passicut_comparison.png)
+
+The passicut curves (5 µm and 2 µm) sit almost on top of the expensive conformal 1 µm curve across L, Q, and R — and clearly separated from the planar baseline's SRF mismatch:
+
+| Variant | avg\|L err\| | avg\|Q err\| |
+|---|---:|---:|
+| Conformal + filled_metals, 1 µm *(reference, §3–4)* | 2.6% | 3.3% |
+| Planar + filled_metals, 1 µm *(reference, §3–4)* | 15.4% | 16.1% |
+| **Passicut + filled_metals, 5 µm** | **2.0%** | **6.8%** |
+| **Passicut + filled_metals, 2 µm** | **4.3%** | **4.6%** |
+
+Passicut's L accuracy at 5 µm (2.0%) is even slightly better than the expensive conformal 1 µm result; its Q accuracy (6.8%) is between conformal and planar but still far closer to conformal than to planar. Passicut at 2 µm brings Q accuracy to 4.6%, essentially matching conformal's 3.3%.
+
+Full table: [`results/passicut_accuracy_table.csv`](results/passicut_accuracy_table.csv), [`results/passicut_cost_table.csv`](results/passicut_cost_table.csv).
+
+**This workaround gets most of the conformal stackup's accuracy benefit at a small fraction of its cost** — a 1D reference-relative stackup edit standing in for expensive derived 3D sidewall geometry. For routine use on inductor geometries where mesh isn't the limiting factor (as established here), passicut + filled_metals at 5 µm is the practical recommendation over the full conformal treatment.
+
+## 7. Where everything lives
+
+The §6 passicut runs' *source* files (model scripts, `SG13G2_200um_passicut.xml`, mesh/config, raw solver output) live in a separate location, `test_data/filled_metals_inductor_L6n2/` (not under this study's own directory) — only their de-embedded results and derived plots/tables were copied in here:
 
 ```
+test_data/filled_metals_inductor_L6n2/
+├── L6n2_with_ports.gds                          # same layout as the main study
+├── SG13G2_200um_passicut.xml                     # §6 passicut stackup (input)
+├── palace_L6n2_passicut_volume_5um.py, _2um.py   # §6 model scripts
+└── palace_model/                                 # §6 raw solver output (not committed)
+
 more_examples/filled_metals_option/filled_metals_inductor_L6n2/
 ├── README.md                                    # this report
 ├── L6n2_with_ports.gds                          # layout (input)
 ├── SG13G2_200um.xml                              # planar stackup (input)
 ├── SG13G2_200um_3D_passivation.xml               # conformal stackup (input)
 ├── meas_L5_6n2_THRU_deemb.S2P                    # measurement reference (input)
-├── palace_L6n2_<stackup>_<model>_<mesh>um.py     # 12 model scripts
+├── palace_L6n2_<stackup>_<model>_<mesh>um.py     # 12 model scripts (§1-5)
 ├── palace_model/                                 # raw solver output (mesh/config/paraview, not committed)
 └── results/
-    ├── analyze_comparison.py                     # regenerates every plot/table below
+    ├── analyze_comparison.py                     # regenerates every §1-5 plot/table
+    ├── analyze_passicut.py                        # regenerates §6's plot/tables (reads test_data/.../palace_model/ + results/snp/)
     ├── cost_table.csv                            # §2
+    ├── passicut_cost_table.csv                    # §6
+    ├── passicut_accuracy_table.csv                # §6
     ├── accuracy_vs_measured_table.csv             # §4, all 3 mesh points
-    ├── snp/                                      # de-embedded Touchstone files, one per combination x mesh, + measured.s2p
+    ├── snp/                                      # de-embedded Touchstone files, one per combination x mesh, + measured.s2p + passicut_volume_{5,2}um.s2p
     └── plots/
           layout_labeled.png                       # §0
           LQR_conformal_volume.png, LQR_planar_surface.png
           LQR_planar_volume.png, LQR_conformal_surface.png
+          LQR_passicut_comparison.png               # §6
 ```
 
-Regenerate all tables/plots with `python results/analyze_comparison.py` (from `d:\venv\palace`) any time the archived `.snp` files change — it re-derives the cost table from `palace_model/` via `scripts/palace_summary.py` and the L/Q/accuracy tables from `results/snp/`.
+Regenerate §1-5's tables/plots with `python results/analyze_comparison.py`, and §6's with `python results/analyze_passicut.py` (from `d:\venv\palace`), any time the archived `.snp` files change or the §6 source data under `test_data/filled_metals_inductor_L6n2/` is re-run — `analyze_comparison.py` re-derives its cost table from `palace_model/` via `scripts/palace_summary.py` and its L/Q/accuracy tables from `results/snp/`; `analyze_passicut.py` does the same but reads `test_data/.../palace_model/` for cost and reuses `conformal_volume_1um.s2p`/`planar_volume_1um.s2p` already in `results/snp/` as its reference points.

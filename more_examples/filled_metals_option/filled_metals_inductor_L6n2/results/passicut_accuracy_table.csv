@@ -1,0 +1,13 @@
+Variant,Freq (GHz),L (nH),L meas (nH),L err (%),Q,Q meas,Q err (%)
+"Conformal + filled_metals, 1 um (best, §3)",1.0,4.9063,5.0087,-2.05,6.2798,6.4567,-2.74
+"Conformal + filled_metals, 1 um (best, §3)",5.0,5.9371,6.0632,-2.08,15.1119,15.8935,-4.92
+"Conformal + filled_metals, 1 um (best, §3)",9.0,13.2314,13.7510,-3.78,7.0827,6.9323,2.17
+"Planar + filled_metals, 1 um (cheapest baseline, §3)",1.0,4.9130,5.0087,-1.91,6.2720,6.4567,-2.86
+"Planar + filled_metals, 1 um (cheapest baseline, §3)",5.0,6.2006,6.0632,2.27,14.3726,15.8935,-9.57
+"Planar + filled_metals, 1 um (cheapest baseline, §3)",9.0,19.5182,13.7510,41.94,4.4569,6.9323,-35.71
+"Passicut + filled_metals, 5 um (new)",1.0,4.8938,5.0087,-2.29,6.2758,6.4567,-2.80
+"Passicut + filled_metals, 5 um (new)",5.0,5.9389,6.0632,-2.05,14.3357,15.8935,-9.80
+"Passicut + filled_metals, 5 um (new)",9.0,13.5358,13.7510,-1.56,6.3972,6.9323,-7.72
+"Passicut + filled_metals, 2 um (new)",1.0,4.9038,5.0087,-2.09,6.2849,6.4567,-2.66
+"Passicut + filled_metals, 2 um (new)",5.0,5.8989,6.0632,-2.71,15.0483,15.8935,-5.32
+"Passicut + filled_metals, 2 um (new)",9.0,12.6277,13.7510,-8.17,7.3342,6.9323,5.80
