@@ -1,28 +1,45 @@
-# Stackup x Conductor-Model Study: L6n2 Inductor vs. Measurement (IHP SG13G2)
+# Stackup and Conductor Model Study: L6n2 Inductor vs. Measurement (IHP SG13G2)
 
-- **Model:** `L6n2_with_ports.gds` (cell `L_6n2`), 2 via ports (Metal1 → TopMetal1, Z0 = 50 Ω)
-- **Solver:** AWS Palace (FEM), order 2, ABC boundaries, 100 µm margin + 50 µm air-around
-- **Sweep:** 0–14 GHz, 0.1 GHz step, Palace's PROM-based adaptive frequency sweep — capped at 14 GHz (~1.2x the measured self-resonant frequency, see below), de-embedded S-parameters throughout (port parasitic inductance removed)
-- **Measurement reference:** `meas_L5_6n2_THRU_deemb.S2P` (already de-embedded, 100 MHz–50 GHz) — measured differential SRF ≈ **11.07 GHz**
-- **Execution:** remote solve on `hpz2` (Spack-built Palace, `mpirun -n 16` of 32 cores, 109 GB RAM), 12 jobs run sequentially
+This study evaluates the benefit of two error sources:
+
+## Conductors modeled as filled volumes ("Mesh inside") 
+In the User's Guide, there is a detailed analysis on the limitations of the "surface impedance sheet" loss model that gds2palace uses for modelling conductor layers. Here, we investigate the benefit of using a volume mesh ("solve inside") with conductivity for such cases. Be aware that this is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. Both loss models have their use cases.
+
+## True conformal passivation
+The stackup used so far covers TopMetal2 with another thick layer of SiO2 plus Passivation. This is efficient for simulation, but we can do better now: a recent extension of the stackup file format now offers "derived layers", so that we can now create a stackup that models the true "conformal" shape of dielectrics above TopMetal2. We will see that this is indeed useful to match the measured fSRF of the testcase, with more accurate prediction of the true capacitance between the sidewalls of closely spaced TopMetal2 traces.
+
+Conformal passivation according to process specification:
+![(Passivation)](results/plots/conformal_passivation.png)
+
+Simple planarized stackup used so far:
+![(Passivation)](results/plots/planar_stackup.png)
+
+
+## The details of this study:
+
+- **Model:** `L6n2_with_ports.gds` (cell `L_6n2`), 2 via ports from Metal1 to TopMetal1, Z0 = 50 Ω
+- **Solver:** AWS Palace (FEM), order 2, ABC boundaries, 100 µm margin, 50 µm air around
+- **Sweep:** 0–14 GHz in 0.1 GHz steps, using Palace's adaptive frequency sweep. 14 GHz is about 1.2x the measured self-resonant frequency (SRF). All S-parameters are de-embedded, so the port inductance is removed.
+- **Measurement:** `meas_L5_6n2_THRU_deemb.S2P`, already de-embedded, 100 MHz–50 GHz. The measured differential SRF is **11.07 GHz**.
+- **Execution:** Simulated on `hpz2` with Palace built by Spack, using 16 of 32 cores and up to 109 GB RAM. The 12 jobs ran one after another.
 
 ## 0. Layout
 
 ![L6n2 layout with port positions labeled, IHP SG13G2 pixel-accurate colors (KLayout)](results/plots/layout_labeled.png)
 
-A 4-turn octagonal spiral inductor wound on TopMetal2, ~257×352 µm bounding box. Turn-to-turn crossovers route down to TopMetal1 through TopVia2 via arrays (128 vias total across the crossings, not single vias — standard IHP practice for current-carrying crossings). Both leads (`L_A`/`L_B` in the GDS) drop to via ports **P1**/**P2** at the bottom, landing on a wider ground-reference pad region.
+The inductor is a 4-turn octagonal spiral on TopMetal2. It is about 257 × 352 µm in size. Where the turns cross each other, the path drops down to TopMetal1 through TopVia2. Each crossing uses an array of vias, 128 vias in total. This is normal IHP practice for crossings that carry current. The two leads (`L_A` and `L_B` in the GDS) end at the via ports **P1** and **P2** at the bottom.
 
 ## 1. Method
 
-Full 2 (stackup) × 2 (conductor model) × 3 (mesh) matrix, 12 runs total, all other settings held fixed:
+We varied three things and kept everything else the same. This gives 2 × 2 × 3 = 12 runs.
 
-| Axis | Values |
+| What we varied | Options |
 |---|---|
-| Stackup | `SG13G2_200um.xml` ("planar" — TopMetal2 under a flat SiO2+Passivation layer) vs. `SG13G2_200um_3D_passivation.xml` ("conformal" — passivation conforms to the metal step) |
-| Conductor model | Surface impedance (default, hollow) vs. `filled_metals=True` (solid bulk-conductivity volume, HFSS "solve inside" equivalent) |
-| Mesh | `refined_cellsize` = 5, 2, 1 µm |
+| Stackup | `SG13G2_200um.xml` ("planar": TopMetal2 sits inside a flat block of SiO2, with Passivation on top) or `SG13G2_200um_3D_passivation.xml` ("conformal": the passivation follows the shape of the metal) |
+| Conductor model | Surface impedance (the default, metal is hollow) or `filled_metals=True` (metal is a solid volume, like "solve inside" in HFSS) |
+| Mesh | `refined_cellsize` = 5, 2 or 1 µm |
 
-Model files: `palace_L6n2_<stackup>_<model>_<mesh>um.py` (12 total). Differential quantities use `Zdiff = Z11-Z12-Z21+Z22` (plain engineering convention, same as `filled_metals_inductor_L2n0/results/analyze_comparison.py` and `mesh_convergence_inductor/results/plot_inductor_convergence.py`), then `Ldiff = Im(Zdiff)/ω`, `Qdiff = Im(Zdiff)/Re(Zdiff)`.
+The model files are named `palace_L6n2_<stackup>_<model>_<mesh>um.py`. For the differential values we use `Zdiff = Z11 - Z12 - Z21 + Z22`. From that we get `Ldiff = Im(Zdiff)/ω` and `Qdiff = Im(Zdiff)/Re(Zdiff)`. This is the same method as in `filled_metals_inductor_L2n0` and `mesh_convergence_inductor`.
 
 ## 2. Simulation cost
 
@@ -41,75 +58,114 @@ Model files: `palace_L6n2_<stackup>_<model>_<mesh>um.py` (12 total). Differentia
 | Conformal | filled_metals | 2 µm | 1,429,384 | 225,477 | 31m 40s | 20.89 GB |
 | Conformal | filled_metals | 1 µm | 2,861,190 | 451,199 | **1h 5m 44s** | **42.09 GB** |
 
-The conformal stackup costs more than planar at every matched mesh/model point (extra geometry from the side SiO2 refinement blocks near TopMetal2 — same effect seen in the earlier `conformal_3D_passivation` balun study), and `filled_metals` costs more than surface impedance at matched mesh/stackup (conductor interior now meshed as real FEM unknowns). The most expensive corner (conformal + filled_metals + 1 µm) is ~4x the cost of the cheapest (planar + surface + 5 µm) on every metric.
+The conformal stackup always costs more than the planar one. It adds small SiO2 blocks on the sides of TopMetal2, and these need a finer mesh. We saw the same effect in the `conformal_3D_passivation` balun study.
+
+`filled_metals` also costs more than surface impedance, because the inside of the metal is now meshed too.
+
+The most expensive run (conformal, filled_metals, 1 µm) costs about 4x more than the cheapest one (planar, surface, 5 µm). This is true for time, RAM and DOF.
 
 Full table: [`results/cost_table.csv`](results/cost_table.csv).
 
-## 3. Differential L / Q / R vs. measurement
+## 3. Differential L, Q and R vs. measurement
 
-One 3-panel plot (L, Q, series R top to bottom) per stackup × conductor-model combination, each overlaying all 3 mesh sizes against the measured curve. L and Q span the full 0–14 GHz sweep; R shares that x-range but its y-axis is clipped to 0–12 Ω to keep the low-frequency loss values legible instead of being dwarfed by the hundreds-of-Ω swing right at/after the ~11 GHz SRF. Conformal + filled_metals (the best-matching combination, see below) first:
+There is one plot for each combination of stackup and conductor model. Each plot has three panels: L, Q and series R. Each panel shows the three mesh sizes and the measured curve.
+
+L and Q are shown from 0 to 14 GHz. R uses the same frequency range, but its y-axis stops at 12 Ω. Near the SRF, R shoots up to hundreds of Ω, and that would hide the small values at low frequency.
+
+The best match (conformal + filled_metals) is shown first:
 
 ![Conformal / filled_metals](results/plots/LQR_conformal_volume.png)
 ![Planar / Surface impedance](results/plots/LQR_planar_surface.png)
 ![Planar / filled_metals](results/plots/LQR_planar_volume.png)
 ![Conformal / Surface impedance](results/plots/LQR_conformal_surface.png)
 
-**Mesh sensitivity is small everywhere** — the 5/2/1 µm curves sit nearly on top of each other in all four plots; the differences that matter are between combinations, not between mesh sizes within one.
+**The mesh size hardly matters.** In all four plots, the 5, 2 and 1 µm curves are almost on top of each other. The big differences are between the combinations, not between mesh sizes.
 
-**Stackup dominates the self-resonant frequency.** The planar stackup's simulated SRF sits at ~10.2 GHz regardless of mesh or conductor model — visibly below the measured 11.07 GHz. The conformal stackup's SRF lands right on top of the measured one (~11.0–11.1 GHz) in both the surface and filled_metals plots. This is the same finding as the `conformal_3D_passivation` balun study: getting the passivation topography right shifts the resonant behavior by an amount mesh refinement can't fix.
+**The stackup sets the self-resonant frequency.** With the planar stackup, the simulated SRF is about 10.2 GHz. This is clearly below the measured 11.07 GHz, and it does not change with mesh or conductor model. With the conformal stackup, the SRF is 11.0–11.1 GHz, right where the measurement is. The balun study showed the same thing: you need the right passivation shape to get the resonance right. A finer mesh does not fix it.
 
-**Conductor model controls the Q level (and, equivalently, R) independent of stackup.** In this frequency range, surface impedance consistently *overestimates* Q / *underestimates* R vs. measurement — visible both as the sim Q curves sitting above the measured one, and the sim R curves sitting below it, in both surface-impedance plots. `filled_metals` pulls both toward (planar) or onto (conformal) the measured curves.
+**The conductor model sets the Q level, and so also R.** In this frequency range, surface impedance gives a Q that is too high and an R that is too low. You can see this in both surface impedance plots. With `filled_metals`, Q and R move closer to the measurement. With the conformal stackup, they are almost on the measured curve.
 
-**IMPORTANT NOTE: The "solve inside" filled metals choice requires to mesh into skin effect, which gets harder at higher frequencies where skin depth decreases much below 1 µm. Do not misunderstand this example - it applies to this frequency range shown here.**  
+**IMPORTANT NOTE: With "solve inside" (filled metals), the mesh has to resolve the skin effect. This gets harder at higher frequencies, where the skin depth becomes much smaller than 1 µm. The results and conclusion in this study are only valid for the frequency range shown.**
 
-**Best combined match: conformal stackup + filled_metals.** In that plot, both L (across the whole band, through resonance) and Q (peak value and shape) track the measured curve closely — visibly the tightest agreement of the four combinations.
+**Best match: conformal stackup + filled_metals.** In this plot, L follows the measurement over the whole band, even through the resonance. Q also matches well in peak value and shape. No other combination comes this close.
 
 ## 4. Accuracy vs. measurement (finest mesh, 1 µm)
 
-At 1/5/9 GHz (all below the measured 11.07 GHz SRF, to avoid the meaningless dB blow-up right at resonance):
+We check L at 0.1, 4 and 8 GHz, and Q at 1, 5 and 9 GHz. All points stay below the measured SRF of 11.07 GHz. Right at the resonance, the error numbers would not mean much. For L, the measured value is interpolated to the exact frequency, because the measured file has no point at exactly 4 GHz.
 
-| Stackup | Conductor model | Freq | L (nH) | L meas (nH) | L err | Q | Q meas | Q err |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| Planar | Surface | 1 GHz | 4.86 | 5.01 | -2.9% | 7.29 | 6.46 | +12.9% |
-| Planar | Surface | 5 GHz | 6.14 | 6.06 | +1.2% | 18.63 | 15.89 | +17.2% |
-| Planar | Surface | 9 GHz | 19.39 | 13.75 | **+41.0%** | 5.80 | 6.93 | -16.4% |
-| Planar | filled_metals | 1 GHz | 4.91 | 5.01 | -1.9% | 6.27 | 6.46 | -2.9% |
-| Planar | filled_metals | 5 GHz | 6.20 | 6.06 | +2.3% | 14.37 | 15.89 | -9.6% |
-| Planar | filled_metals | 9 GHz | 19.52 | 13.75 | **+41.9%** | 4.46 | 6.93 | -35.7% |
-| Conformal | Surface | 1 GHz | 4.86 | 5.01 | -3.0% | 7.29 | 6.46 | +13.0% |
-| Conformal | Surface | 5 GHz | 5.88 | 6.06 | -3.1% | 19.58 | 15.89 | +23.2% |
-| Conformal | Surface | 9 GHz | 13.12 | 13.75 | -4.6% | 9.10 | 6.93 | +31.3% |
-| Conformal | filled_metals | 1 GHz | 4.91 | 5.01 | -2.1% | 6.28 | 6.46 | -2.7% |
-| Conformal | filled_metals | 5 GHz | 5.94 | 6.06 | -2.1% | 15.11 | 15.89 | -4.9% |
-| Conformal | filled_metals | 9 GHz | 13.23 | 13.75 | -3.8% | 7.08 | 6.93 | +2.2% |
+**Inductance L:**
 
-**Average |error| across these 3 points, finest mesh:**
+| Stackup | Conductor model | Freq | L (nH) | L meas (nH) | L err |
+|---|---|---:|---:|---:|---:|
+| Planar | Surface | 0.1 GHz | 4.97 | 4.94 | +0.5% |
+| Planar | Surface | 4 GHz | 5.55 | 5.59 | -0.6% |
+| Planar | Surface | 8 GHz | 11.62 | 9.75 | **+19.1%** |
+| Planar | filled_metals | 0.1 GHz | 4.88 | 4.94 | -1.1% |
+| Planar | filled_metals | 4 GHz | 5.62 | 5.59 | +0.5% |
+| Planar | filled_metals | 8 GHz | 11.74 | 9.75 | **+20.4%** |
+| Conformal | Surface | 0.1 GHz | 4.97 | 4.94 | +0.5% |
+| Conformal | Surface | 4 GHz | 5.42 | 5.59 | -3.1% |
+| Conformal | Surface | 8 GHz | 9.50 | 9.75 | -2.6% |
+| Conformal | filled_metals | 0.1 GHz | 4.88 | 4.94 | -1.1% |
+| Conformal | filled_metals | 4 GHz | 5.48 | 5.59 | -2.0% |
+| Conformal | filled_metals | 8 GHz | 9.58 | 9.75 | -1.8% |
 
-| Combination | avg\|L err\| | avg\|Q err\| |
+**Quality factor Q:**
+
+| Stackup | Conductor model | Freq | Q | Q meas | Q err |
+|---|---|---:|---:|---:|---:|
+| Planar | Surface | 1 GHz | 7.29 | 6.46 | +12.9% |
+| Planar | Surface | 5 GHz | 18.63 | 15.89 | +17.2% |
+| Planar | Surface | 9 GHz | 5.80 | 6.93 | -16.4% |
+| Planar | filled_metals | 1 GHz | 6.27 | 6.46 | -2.9% |
+| Planar | filled_metals | 5 GHz | 14.37 | 15.89 | -9.6% |
+| Planar | filled_metals | 9 GHz | 4.46 | 6.93 | -35.7% |
+| Conformal | Surface | 1 GHz | 7.29 | 6.46 | +13.0% |
+| Conformal | Surface | 5 GHz | 19.58 | 15.89 | +23.2% |
+| Conformal | Surface | 9 GHz | 9.10 | 6.93 | +31.3% |
+| Conformal | filled_metals | 1 GHz | 6.28 | 6.46 | -2.7% |
+| Conformal | filled_metals | 5 GHz | 15.11 | 15.89 | -4.9% |
+| Conformal | filled_metals | 9 GHz | 7.08 | 6.93 | +2.2% |
+
+**Average error over the 3 points, finest mesh:**
+
+| Combination | avg\|L err\| (0.1/4/8 GHz) | avg\|Q err\| (1/5/9 GHz) |
 |---|---:|---:|
-| Planar / Surface | 15.0% | 15.5% |
-| Planar / filled_metals | 15.4% | 16.1% |
-| Conformal / Surface | 3.6% | 22.5% |
-| **Conformal / filled_metals** | **2.6%** | **3.3%** |
+| Planar / Surface | 6.8% | 15.5% |
+| Planar / filled_metals | 7.3% | 16.1% |
+| Conformal / Surface | 2.1% | 22.5% |
+| **Conformal / filled_metals** | **1.6%** | **3.3%** |
 
-Both planar rows are dominated by the 9 GHz point (+41%), a direct consequence of the planar stackup's SRF sitting below 9 GHz's neighborhood while the real device's SRF hasn't been reached yet — not a mesh or conductor-model artifact. Conformal/Surface fixes L (3.6%) but leaves Q badly overestimated (22.5%, sim underestimates loss). Conformal/filled_metals is the only combination accurate on **both** L and Q, by a wide margin.
+With the planar stackup, L is fine at 0.1 and 4 GHz (about 1% error). But at 8 GHz it is about 20% too high. The reason is the low SRF. At 8 GHz the planar model is already getting close to its own resonance, so L rises too early. The real inductor is still further away from its resonance. This is not a mesh or conductor model problem.
 
-Full table (all 3 mesh points): [`results/accuracy_vs_measured_table.csv`](results/accuracy_vs_measured_table.csv).
+With the conformal stackup, the L error stays at 3% or less at all three points.
+
+Conformal with surface impedance gets L right (2.1%), but Q is still much too high (22.5%). The simulation underestimates the loss.
+
+Only conformal with filled_metals gets **both** L and Q right, and by a wide margin.
+
+Full table with all three mesh sizes: [`results/accuracy_vs_measured_table.csv`](results/accuracy_vs_measured_table.csv).
 
 ## 5. Conclusion
 
-- **Stackup choice, not mesh refinement, fixes the resonant-frequency error.** Planar's SRF is ~0.9 GHz low regardless of mesh (5→1 µm barely moves it) or conductor model; switching to the conformal stackup alone closes that gap, matching the same conclusion as the `conformal_3D_passivation` balun study.
-- **Conductor model choice, not mesh refinement, fixes the Q-level error.** For this testcase, surface impedance overestimates Q by 13–31% vs. measurement across both stackups; `filled_metals` corrects this, most completely when paired with the conformal stackup (Q error down to 2–5% at 1/5 GHz, only 2.2% even at 9 GHz).
-- **Recommendation: conformal stackup + `filled_metals`, at 2 µm.** It's the only combination accurate for this example and frequency range on both L and Q (2.6%/3.3% avg error at finest mesh), and mesh sensitivity is small enough that 2 µm (31m 40s, 20.89 GB) already tracks the 1 µm result (1h 5m 44s, 42.09 GB) closely — going finer than 2 µm buys little here. Against the cheapest corner (planar/surface/5µm: 8m 26s, 5.57 GB), that's roughly **4x the runtime and RAM for a combination that's actually validated against measurement**, rather than one that's merely cheap.
-- **If only one axis can be changed:** stackup accuracy (SRF) matters more for L, conductor-model accuracy (loss) matters more for Q — but conformal+filled_metals is needed to fix both at once; conformal+surface alone still leaves Q off by >20%.
+- **The stackup fixes the resonance, not the mesh.** With the planar stackup, the SRF is about 0.9 GHz too low. Going from 5 µm to 1 µm mesh barely changes this, and neither does the conductor model. The conformal stackup alone closes the gap. The balun study came to the same result.
+- **The conductor model fixes Q, not the mesh.** For this inductor, surface impedance gives a Q that is 13–31% too high, with both stackups. `filled_metals` fixes this. It works best together with the conformal stackup. Then the Q error is 2–5% at 1 and 5 GHz, and only 2.2% at 9 GHz.
+- **Recommendation: conformal stackup + `filled_metals` at 2 µm.** This is the only combination that gets both L and Q right for this example and frequency range (1.6% L error and 3.3% Q error on average at 1 µm). The 2 µm result (31m 40s, 20.89 GB) is already very close to the 1 µm result (1h 5m 44s, 42.09 GB), so a finer mesh brings little. Compared to the cheapest run (planar, surface, 5 µm: 8m 26s, 5.57 GB), it costs about **4x more time and RAM. But unlike the cheap run, it actually matches the measurement.**
+- **If you can only change one thing:** The stackup matters more for L, because it sets the SRF. The conductor model matters more for Q, because it sets the loss. To get both right, you need conformal and filled_metals together. Conformal with surface impedance still has a Q error above 20%.
 
-**IMPORTANT NOTE: The "solve inside" filled metals choice requires to mesh into skin effect, which gets harder at higher frequencies where skin depth decreases much below 1 µm. Do not misunderstand this example - it applies to this frequency range shown here.**  
+**IMPORTANT NOTE: With "solve inside" (filled metals), the mesh has to resolve the skin effect. This gets harder at higher frequencies, where the skin depth becomes much smaller than 1 µm. The results here are only valid for the frequency range shown.**
 
-## 6. "Passicut" workaround: cheap approximation of the conformal stackup
+## 6. "Passicut": a cheaper way to model the passivation
 
-§3–5 found that the conformal-passivation stackup is what fixes the SRF match, but its explicit 3D sidewall geometry (`SiO2_above`/`SiO2_sides` derived layers, oversize+NOT boolean around TopMetal2) is the most expensive corner of the whole study (2.86M DOF, 1h 5m 44s, 42.09 GB at 1 µm). Since mesh refinement itself wasn't the limiting factor for *this* inductor's geometry (5.5 µm gap, 8 µm trace — coarse enough that 5 µm cells still resolve it), a cheaper workaround was tried instead: **`SG13G2_200um_passicut.xml`**.
+Sections 3–5 showed that the conformal stackup gives the right SRF. But it is also the most expensive option in this study: 2.86M DOF, 1h 5m 44s and 42.09 GB at 1 µm. The cost comes from the extra 3D SiO2 shapes on the sides and top of TopMetal2 (`SiO2_above` and `SiO2_sides`, made with an oversize and NOT operation on TopMetal2).
 
-Rather than deriving separate 3D sidewall/cap geometry, this stackup just shortens the SiO2 dielectric block by TopMetal2's own thickness using reference-relative positioning (`Thickness="=15.7303-3"`) so AIR (with a thin 0.4 µm Passivation liner in the "valleys" between traces) takes over beside and above the metal, instead of solid SiO2 fully embedding it as in the plain planar stackup. No derived-layer booleans, no extra mesh-refinement geometry — SiO2 simply stops partway up TopMetal2's sides instead of wrapping it. `filled_metals` was kept (§3–5 showed conductor model, not stackup, controls the Q/R match), and only 5/2 µm mesh was tried (no 1 µm — unnecessary per the point above).
+For this inductor, the mesh size was not the limiting factor. The gap is 5.5 µm and the traces are 8 µm wide, so a 5 µm mesh is still fine. So we tried a cheaper approach with a new stackup: **`SG13G2_200um_passicut.xml`**.
+
+This stackup does not add any extra 3D shapes. Instead, it makes the SiO2 layer thinner by the thickness of TopMetal2. Now SiO2 reaches 1.5 µm above the bottom of TopMetal2, with 0.4 µm Passivation on top. This matches the real stackup in the "valleys" between the TopMetal2 traces. We leave out the conformal coating completely.
+
+The idea: the dielectric between the TopMetal2 traces is now mostly correct. What is still missing is the 0.4 µm dielectric on the sides and the coating on top of the traces. But the dielectric between the sidewalls is now much more realistic than in the planar stackup, where TopMetal2 is fully buried in a solid block of SiO2.
+
+This needs no derived layers and no extra mesh refinement. SiO2 just stops partway up the sides of TopMetal2. We kept `filled_metals`, because sections 3–5 showed that it controls Q and R. We only ran 5 µm and 2 µm mesh. 1 µm was not needed, as explained above.
 
 ### Cost
 
@@ -120,59 +176,64 @@ Rather than deriving separate 3D sidewall/cap geometry, this stackup just shorte
 | *(for reference)* Conformal + filled_metals | 1 µm | 2,861,190 | 451,199 | 1h 5m 44s | 42.09 GB |
 | *(for reference)* Planar + filled_metals | 1 µm | 2,410,314 | 379,819 | 45m 40s | 35.86 GB |
 
-Passicut at 5 µm is **~7x faster and ~6.6x less RAM** than the conformal 1 µm result it's compared against below — even cheaper than the plain planar stackup at any mesh in §2.
+Passicut at 5 µm is **about 7x faster and needs about 6.6x less RAM** than conformal at 1 µm.
 
 ### Accuracy vs. measurement
 
 ![Passicut workaround vs. previous best/cheapest](results/plots/LQR_passicut_comparison.png)
 
-The passicut curves (5 µm and 2 µm) sit almost on top of the expensive conformal 1 µm curve across L, Q, and R — and clearly separated from the planar baseline's SRF mismatch:
+The passicut curves at 5 µm and 2 µm are almost on top of the conformal 1 µm curve, for L, Q and R. They are clearly better than the planar stackup, which has the wrong SRF.
 
-| Variant | avg\|L err\| | avg\|Q err\| |
+| Variant | avg\|L err\| (0.1/4/8 GHz) | avg\|Q err\| (1/5/9 GHz) |
 |---|---:|---:|
-| Conformal + filled_metals, 1 µm *(reference, §3–4)* | 2.6% | 3.3% |
-| Planar + filled_metals, 1 µm *(reference, §3–4)* | 15.4% | 16.1% |
-| **Passicut + filled_metals, 5 µm** | **2.0%** | **6.8%** |
-| **Passicut + filled_metals, 2 µm** | **4.3%** | **4.6%** |
+| Conformal + filled_metals, 1 µm *(reference, sections 3–4)* | 1.6% | 3.3% |
+| Planar + filled_metals, 1 µm *(reference, sections 3–4)* | 7.3% | 16.1% |
+| **Passicut + filled_metals, 5 µm** | **1.4%** | **6.8%** |
+| **Passicut + filled_metals, 2 µm** | **2.6%** | **4.6%** |
 
-Passicut's L accuracy at 5 µm (2.0%) is even slightly better than the expensive conformal 1 µm result; its Q accuracy (6.8%) is between conformal and planar but still far closer to conformal than to planar. Passicut at 2 µm brings Q accuracy to 4.6%, essentially matching conformal's 3.3%.
+At 5 µm, passicut gets L even a bit more accurate than conformal at 1 µm (1.4% vs. 1.6%). At 2 µm the L error is 2.6%, mostly from 8 GHz (-4.4%). Both are much better than planar, which is 20% off at 8 GHz.
 
-Full table: [`results/passicut_accuracy_table.csv`](results/passicut_accuracy_table.csv), [`results/passicut_cost_table.csv`](results/passicut_cost_table.csv).
+The Q error of passicut at 5 µm (6.8%) is higher than for conformal, but much lower than for planar. At 2 µm, the Q error drops to 4.6%, which is close to the 3.3% of conformal.
 
-**This workaround gets most of the conformal stackup's accuracy benefit at a small fraction of its cost** — a 1D reference-relative stackup edit standing in for expensive derived 3D sidewall geometry. For routine use on inductor geometries where mesh isn't the limiting factor (as established here), passicut + filled_metals at 5 µm is the practical recommendation over the full conformal treatment.
+Full tables: [`results/passicut_accuracy_table.csv`](results/passicut_accuracy_table.csv), [`results/passicut_cost_table.csv`](results/passicut_cost_table.csv).
+
+**Passicut gives most of the accuracy of the conformal stackup at a small part of the cost.** It is a simple change to the stackup file, with no extra 3D shapes. For inductors where the mesh size is not the limiting factor, like this one, we recommend passicut + filled_metals at 5 µm instead of the full conformal stackup.
 
 ## 7. Where everything lives
 
-The §6 passicut runs' *source* files (model scripts, `SG13G2_200um_passicut.xml`, mesh/config, raw solver output) live in a separate location, `test_data/filled_metals_inductor_L6n2/` (not under this study's own directory) — only their de-embedded results and derived plots/tables were copied in here:
+The source files for the passicut runs in section 6 are in a different folder, `test_data/filled_metals_inductor_L6n2/`. This includes the model scripts, `SG13G2_200um_passicut.xml`, the mesh and config files, and the raw solver output. Only the de-embedded results and the plots and tables were copied into this study folder.
 
 ```
 test_data/filled_metals_inductor_L6n2/
 ├── L6n2_with_ports.gds                          # same layout as the main study
-├── SG13G2_200um_passicut.xml                     # §6 passicut stackup (input)
-├── palace_L6n2_passicut_volume_5um.py, _2um.py   # §6 model scripts
-└── palace_model/                                 # §6 raw solver output (not committed)
+├── SG13G2_200um_passicut.xml                     # section 6 passicut stackup (input)
+├── palace_L6n2_passicut_volume_5um.py, _2um.py   # section 6 model scripts
+└── palace_model/                                 # section 6 raw solver output (not committed)
 
 more_examples/filled_metals_option/filled_metals_inductor_L6n2/
 ├── README.md                                    # this report
 ├── L6n2_with_ports.gds                          # layout (input)
 ├── SG13G2_200um.xml                              # planar stackup (input)
 ├── SG13G2_200um_3D_passivation.xml               # conformal stackup (input)
-├── meas_L5_6n2_THRU_deemb.S2P                    # measurement reference (input)
-├── palace_L6n2_<stackup>_<model>_<mesh>um.py     # 12 model scripts (§1-5)
-├── palace_model/                                 # raw solver output (mesh/config/paraview, not committed)
+├── meas_L5_6n2_THRU_deemb.S2P                    # measurement (input)
+├── palace_L6n2_<stackup>_<model>_<mesh>um.py     # 12 model scripts (sections 1-5)
+├── palace_model/                                 # raw solver output (not committed)
 └── results/
-    ├── analyze_comparison.py                     # regenerates every §1-5 plot/table
-    ├── analyze_passicut.py                        # regenerates §6's plot/tables (reads test_data/.../palace_model/ + results/snp/)
-    ├── cost_table.csv                            # §2
-    ├── passicut_cost_table.csv                    # §6
-    ├── passicut_accuracy_table.csv                # §6
-    ├── accuracy_vs_measured_table.csv             # §4, all 3 mesh points
-    ├── snp/                                      # de-embedded Touchstone files, one per combination x mesh, + measured.s2p + passicut_volume_{5,2}um.s2p
+    ├── analyze_comparison.py                     # makes the plots and tables for sections 1-5
+    ├── analyze_passicut.py                        # makes the plot and tables for section 6
+    ├── cost_table.csv                            # section 2
+    ├── accuracy_vs_measured_table.csv             # section 4, all 3 mesh sizes
+    ├── passicut_cost_table.csv                    # section 6
+    ├── passicut_accuracy_table.csv                # section 6
+    ├── snp/                                      # de-embedded Touchstone files for all runs, plus measured.s2p
     └── plots/
-          layout_labeled.png                       # §0
+          layout_labeled.png                       # section 0
           LQR_conformal_volume.png, LQR_planar_surface.png
           LQR_planar_volume.png, LQR_conformal_surface.png
-          LQR_passicut_comparison.png               # §6
+          LQR_passicut_comparison.png               # section 6
 ```
 
-Regenerate §1-5's tables/plots with `python results/analyze_comparison.py`, and §6's with `python results/analyze_passicut.py` (from `d:\venv\palace`), any time the archived `.snp` files change or the §6 source data under `test_data/filled_metals_inductor_L6n2/` is re-run — `analyze_comparison.py` re-derives its cost table from `palace_model/` via `scripts/palace_summary.py` and its L/Q/accuracy tables from `results/snp/`; `analyze_passicut.py` does the same but reads `test_data/.../palace_model/` for cost and reuses `conformal_volume_1um.s2p`/`planar_volume_1um.s2p` already in `results/snp/` as its reference points.
+To remake the plots and tables, run these from the `d:\venv\palace` environment:
+
+- `python results/analyze_comparison.py` for sections 1–5. It reads the cost data from `palace_model/` (using `scripts/palace_summary.py`) and the S-parameters from `results/snp/`.
+- `python results/analyze_passicut.py` for section 6. It reads the cost data from `test_data/filled_metals_inductor_L6n2/palace_model/`. For comparison, it uses `conformal_volume_1um.s2p` and `planar_volume_1um.s2p`, which are already in `results/snp/`.

@@ -3,10 +3,10 @@
 inductor: instead of deriving explicit 3D conformal SiO2-sidewall geometry
 (the conformal_volume combination in analyze_comparison.py, expensive: 2.86M
 DOF / 42 GB / 1h6m at 1 um), the SiO2 dielectric block is simply shortened by
-TopMetal2's own thickness (reference-relative positioning,
-Thickness="=15.7303-3") so AIR/a thin Passivation liner take over beside and
-above the metal instead of solid SiO2 - a 1D stackup change, no derived-layer
-booleans, no extra mesh-refinement geometry. filled_metals kept throughout
+TopMetal2's own thickness (Thickness="=15.7303-3"), so SiO2 now ends 1.5 um
+above the bottom of TopMetal2 with the 0.4 um Passivation on top - correct in
+the "valleys" between traces, no conformal coating on the metal itself. A 1D
+stackup change, no derived-layer booleans, no extra mesh-refinement geometry. filled_metals kept throughout
 (surface impedance not tried here - see analyze_comparison.py's finding that
 conductor model, not stackup, controls the Q/R match).
 
@@ -49,7 +49,8 @@ SERIES = [
 
 PLOT_XLIM_GHZ = (0, 14)
 R_YLIM_MAX_OHM = 12
-EVAL_FREQS_GHZ = [1.0, 5.0, 9.0]
+L_EVAL_FREQS_GHZ = [0.1, 4.0, 8.0]  # stays clear of the SRF region (measured SRF ~11.07 GHz)
+Q_EVAL_FREQS_GHZ = [1.0, 5.0, 9.0]
 
 
 def load(fname):
@@ -164,28 +165,28 @@ def main():
     print(f"Wrote cost table: {cost_csv}")
 
     # ---------------- accuracy vs. measurement table ----------------
+    # L at L_EVAL_FREQS_GHZ (interpolated - the measured file is log-spaced),
+    # Q at Q_EVAL_FREQS_GHZ, one row per quantity/frequency.
     acc_csv = os.path.join(HERE, "passicut_accuracy_table.csv")
+    fmt = lambda x, nd=4: f"{x:.{nd}f}" if x is not None else "n/a"
     with open(acc_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["Variant", "Freq (GHz)", "L (nH)", "L meas (nH)", "L err (%)",
-                          "Q", "Q meas", "Q err (%)"])
+        writer.writerow(["Variant", "Quantity", "Freq (GHz)", "Sim", "Meas", "Err (%)"])
         mfreq, mL, mQ, _ = networks["measured"]
         for key, label, *_ in SERIES:
             if key == "measured" or key not in networks:
                 continue
             freq, L, Q, R = networks[key]
-            for g in EVAL_FREQS_GHZ:
-                L_val = value_at_freq(freq, L, g * 1e9)
+            for g in L_EVAL_FREQS_GHZ:
+                L_val = float(np.interp(g * 1e9, freq, L))
+                L_meas = float(np.interp(g * 1e9, mfreq, mL))
+                L_err = 100.0 * (L_val - L_meas) / L_meas
+                writer.writerow([label, "L (nH)", f"{g:g}", fmt(L_val * 1e9), fmt(L_meas * 1e9), fmt(L_err, 2)])
+            for g in Q_EVAL_FREQS_GHZ:
                 Q_val = value_at_freq(freq, Q, g * 1e9)
-                L_meas = value_at_freq(mfreq, mL, g * 1e9)
                 Q_meas = value_at_freq(mfreq, mQ, g * 1e9)
-                L_err = 100.0 * (L_val - L_meas) / L_meas if (L_val is not None and L_meas) else None
                 Q_err = 100.0 * (Q_val - Q_meas) / Q_meas if (Q_val is not None and Q_meas) else None
-                fmt = lambda x, nd=4: f"{x:.{nd}f}" if x is not None else "n/a"
-                writer.writerow([label, f"{g:.1f}",
-                                  fmt(L_val * 1e9 if L_val is not None else None),
-                                  fmt(L_meas * 1e9 if L_meas is not None else None), fmt(L_err, 2),
-                                  fmt(Q_val), fmt(Q_meas), fmt(Q_err, 2)])
+                writer.writerow([label, "Q", f"{g:g}", fmt(Q_val), fmt(Q_meas), fmt(Q_err, 2)])
     print(f"Wrote accuracy table: {acc_csv}")
 
 

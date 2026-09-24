@@ -15,8 +15,8 @@ has its y-axis clipped to R_YLIM_MAX_OHM (12 Ohm) to keep the low-frequency
 loss values visible instead of being dwarfed by the near-SRF blowup.
 
 Also writes a cost table (DOF/mesh elements/solve time/peak RAM, from
-palace_summary.py's own parsing) and an accuracy table (L/Q percent error vs.
-measurement at 1/5/9 GHz - all below the measured SRF ~11.07 GHz).
+palace_summary.py's own parsing) and an accuracy table (percent error vs.
+measurement: L at 0.1/4/8 GHz, clear of the SRF region; Q at 1/5/9 GHz).
 """
 import csv
 import math
@@ -48,7 +48,8 @@ MEAS_COLOR = "#333333"
 PLOT_XLIM_GHZ = (0, 14)
 R_YLIM_MAX_OHM = 12
 
-EVAL_FREQS_GHZ = [1.0, 5.0, 9.0]  # all below measured SRF ~11.07 GHz
+L_EVAL_FREQS_GHZ = [0.1, 4.0, 8.0]  # stays clear of the SRF region (measured SRF ~11.07 GHz)
+Q_EVAL_FREQS_GHZ = [1.0, 5.0, 9.0]
 
 
 def load(path):
@@ -74,6 +75,10 @@ def value_at_freq(freq, values, freq_hz, tol_hz=0.3e9):
     if abs(freq[idx] - freq_hz) > tol_hz:
         return None
     return float(values[idx])
+
+
+def value_interp(freq, values, freq_hz):
+    return float(np.interp(freq_hz, freq, values))
 
 
 def find_srf_hz(freq, L):
@@ -200,31 +205,33 @@ def main():
     print(f"Wrote cost table: {cost_csv}")
 
     # ---------------- accuracy vs. measurement table ----------------
+    # L at L_EVAL_FREQS_GHZ, Q at Q_EVAL_FREQS_GHZ - one row per quantity/frequency.
+    # L uses linear interpolation onto the exact frequency, because the measured
+    # file is log-spaced (e.g. its nearest point to 4 GHz is 4.035 GHz).
     acc_csv = os.path.join(HERE, "accuracy_vs_measured_table.csv")
+    fmt = lambda x, nd=4: f"{x:.{nd}f}" if x is not None else "n/a"
     with open(acc_csv, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Stackup", "Conductor model", "Mesh", "Freq (GHz)",
-                          "L (nH)", "L meas (nH)", "L err (%)",
-                          "Q", "Q meas", "Q err (%)"])
+        writer.writerow(["Stackup", "Conductor model", "Mesh", "Quantity", "Freq (GHz)",
+                          "Sim", "Meas", "Err (%)"])
         for stackup_key, stackup_label in STACKUPS:
             for model_key, model_label in MODELS:
                 for mesh, mesh_label in MESHES:
                     key = f"{stackup_key}_{model_key}_{mesh}um"
-                    if key not in all_series:
+                    if key not in all_series or not meas_data:
                         continue
                     freq, L, Q, R = all_series[key]
-                    for g in EVAL_FREQS_GHZ:
-                        L_val = value_at_freq(freq, L, g * 1e9)
+                    for g in L_EVAL_FREQS_GHZ:
+                        L_val = value_interp(freq, L, g * 1e9)
+                        L_meas = value_interp(meas_data[0], meas_data[1], g * 1e9)
+                        L_err = 100.0 * (L_val - L_meas) / L_meas
+                        writer.writerow([stackup_label, model_label, mesh_label, "L (nH)", f"{g:g}",
+                                          fmt(L_val * 1e9), fmt(L_meas * 1e9), fmt(L_err, 2)])
+                    for g in Q_EVAL_FREQS_GHZ:
                         Q_val = value_at_freq(freq, Q, g * 1e9)
-                        L_meas = value_at_freq(meas_data[0], meas_data[1], g * 1e9) if meas_data else None
-                        Q_meas = value_at_freq(meas_data[0], meas_data[2], g * 1e9) if meas_data else None
-                        L_err = 100.0 * (L_val - L_meas) / L_meas if (L_val is not None and L_meas) else None
+                        Q_meas = value_at_freq(meas_data[0], meas_data[2], g * 1e9)
                         Q_err = 100.0 * (Q_val - Q_meas) / Q_meas if (Q_val is not None and Q_meas) else None
-                        fmt = lambda x, nd=4: f"{x:.{nd}f}" if x is not None else "n/a"
-                        writer.writerow([stackup_label, model_label, mesh_label, f"{g:.1f}",
-                                          fmt(L_val * 1e9 if L_val is not None else None),
-                                          fmt(L_meas * 1e9 if L_meas is not None else None),
-                                          fmt(L_err, 2),
+                        writer.writerow([stackup_label, model_label, mesh_label, "Q", f"{g:g}",
                                           fmt(Q_val), fmt(Q_meas), fmt(Q_err, 2)])
     print(f"Wrote accuracy table: {acc_csv}")
 
