@@ -36,8 +36,9 @@ import matplotlib.pyplot as plt
 HERE = os.path.dirname(os.path.abspath(__file__))
 SNP_DIR = os.path.join(HERE, "snp")
 PLOT_DIR = os.path.join(HERE, "plots")
-PALACE_SUMMARY = r"D:\github-claude\gds2palace_ihp_sg13g2\scripts\palace_summary.py"
-PASSICUT_PALACE_MODEL_DIR = r"D:\github-claude\gds2palace_ihp_sg13g2\test_data\filled_metals_inductor_L6n2\palace_model"
+REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+PALACE_SUMMARY = os.path.join(REPO_ROOT, "scripts", "palace_summary.py")
+PASSICUT_PALACE_MODEL_DIR = os.path.join(REPO_ROOT, "test_data", "filled_metals_inductor_L6n2", "palace_model")
 
 SERIES = [
     ("measured", "Measured", None, "#333333", "-", 2.2),

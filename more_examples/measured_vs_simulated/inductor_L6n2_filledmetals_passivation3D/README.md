@@ -1,6 +1,6 @@
 # Stackup and Conductor Model Study: L6n2 Inductor vs. Measurement (IHP SG13G2)
 
-This study evaluates the benefit of two error sources:
+This study evaluates possible improvement regarding two error sources:
 
 ## Conductors modeled as filled volumes ("Mesh inside") 
 In the User's Guide, there is a detailed analysis on the limitations of the "surface impedance sheet" loss model that gds2palace uses for modelling conductor layers. Here, we investigate the benefit of using a volume mesh ("solve inside") with conductivity for such cases. Be aware that this is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. Both loss models have their use cases.
@@ -39,7 +39,7 @@ We varied three things and kept everything else the same. This gives 2 × 2 × 3
 | Conductor model | Surface impedance (the default, metal is hollow) or `filled_metals=True` (metal is a solid volume, like "solve inside" in HFSS) |
 | Mesh | `refined_cellsize` = 5, 2 or 1 µm |
 
-The model files are named `palace_L6n2_<stackup>_<model>_<mesh>um.py`. For the differential values we use `Zdiff = Z11 - Z12 - Z21 + Z22`. From that we get `Ldiff = Im(Zdiff)/ω` and `Qdiff = Im(Zdiff)/Re(Zdiff)`. This is the same method as in `filled_metals_inductor_L2n0` and `mesh_convergence_inductor`.
+The model files are named `palace_L6n2_<stackup>_<model>_<mesh>um.py`. For the differential values we use `Zdiff = Z11 - Z12 - Z21 + Z22`. From that we get `Ldiff = Im(Zdiff)/ω` and `Qdiff = Im(Zdiff)/Re(Zdiff)`. This is the same method as in the [inductor mesh convergence study](../../mesh_convergence/mesh_convergence_inductor/README.md).
 
 ## 2. Simulation cost
 
@@ -210,7 +210,7 @@ test_data/filled_metals_inductor_L6n2/
 ├── palace_L6n2_passicut_volume_5um.py, _2um.py   # section 6 model scripts
 └── palace_model/                                 # section 6 raw solver output (not committed)
 
-more_examples/filled_metals_option/filled_metals_inductor_L6n2/
+more_examples/measured_vs_simulated/inductor_L6n2_filledmetals_passivation3D/
 ├── README.md                                    # this report
 ├── L6n2_with_ports.gds                          # layout (input)
 ├── SG13G2_200um.xml                              # planar stackup (input)

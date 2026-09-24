@@ -6,8 +6,7 @@ de-embedded).
 
 Reads de-embedded 2-port Touchstone files from results/snp/, computes
 differential L/Q/Rseries (Zdiff = Z11-Z12-Z21+Z22, same convention as
-filled_metals_inductor_L2n0/results/analyze_comparison.py and
-mesh_convergence_inductor/results/plot_inductor_convergence.py), and renders
+more_examples/mesh_convergence/mesh_convergence_inductor/results/plot_inductor_convergence.py), and renders
 one 3-panel (L/Q/R, top to bottom) plot per stackup x conductor-model
 combination, each overlaying its 3 mesh sizes plus the measured curve. L/Q
 span the full PLOT_XLIM_GHZ (0-14 GHz) x-range; R shares that x-range but
@@ -36,7 +35,8 @@ SNP_DIR = os.path.join(HERE, "snp")
 PLOT_DIR = os.path.join(HERE, "plots")
 STUDY_DIR = os.path.dirname(HERE)
 PALACE_MODEL_DIR = os.path.join(STUDY_DIR, "palace_model")
-PALACE_SUMMARY = r"D:\github-claude\gds2palace_ihp_sg13g2\scripts\palace_summary.py"
+REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+PALACE_SUMMARY = os.path.join(REPO_ROOT, "scripts", "palace_summary.py")
 
 STACKUPS = [("planar", "Planar (flat SiO2+Passivation)"), ("conformal", "Conformal 3D-passivation")]
 MODELS = [("surface", "Surface impedance"), ("volume", "filled_metals (volume)")]
