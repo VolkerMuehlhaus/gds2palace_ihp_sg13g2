@@ -45,20 +45,20 @@ The conformal stackup costs more than planar at every matched mesh/model point (
 
 Full table: [`results/cost_table.csv`](results/cost_table.csv).
 
-## 3. Differential L / Q vs. measurement
+## 3. Differential L / Q / R vs. measurement
 
-One plot per stackup × conductor-model combination, each overlaying all 3 mesh sizes against the measured curve (0–14 GHz). Conformal + filled_metals (the best-matching combination, see below) first:
+One 3-panel plot (L, Q, series R top to bottom) per stackup × conductor-model combination, each overlaying all 3 mesh sizes against the measured curve. L and Q span the full 0–14 GHz sweep; R shares that x-range but its y-axis is clipped to 0–12 Ω to keep the low-frequency loss values legible instead of being dwarfed by the hundreds-of-Ω swing right at/after the ~11 GHz SRF. Conformal + filled_metals (the best-matching combination, see below) first:
 
-![Conformal / filled_metals](results/plots/LQ_conformal_volume.png)
-![Planar / Surface impedance](results/plots/LQ_planar_surface.png)
-![Planar / filled_metals](results/plots/LQ_planar_volume.png)
-![Conformal / Surface impedance](results/plots/LQ_conformal_surface.png)
+![Conformal / filled_metals](results/plots/LQR_conformal_volume.png)
+![Planar / Surface impedance](results/plots/LQR_planar_surface.png)
+![Planar / filled_metals](results/plots/LQR_planar_volume.png)
+![Conformal / Surface impedance](results/plots/LQR_conformal_surface.png)
 
 **Mesh sensitivity is small everywhere** — the 5/2/1 µm curves sit nearly on top of each other in all four plots; the differences that matter are between combinations, not between mesh sizes within one.
 
 **Stackup dominates the self-resonant frequency.** The planar stackup's simulated SRF sits at ~10.2 GHz regardless of mesh or conductor model — visibly below the measured 11.07 GHz. The conformal stackup's SRF lands right on top of the measured one (~11.0–11.1 GHz) in both the surface and filled_metals plots. This is the same finding as the `conformal_3D_passivation` balun study: getting the passivation topography right shifts the resonant behavior by an amount mesh refinement can't fix.
 
-**Conductor model controls the Q level, independent of stackup.** In this frequency range, surface impedance consistently *overestimates* Q (underestimates loss) vs. measurement — visible as the sim curves sitting above the measured Q curve in both surface-impedance plots. `filled_metals` pulls Q down toward (planar) or onto (conformal) the measured curve.
+**Conductor model controls the Q level (and, equivalently, R) independent of stackup.** In this frequency range, surface impedance consistently *overestimates* Q / *underestimates* R vs. measurement — visible both as the sim Q curves sitting above the measured one, and the sim R curves sitting below it, in both surface-impedance plots. `filled_metals` pulls both toward (planar) or onto (conformal) the measured curves.
 
 **IMPORTANT NOTE: The "solve inside" filled metals choice requires to mesh into skin effect, which gets harder at higher frequencies where skin depth decreases much below 1 µm. Do not misunderstand this example - it applies to this frequency range shown here.**  
 
@@ -122,8 +122,9 @@ more_examples/filled_metals_option/filled_metals_inductor_L6n2/
     ├── accuracy_vs_measured_table.csv             # §4, all 3 mesh points
     ├── snp/                                      # de-embedded Touchstone files, one per combination x mesh, + measured.s2p
     └── plots/
-          LQ_planar_surface.png, LQ_planar_volume.png
-          LQ_conformal_surface.png, LQ_conformal_volume.png
+          layout_labeled.png                       # §0
+          LQR_conformal_volume.png, LQR_planar_surface.png
+          LQR_planar_volume.png, LQR_conformal_surface.png
 ```
 
 Regenerate all tables/plots with `python results/analyze_comparison.py` (from `d:\venv\palace`) any time the archived `.snp` files change — it re-derives the cost table from `palace_model/` via `scripts/palace_summary.py` and the L/Q/accuracy tables from `results/snp/`.

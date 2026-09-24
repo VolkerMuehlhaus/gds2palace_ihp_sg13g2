@@ -8,8 +8,11 @@ Reads de-embedded 2-port Touchstone files from results/snp/, computes
 differential L/Q/Rseries (Zdiff = Z11-Z12-Z21+Z22, same convention as
 filled_metals_inductor_L2n0/results/analyze_comparison.py and
 mesh_convergence_inductor/results/plot_inductor_convergence.py), and renders
-one 2-panel (L on top, Q on bottom) plot per stackup x conductor-model
-combination, each overlaying its 3 mesh sizes plus the measured curve.
+one 3-panel (L/Q/R, top to bottom) plot per stackup x conductor-model
+combination, each overlaying its 3 mesh sizes plus the measured curve. L/Q
+span the full PLOT_XLIM_GHZ (0-14 GHz) x-range; R shares that x-range but
+has its y-axis clipped to R_YLIM_MAX_OHM (12 Ohm) to keep the low-frequency
+loss values visible instead of being dwarfed by the near-SRF blowup.
 
 Also writes a cost table (DOF/mesh elements/solve time/peak RAM, from
 palace_summary.py's own parsing) and an accuracy table (L/Q percent error vs.
@@ -42,6 +45,8 @@ MESHES = [(5, "5 um"), (2, "2 um"), (1, "1 um")]
 COLORS = {5: "#55a868", 2: "#dd8452", 1: "#c44e52"}
 STYLES = {5: ":", 2: "--", 1: "-"}
 MEAS_COLOR = "#333333"
+PLOT_XLIM_GHZ = (0, 14)
+R_YLIM_MAX_OHM = 12
 
 EVAL_FREQS_GHZ = [1.0, 5.0, 9.0]  # all below measured SRF ~11.07 GHz
 
@@ -122,17 +127,23 @@ def main():
 
     cost = parse_cost_table()
 
-    # ---------------- per-combination L/Q plots ----------------
+    # ---------------- per-combination L/Q/R plots ----------------
+    # L and Q share the full 0-14 GHz sweep range. R uses the same x-range
+    # (all three panels share one x-axis) but a clipped y-axis (0-12 Ohm) -
+    # near/past the ~11 GHz measured SRF, series R swings into the hundreds
+    # of Ohms, which would otherwise dominate the axis and hide the much
+    # smaller, more physically meaningful low-frequency loss values.
     all_series = {}  # key -> (freq, L, Q, R)
     for stackup_key, stackup_label in STACKUPS:
         for model_key, model_label in MODELS:
             combo_key = f"{stackup_key}_{model_key}"
-            fig, (ax_l, ax_q) = plt.subplots(2, 1, figsize=(7.5, 8), sharex=True)
+            fig, (ax_l, ax_q, ax_r) = plt.subplots(3, 1, figsize=(7.5, 11), sharex=True)
 
             if meas_data:
-                mfreq, mL, mQ, _ = meas_data
+                mfreq, mL, mQ, mR = meas_data
                 ax_l.plot(mfreq / 1e9, mL * 1e9, color=MEAS_COLOR, linestyle="-", linewidth=2.2, label="Measured")
                 ax_q.plot(mfreq / 1e9, mQ, color=MEAS_COLOR, linestyle="-", linewidth=2.2, label="Measured")
+                ax_r.plot(mfreq / 1e9, mR, color=MEAS_COLOR, linestyle="-", linewidth=2.2, label="Measured")
 
             for mesh, mesh_label in MESHES:
                 key = f"{stackup_key}_{model_key}_{mesh}um"
@@ -146,21 +157,29 @@ def main():
                 label = f"Sim, {mesh_label}"
                 ax_l.plot(freq_ghz, L * 1e9, color=COLORS[mesh], linestyle=STYLES[mesh], label=label)
                 ax_q.plot(freq_ghz, Q, color=COLORS[mesh], linestyle=STYLES[mesh], label=label)
+                ax_r.plot(freq_ghz, R, color=COLORS[mesh], linestyle=STYLES[mesh], label=label)
 
             ax_l.set_ylabel("Diff. inductance L (nH)")
             ax_l.set_title(f"L6n2: {stackup_label} / {model_label}")
             ax_l.grid(True, alpha=0.3)
             ax_l.legend(fontsize=8)
-            ax_l.set_xlim(0, 14)
+            ax_l.set_xlim(*PLOT_XLIM_GHZ)
 
             ax_q.set_ylabel("Diff. Q factor")
-            ax_q.set_xlabel("Frequency (GHz)")
             ax_q.grid(True, alpha=0.3)
-            ax_q.set_xlim(0, 14)
+            ax_q.legend(fontsize=8)
+            ax_q.set_xlim(*PLOT_XLIM_GHZ)
             ax_q.set_ylim(bottom=0)
 
+            ax_r.set_ylabel("Diff. series resistance R (Ohm)")
+            ax_r.set_xlabel("Frequency (GHz)")
+            ax_r.legend(fontsize=8)
+            ax_r.grid(True, alpha=0.3)
+            ax_r.set_xlim(*PLOT_XLIM_GHZ)
+            ax_r.set_ylim(0, R_YLIM_MAX_OHM)
+
             fig.tight_layout()
-            out_path = os.path.join(PLOT_DIR, f"LQ_{combo_key}.png")
+            out_path = os.path.join(PLOT_DIR, f"LQR_{combo_key}.png")
             fig.savefig(out_path, dpi=150)
             plt.close(fig)
             print(f"Wrote plot: {out_path}")
