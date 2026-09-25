@@ -193,10 +193,14 @@ Reasonable defaults, confirmed against the existing studies:
 - **Via-array merging**, if the layout has dense via arrays (e.g. under a
   MIM capacitor): `settings['merge_polygon_size']` controls how close
   polygons need to be before gds2palace merges them into one. Too small
-  and each individual via becomes its own tiny mesh feature (expensive,
-  no accuracy benefit); too large and it can accidentally merge two
-  physically separate via arrays into one. Measure the actual via pitch
-  and the minimum gap between separate arrays first (same KLayout
+  and each individual via becomes its own tiny mesh feature (expensive);
+  too large and it can accidentally merge two physically separate via
+  arrays into one. Merging also fills the gaps between vias with via
+  material, so a merged array gets more via conductivity than the real
+  array, unless `settings['fill_factor_correction'] = True` scales it
+  back by the fill factor (original via area / merged area). Measure
+  the actual via pitch and the minimum gap between separate arrays
+  first (same KLayout
   `Region#sized`/merge-and-compare technique as §2.1's trace/gap
   measurement, just applied at a few candidate merge distances to see
   where the polygon count jumps) and pick a value with margin on both
