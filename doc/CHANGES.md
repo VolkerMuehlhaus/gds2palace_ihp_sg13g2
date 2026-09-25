@@ -2,10 +2,19 @@
 
 This is an (incomplete) list of changes and new features.
 
-
 ## 25-September-2026
-`settings['fill_factor_correction']` is a new option for Palace (default `False`), used together with via array merging (`merge_polygon_size > 0`). Merging fills the gaps between vias with via material, so the merged via block conducts better than the real via array. With this option, each merged via polygon's conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials when their fill factors differ by more than 20%, and each group uses its mean fill factor. The fill factors are only computed when the option is enabled, so `read_gds()` is not slowed down otherwise.
 
+**Examples and documentation**  
+New study on getting most accurate models for a 6nH octagon inductor, with comparison to measured data. Besides the `filled_metals` option, this study also covers two other new features for improving accuracy: 
+- via array merging gets a compensation factor for **accurate effective cross section** and
+- **conformal (non-planar) dielectric** above TopMetal2 is modelled by a modified stackup.
+
+All mesh convergence studies in the more_example folder were re-written completely.
+
+**New features**  
+`settings['fill_factor_correction']` is a new option for improved accuracy when using via array merging. It is used together with via array merging (`merge_polygon_size > 0`) and is **not** active by default. Merging fills the gaps between vias with via material, so the merged via block has increased cross section = lower resistance than the real via array. With this option, each merged via polygon's conductivity is **multiplied by its fill factor** (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials when their fill factors differ by more than 20%, and each group uses its mean fill factor. The fill factors are only computed when the option is enabled, so `read_gds()` is not slowed down otherwise.
+
+**Changes**  
 `gds_polygon.is_via` and the `is_via` parameter of `all_polygons_list.add_rectangle()`/`add_polygon()` were removed: they were never set when reading GDSII and never used. Scripts that pass `is_via=` to these functions need to drop that argument.
 
 ## 22-23 September-2026

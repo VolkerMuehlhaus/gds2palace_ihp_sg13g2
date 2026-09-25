@@ -18,7 +18,10 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
+
+# solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
+FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
 
 import os
 import sys
@@ -1314,11 +1317,8 @@ def create_model (excite_ports, settings):
     # redundant surface-impedance BC on the same faces as the bulk-conductivity domain).
     filled_metals_em = filled_metals and not elmer_thermal
 
-    # scale via conductivity by the fill factor of merged via arrays (Palace only)
+    # scale via conductivity (thermal: heat conductivity) by the fill factor of merged via arrays
     fill_factor_correction = get_optional_setting(settings, 'fill_factor_correction', False)
-    if fill_factor_correction and elmer:
-        print("Note: settings['fill_factor_correction'] is only supported for Palace, ignored for Elmer.")
-        fill_factor_correction = False
     if fill_factor_correction:
         if allpolygons.via_originals:
             allpolygons.compute_via_fill_factors()
@@ -1815,6 +1815,11 @@ def create_model (excite_ports, settings):
                     physical_groups_3D.append({"layername":key, "groupname":groupname, "grouptag":phys_group, "fill_factor":bucket["mean_fill_factor"]})
                     if _is_pec_material(via_metal.material):
                         sigma_info = 'PEC material, conductivity not scaled'
+                    elif via_material is not None and elmer_thermal:
+                        if via_material.thermaltablename == "":
+                            sigma_info = f'heat conductivity = {via_material.thermalcond*bucket["mean_fill_factor"]:.4g} W/mK'
+                        else:
+                            sigma_info = 'heat conductivity table scaled by fill factor'
                     elif via_material is not None:
                         sigma_info = f'sigma = {via_material.sigma*bucket["mean_fill_factor"]:.4g} S/m'
                     else:
@@ -2487,6 +2492,8 @@ def create_model (excite_ports, settings):
             groupname = item["groupname"]
             grouptag = item["grouptag"]
             metal = metals_list.getbylayername(layername)
+            # fill factor of merged via arrays, 1.0 unless fill_factor_correction split this via layer
+            via_fill_factor = item.get("fill_factor", 1.0) if (metal is not None and metal.is_via) else 1.0
 
             if metal is not None and _is_pec_material(metal.material):
                 if elmer_thermal:
@@ -2505,7 +2512,8 @@ def create_model (excite_ports, settings):
                 if Elmer_material not in Elmer_materials:
                     Elmer_materials.append(Elmer_material)
                 material_index = Elmer_materials.index(Elmer_material)
-                Elmer_bodies.append({'name': layername, 'material': material_index+1})
+                # body name must match the gmsh physical group name (Use Mesh Names)
+                Elmer_bodies.append({'name': groupname, 'material': material_index+1})
                 continue
 
             material = get_material_from_layer_or_dielectric_name(layername)
@@ -2522,9 +2530,10 @@ def create_model (excite_ports, settings):
                         Elmer_material['thermalcond']=0.026
                         Elmer_material['density']=1.2
                 else:
-                    Elmer_material['name']=material.name
+                    # scaled via material gets its own name, e.g. TopVia2_x0.49
+                    Elmer_material['name']=material.name if via_fill_factor == 1.0 else f'{material.name}_x{via_fill_factor:.2f}'
                     Elmer_material['permittivity']=material.eps
-                    Elmer_material['conductivity']=material.sigma
+                    Elmer_material['conductivity']=material.sigma * via_fill_factor
 
                     if elmer_thermal:
                         Elmer_material['density']=material.density
@@ -2536,12 +2545,12 @@ def create_model (excite_ports, settings):
                                     'XML file (defaults to 0 W/m/K). Thermal simulation results would be meaningless '
                                     '-- add a ThermalConductivity attribute for this material in the stackup XML file.'
                                 )
-                            Elmer_material['thermalcond']=material.thermalcond
+                            Elmer_material['thermalcond']=material.thermalcond * via_fill_factor
                         else:
                             # table
                             table = "Variable Temperature\n    Real\n"
                             for T, k in material.thermaltable.points:
-                              table = table + f"      {T:.2f} {k:.2f}\n"
+                              table = table + f"      {T:.2f} {k * via_fill_factor:.2f}\n"
                             table = table + "    End"
                             Elmer_material['thermalcond']=table
 
@@ -2552,9 +2561,10 @@ def create_model (excite_ports, settings):
 
                     material_index = Elmer_materials.index(Elmer_material)
                 
-                    # volumes are identified by physical group name (=layername), which was already set above
+                    # volumes are identified by physical group name (Use Mesh Names): the layer
+                    # name, or <layer>_x<fill factor> for a via layer split by fill_factor_correction
                     Elmerbody = {}
-                    Elmerbody['name']=layername
+                    Elmerbody['name']=groupname
                     Elmerbody['material']=material_index+1
                 
                     if elmer_thermal:
