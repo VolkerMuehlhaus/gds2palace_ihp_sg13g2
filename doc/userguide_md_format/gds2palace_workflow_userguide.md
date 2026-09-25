@@ -369,6 +369,7 @@ These other settings are optional:
 **settings['z_thickness_factor']:** Factor for metal thickness value on conductor side walls (see footnote), default is 1  
 **settings['no_gui']:** Run script without showing gmsh user interface, useful for automated processing, default is False  
 **settings['no_preview']:** don't show unmeshed geometry, immediately show meshed model, default is False  
+**settings['fill_factor_correction']:** Only has an effect with merge_polygon_size > 0. Via array merging fills the gaps between vias with via material, so each merged via polygon is scaled down to its real via conductivity: its conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials, starting a new group when the fill factor is more than 20% below the group's highest value, and each group uses its mean fill factor. Vias with the reserved PEC material are grouped but not scaled. Palace only, ignored for Elmer. Default is False  
 
 footnote on z_thickness_factor: See chapter on metal loss at low frequency, where skin depth is larger than metal thickness   
 

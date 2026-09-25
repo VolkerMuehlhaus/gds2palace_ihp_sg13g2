@@ -3,6 +3,11 @@
 This is an (incomplete) list of changes and new features.
 
 
+## 25-September-2026
+`settings['fill_factor_correction']` is a new option for Palace (default `False`), used together with via array merging (`merge_polygon_size > 0`). Merging fills the gaps between vias with via material, so the merged via block conducts better than the real via array. With this option, each merged via polygon's conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials when their fill factors differ by more than 20%, and each group uses its mean fill factor. The fill factors are only computed when the option is enabled, so `read_gds()` is not slowed down otherwise.
+
+`gds_polygon.is_via` and the `is_via` parameter of `all_polygons_list.add_rectangle()`/`add_polygon()` were removed: they were never set when reading GDSII and never used. Scripts that pass `is_via=` to these functions need to drop that argument.
+
 ## 22-23 September-2026
 `settings['filled_metals']` is a new option for Palace, used for volume meshing of conductors instead of placing a surface impedance onto the side walls. This gives more accurate conductor loss at **low** frequency, where the skin depth is no longer small compared to conductor cross section. 
 
