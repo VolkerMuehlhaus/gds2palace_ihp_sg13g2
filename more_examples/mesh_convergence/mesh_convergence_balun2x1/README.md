@@ -1,174 +1,104 @@
-# Mesh Convergence Study: balun2x1 edge-coupled balun (IHP SG13G2)
+# How fine a mesh does this 2:1 edge-coupled balun need? (IHP SG13G2)
+
+This study asks a practical question for one specific layout: a 2:1 balun made of edge-coupled lines with a 2 µm gap, simulated from 1 to 50 GHz. How fine must the Palace mesh be to get its coil properties and its transmission right? And do FEM order 1 or adaptive mesh refinement help?
+
+We answer this in three steps:
+
+1. **Refine a uniform mesh** from 5 µm to 1 µm and see which properties move.
+2. **Cross-check the finest result** with adaptive mesh refinement (AMR).
+3. **Try FEM order 1** as a fast alternative, and compare everything on accuracy vs. cost.
+
+The findings apply to this balun, with this stackup, in this frequency range. Other structures can behave quite differently. The [overview page](../README.md) collects the other mesh studies.
+
+## The details of this study
 
 - **Model:** `balun2x1_edgecoupled_do200_w8_s2.gds`, stackup `SG13G2_200um.xml`
-- **Solver:** AWS Palace (FEM), order 2 unless noted, ABC boundaries, 100 µm margin + 20 µm air-around
-- **Sweep:** 1–50 GHz, 1 GHz step, Palace's PROM-based adaptive frequency sweep
-- **Ports:** 4 via ports (Metal1→TopMetal2), Z0 = 50 Ω — 1/2 = primary +/- (PP/PN), 3/4 = secondary +/- (S1/S2), no center tap
-- **Execution:** remote solve on `hpz2` (`mpirun -n 16` of 32 cores, 109 GB RAM), jobs run sequentially
+- **Ports:** 4 via ports (Metal1 → TopMetal2), Z0 = 50 Ω, de-embedded: 1/2 = primary pair, 3/4 = secondary pair, no center tap
+- **Solver:** AWS Palace (FEM), ABC boundaries, 100 µm margin + 20 µm air, order 2 unless noted
+- **Sweep:** 1–50 GHz in 1 GHz steps (adaptive frequency sweep)
+- **Execution:** `hpz2`, 16 of 32 cores
+- **Scope:** this is the bare balun. A real matching network would add MIM capacitors that are not in this model, so no matching or real-load result is reported.
 
 ## 0. Layout
 
-![balun2x1 layout with port positions labeled, IHP SG13G2 pixel-accurate colors](results/plots/balun2x1_layout_labeled.png)
+![balun2x1 layout with port positions labeled](results/plots/balun2x1_layout_labeled.png)
 
-Measured directly from the GDS (KLayout): a single octagonal loop of 4 edge-coupled parallel lines, 8 µm trace width with a 2 µm gap between adjacent lines, ~200 µm outer diameter, inside a 310×310 µm cell. **PP/PN** (primary, ports 1/2) break out on the left, **S1/S2** (secondary, ports 3/4) on the right; two via-stitched line-transposition crossovers are visible at the top and bottom of the loop. **Turns ratio is 2:1 (primary:secondary)** — the primary uses 2 of the 4 lines connected in series through the crossovers (2 effective turns), the secondary uses 1 line (1 turn). A separate Metal1 guard ring runs around the entire cell perimeter (visible as the outer frame) and is not part of the signal path.
+A single octagonal loop of 4 edge-coupled lines on TopMetal2, 8 µm wide with a **2 µm gap**, about 200 µm outer diameter. The primary (ports 1/2, left) uses two of the lines in series through the crossovers at top and bottom. The secondary (ports 3/4, right) uses one line. That gives a 2:1 turns ratio, so the system impedances are 200 Ω (primary) and 50 Ω (secondary).
 
-## 1. Method
+**What we look at.** From the 4-port Z-matrix we form the differential impedances of primary and secondary and read:
 
-Seven model variants were generated from the common baseline (`balun2x1_edgecoupled_do200_w8_s2.py`, `refined_cellsize=5`):
+- **Coupling factor** k, **inductance** L and **Q factor** of each coil. These are only meaningful below the primary's self-resonance at about 29 GHz.
+- **|Sdd21|** and **|Sdd11|**: differential transmission and reflection at 200 Ω / 50 Ω. |Sdd21| peaks at about −1.3 dB near 34 GHz.
 
-- **Uniform mesh sweep (order 2):** `refined_cellsize` = 5, 2, 1 µm, `adaptive_mesh_iterations=0`.
-- **Adaptive mesh refinement (AMR, order 2):** `refined_cellsize=5` (starting mesh), `adaptive_mesh_iterations=2`.
-- **Order comparison:** the same 5, 2, 1 µm cell sizes re-run at `order=1`.
+## 1. Uniform mesh refinement
 
-Model files: `balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}.py`, `..._amr2.py`, `..._mesh{5,2,1}_order1.py` (all in `more_examples/mesh_convergence/mesh_convergence_balun2x1/`).
+We ran the model at `refined_cellsize` = 5, 2 and 1 µm, all at FEM order 2.
 
-## 2. Uniform mesh sweep — results (order 2)
+![Balun properties vs. mesh size](results/plots/story_uniform.png)
 
-| Mesh | DOF | Mesh elements | Solve time | Peak RAM |
-|---|---:|---:|---:|---:|
-| 5 µm | 311,536 | 45,074 | 4m 3s | 4.36 GB |
-| 2 µm | 843,390 | 120,688 | 11m 18s | 11.02 GB |
-| 1 µm | 1,672,974 | 236,525 | 27m 5s | 24.17 GB |
+- **The 5 µm mesh stands apart; 2 µm and 1 µm nearly coincide.** A 5 µm cell is wider than the 2 µm coupling gap, so it can't resolve the field there. (gmsh also reported a few ill-shaped elements at this setting.)
+- **Coupling and inductance change little.** At 10 GHz, 5 µm overestimates k by 1.3% and L by 0.5%.
+- **Q is the most sensitive coil property.** Peak primary Q is 6.6% low at 5 µm and 1.4% low at 2 µm (1 µm: 19.0 at 14 GHz).
+- **Transmission shifts in frequency.** The |Sdd21| peak moves from 32 GHz (5 µm) to 34 GHz (1 µm). The 5 µm mesh also shows about 0.08 dB less loss than the finer meshes.
 
-No crashes or mesh-quality failures anywhere in this range, though gmsh flagged 2 "ill-shaped tets" at the 5 µm setting (out of ~45k elements) — consistent with a cell size larger than the 2 µm coupled-line gap it needs to resolve.
+The step from 2 to 1 µm is much smaller than the step from 5 to 2 µm, on every quantity. The mesh is converging.
 
-## 3. Adaptive mesh refinement — results
+| Mesh | DOF | Solve time | Peak RAM |
+|---|---:|---:|---:|
+| 5 µm | 311,536 | 4m 3s | 4.36 GB |
+| 2 µm | 843,390 | 11m 18s | 11.02 GB |
+| 1 µm | 1,672,974 | 27m 5s | 24.17 GB |
 
-Starting mesh: 5 µm. Requested `adaptive_mesh_iterations=2`.
+## 2. Cross-check with AMR
 
-| Iteration | DOF | Mesh elements | Max \|ΔS\| vs. prev. | Time (cumulative) | Peak RAM |
+AMR started from the 5 µm mesh and ran 2 refinement iterations, ending at 1.08 million DOF.
+
+| | Peak primary Q | \|Sdd21\| peak | Max\|ΔS\| vs. 1 µm | Total time | Peak RAM |
 |---|---:|---:|---:|---:|---:|
-| 1 | 311,536 | 45,074 | n/a | 4m 5s | 4.56 GB |
-| 2 | 418,314 | 66,872 | 0.0494 | 10m 29s | 6.35 GB |
-| **Final** | **1,084,000** | **189,855** | **0.0364** | **32m 36s** | **15.60 GB** |
+| 2 µm uniform | 18.77 | −1.26 dB at 33 GHz | 0.018 | 11m 18s | 11.0 GB |
+| 1 µm uniform | 19.04 | −1.27 dB at 34 GHz | (reference) | 27m 5s | 24.2 GB |
+| AMR, 2 iterations | 18.57 | −1.27 dB at 34 GHz | 0.011 | 32m 36s | 15.6 GB |
 
-Iteration 1 matches the 5 µm uniform mesh exactly, as expected. Max|ΔS| keeps improving through the final iteration (no plateau within this 2-iteration budget) — it roughly halves from 0.0494 to 0.0364.
+- **For the S-parameters, AMR confirms the 1 µm result.** Its |Sdd21| peak is identical, and its Max|ΔS| distance to 1 µm is smaller than that of the 2 µm mesh.
+- **For Q, AMR is less accurate than the 2 µm uniform mesh.** It ends between the 2 µm and 5 µm results. AMR refines where Palace's error estimate is largest, and for this model that isn't where Q is decided.
+- The uniform Q steps shrink quickly (+5.6%, then +1.4%). So we take 1 µm as the reference for Q, and expect it to be within about 1% of the converged value.
 
-## 4. Mixed-mode S-parameters at the real system impedances (200 Ω / 50 Ω)
+## 3. Order 1 as a shortcut? Accuracy vs. cost
 
-Local port order [1:primary+, 2:primary-, 3:secondary+, 4:secondary-] maps directly onto ports 1-4 — no port elimination is needed here (unlike the 5-port transformer study's center-tap drop). This is a 2:1 turns-ratio balun with system impedances of **200 Ω differential on the primary, 50 Ω differential on the secondary** (4:1, matching the turns ratio squared). Mixed-mode parameters are computed at this reference by reducing the native 4-port Z-matrix to the differential-equivalent 2-port `(Zaa,Zab,Zba,Zbb)` (antisymmetric combination across each port pair) and applying the standard unequal-reference-impedance 2-port Z→S conversion:
+FEM order 1 runs about 10× faster than order 2 on the same mesh. We re-ran all three meshes at order 1. The chart shows every run's error against the 1 µm order-2 reference, over its solve time:
 
-```
-Zaa = Z11-Z12-Z21+Z22   (primary)
-Zab = Z13-Z14-Z23+Z24
-Zba = Z31-Z32-Z41+Z42   (== Zab by reciprocity)
-Zbb = Z33-Z34-Z43+Z44
+![Accuracy vs. solve time](results/plots/story_accuracy_vs_cost.png)
 
-D     = (Zaa+Z01)*(Zbb+Z02) - Zab*Zba
-Sdd11 = ((Zaa-Z01)*(Zbb+Z02) - Zab*Zba) / D
-Sdd22 = ((Zaa+Z01)*(Zbb-Z02) - Zab*Zba) / D
-Sdd21 = 2*Zba*sqrt(Z01*Z02) / D
-```
+- **Order 1 is far off on this balun.** At 5 µm, peak Q is 26% low and the |Sdd21| peak sits at 26 GHz instead of 34 GHz. The error shrinks with a finer mesh, but at 1 µm Q is still 10% low and the peak is at 31 GHz.
+- **Order 1 also makes the balun look better than it is.** Its |Sdd21| peak is −0.96 dB at 5 µm and −1.14 dB at 1 µm, compared with −1.27 dB for the reference.
+- **Order 2 at 5 µm is more accurate than order 1 at 1 µm**, in Q, in frequency and in Max|ΔS|, at 1.7× the time (4 vs. 2.4 minutes).
 
-with `Z01 = 200 Ω`, `Z02 = 50 Ω`. (Setting `Z01=Z02` reduces this to the standard equal-impedance Z→S formula, confirmed to ~1e-4 as a sanity check on the general formula.)
+## Summary for this balun
 
-![Sdd11 magnitude and phase vs. mesh](results/plots/sdd11_convergence.png)
-![Sdd21 magnitude and phase vs. mesh](results/plots/sdd21_convergence.png)
-![Sdd22 magnitude and phase vs. mesh](results/plots/sdd22_convergence.png)
+- **2 µm uniform mesh, order 2, is the working point.** Q is within 1.5%, |Sdd21| within 0.02 dB and 1 GHz of the finest result, in about 11 minutes.
+- **5 µm is too coarse for this geometry**, because the cell is wider than the 2 µm coupling gap. It's still usable for a first look at L and k.
+- **Don't use order 1 for this balun**, not even on a fine mesh. It shifts the response down in frequency and underestimates loss.
+- **AMR matched the S-parameters but not Q.** When Q matters, check it on a uniform mesh.
 
-### 4a. Successive mesh steps
+These numbers belong to this layout. Other gap widths, line widths or frequency ranges will change them.
 
-#### Sdd11
-
-| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---:|---:|---:|---:|
-| 5→2 µm | 0.1240 | 0.0004 | 0.7930 | 0.4517 |
-| 2→1 µm | 0.0322 | 0.0001 | 0.1758 | 0.1148 |
-| 1µm→AMR final | 0.0149 | 0.0004 | 0.0755 | 0.0623 |
-
-#### Sdd21
-
-| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---:|---:|---:|---:|
-| 5→2 µm | 0.0589 | 0.0144 | 0.1864 | 0.4041 |
-| 2→1 µm | 0.0153 | 0.0008 | 0.0456 | 0.0967 |
-| 1µm→AMR final | 0.0076 | 0.0049 | 0.0123 | 0.0541 |
-
-#### Sdd22
-
-| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---:|---:|---:|---:|
-| 5→2 µm | 0.0560 | 0.0004 | 0.7010 | 0.3028 |
-| 2→1 µm | 0.0134 | 0.0000 | 0.1556 | 0.0711 |
-| 1µm→AMR final | 0.0061 | 0.0002 | 0.0604 | 0.0559 |
-
-### 4b. Every mesh vs. the finest uniform mesh (1 µm) as reference
-
-#### Sdd11
-
-| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---:|---:|---:|---:|
-| 5 µm | 0.1559 | 0.0005 | 0.9688 | 0.5664 |
-| 2 µm | 0.0322 | 0.0001 | 0.1758 | 0.1148 |
-| AMR final | 0.0149 | 0.0004 | 0.0755 | 0.0623 |
-
-#### Sdd21
-
-| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---:|---:|---:|---:|
-| 5 µm | 0.0740 | 0.0152 | 0.2320 | 0.5008 |
-| 2 µm | 0.0153 | 0.0008 | 0.0456 | 0.0967 |
-| AMR final | 0.0076 | 0.0049 | 0.0123 | 0.0541 |
-
-#### Sdd22
-
-| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@25GHz (dB) | \|ΔS\|@50GHz (dB) |
-|---|---:|---:|---:|---:|
-| 5 µm | 0.0694 | 0.0005 | 0.8566 | 0.3739 |
-| 2 µm | 0.0134 | 0.0000 | 0.1556 | 0.0711 |
-| AMR final | 0.0061 | 0.0002 | 0.0604 | 0.0559 |
-
-The 5 µm mesh is clearly the worst point (Max|ΔS| up to 0.16 vs. the 1 µm reference) — this structure's 2 µm coupled-line gap is smaller than the 5 µm cell size itself, so that setting can't really resolve the coupling at all. 2 µm brings all three parameters within 0.01–0.03 of the 1 µm reference. The AMR final result is closer to the 1 µm reference than the 2 µm uniform mesh on every parameter. Peak `Sdd21` (finest mesh) reaches about **−1.27 dB at 34 GHz** — a well-matched, low-loss balun.
-
-## 5. Why there is no "real load" / floating-impedance analysis here
-
-An earlier version of this report reduced the 4-port Z-matrix under a floating 50 Ω differential load on the secondary, to derive `Zin_diff` at the primary and compare it against the mixed-mode `Sdd11` from §4. That analysis has been removed: this test structure is the coupled-line balun coils only — it does not include the MIM capacitors that a real matching network would use to compensate the balun's imaginary part. A bare-coil floating-load impedance (or any "how well does this match a real load" claim built on it) is therefore not representative of the real circuit, and reporting it invites the wrong conclusion. The mixed-mode S-parameters in §4 remain valid as EM characterization of the coil pair itself (referenced to the true 200 Ω/50 Ω system impedances, not a claim about real-load matching), and are the right basis for feeding into a separate matching-network design step.
-
-## 6. Order 1 vs. order 2 comparison
-
-| Cell size | Order | DOF | Mesh elements | Solve time | Peak RAM |
-|---:|---:|---:|---:|---:|---:|
-| 5 µm | 1 | 60,271 | 45,074 | 25.6 s | 2.44 GB |
-| 5 µm | 2 | 311,536 | 45,074 | 4m 3s | 4.36 GB |
-| 2 µm | 1 | 164,249 | 120,688 | 1m 17s | 5.83 GB |
-| 2 µm | 2 | 843,390 | 120,688 | 11m 18s | 11.02 GB |
-| 1 µm | 1 | 328,043 | 236,525 | 2m 24s | 10.04 GB |
-| 1 µm | 2 | 1,672,974 | 236,525 | 27m 5s | 24.17 GB |
-
-![Solve time and DOF: order 1 vs order 2](results/plots/order_comparison_time_dof.png)
-![Sdd11/Sdd21: order 1 (dashed) vs order 2 (solid), same cell sizes](results/plots/order_comparison_sdd.png)
-
-Order 1 is ~5.2× fewer DOF and roughly 9-11× faster than order 2 at the same mesh, at 40-60% of the RAM — similar ratios to the other studies. **The accuracy picture is different from the spiral inductor study, though**: rather than a fixed offset independent of mesh size, order 1's `Sdd11` dip is visibly shifted in both frequency and depth at 5 µm (dipping ~4 dB deeper, shifted a few GHz lower than order 2), and that shift shrinks as the mesh refines toward 1 µm. In other words, on this tightly-coupled structure the order-1 error and the coarse-mesh error compound at 5 µm; refining the mesh does help order 1 get closer here, though it still doesn't fully close the gap to order 2 at 1 µm. **Order 1 remains a reasonable way to get a quick rough look, not a source of final numbers, and that conclusion is structure-dependent** — check both mesh and order sensitivity on any new geometry rather than assuming one dominates.
-
-## 7. Discussion
-
-- **This structure's 2 µm coupled-line gap makes 5 µm mesh a poor choice** — Max|ΔS| up to 0.16 vs. the 1 µm reference, clearly worse than the equivalent coarse point in the transformer or balun studies (both had ≥3 µm gaps/traces relative to their coarsest mesh). **2 µm uniform mesh is the practical minimum working point** for this geometry, bringing all three Sdd parameters within 0.01–0.03 of the finest mesh at under half the 1 µm run's cost.
-- **AMR (5 µm start, 2 iterations) lands closer to the 1 µm reference than the 2 µm uniform mesh does**, on all three mixed-mode S-parameters, without needing to already know 2 µm was a reasonable cell size — consistent with the spiral inductor study's finding, though again at higher wall-clock cost (32m 36s, 15.6 GB) than the 2 µm uniform run (11m 18s, 11.0 GB).
-- **Order 1's error is coupled to mesh coarseness here**, unlike the spiral inductor's roughly mesh-independent offset — a reminder that these behaviors are structure-dependent and worth checking per design rather than assuming a prior study's pattern carries over.
-
-## 8. Where everything lives
+## Files
 
 ```
-more_examples/mesh_convergence/mesh_convergence_balun2x1/
-├── README.md                                          # this report
-├── balun2x1_edgecoupled_do200_w8_s2.py                # original baseline (refined_cellsize=5)
-├── balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}.py    # uniform mesh model scripts, order 2
-├── balun2x1_edgecoupled_do200_w8_s2_amr2.py           # AMR model script, 5 um start, 2 iterations
-├── balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}_order1.py  # order 1 comparison model scripts
-├── palace_model/balun2x1_edgecoupled_do200_w8_s2_<name>_data/  # generated mesh/config + full Palace output
+mesh_convergence_balun2x1/
+├── balun2x1_edgecoupled_do200_w8_s2.py                # original model (refined_cellsize=5)
+├── balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}.py    # uniform mesh, order 2
+├── balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}_order1.py  # uniform mesh, order 1
+├── balun2x1_edgecoupled_do200_w8_s2_amr2.py           # AMR, 5 µm start, 2 iterations
+├── palace_model/balun2x1_edgecoupled_do200_w8_s2_<name>_data/  # mesh, config and full Palace output per run
 └── results/
-    ├── delta_S_table.csv, delta_S_vs_finest.csv       # §4a/4b (real 200/50 ohm reference)
-    ├── order_comparison_table.csv                     # §6
-    ├── analyze_convergence.py                         # regenerates the Sdd CSVs/plots (§4, 200/50 ohm)
-    ├── order_comparison.py                            # regenerates §6's table/plots
-    ├── render_labeled_layout.py                       # regenerates the labeled layout picture (§0)
-    ├── snp/                                           # de-embedded 4-port Touchstone files
-    │     balun2x1_mesh{5,2,1}.s4p, balun2x1_mesh{5,2,1}_order1.s4p
-    │     balun2x1_amr2_iter1.s4p, balun2x1_amr2_iter2.s4p, balun2x1_amr2_final.s4p
+    ├── story_plots.py            # the story_*.png plots and numbers in this report
+    ├── analyze_convergence.py    # mixed-mode Sdd ΔS tables (CSV) and Sdd overlays
+    ├── order_comparison.py       # order 1 vs. order 2 overlays and timing table
+    ├── delta_S_table.csv, delta_S_vs_finest.csv, order_comparison_table.csv
+    ├── snp/                      # de-embedded 4-port Touchstone files, one per run
+    │                             #   (the AMR iteration files balun2x1_amr2_iter1..2 are raw)
     └── plots/
-          balun2x1_layout_labeled.png                              # §0
-          sdd11_convergence.png, sdd21_convergence.png, sdd22_convergence.png  # §4 (200/50 ohm)
-          order_comparison_time_dof.png, order_comparison_sdd.png   # §6
 ```
 
-Re-run `python results/analyze_convergence.py` and `python results/order_comparison.py` from `more_examples/mesh_convergence/mesh_convergence_balun2x1/` (in the `d:\venv\palace` venv) any time to regenerate the tables and plots from the archived `.snp`/`palace.json` files.
+Run the scripts from this folder in the `d:\venv\palace` venv to regenerate plots and tables from the archived Touchstone files.

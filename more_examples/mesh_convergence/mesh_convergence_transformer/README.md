@@ -1,174 +1,100 @@
-# Mesh Convergence Study: Transformer_IMN (IHP SG13G2)
+# How fine a mesh does this 30 GHz transformer need? (IHP SG13G2)
+
+This study asks a practical question for one specific layout: a 1:1 transformer coil pair designed for 30 GHz. How fine must the Palace mesh be to get the numbers a transformer designer uses, which are inductance, coupling and Q factor? And does adaptive mesh refinement add anything here?
+
+We answer this in three steps:
+
+1. **Refine a uniform mesh** from 4 µm to 1 µm and see which coil properties move.
+2. **Look at the trend at 30 GHz** and ask whether each quantity has settled.
+3. **Cross-check with adaptive mesh refinement (AMR)**, which goes to a much larger mesh than the uniform sweep.
+
+The findings apply to this transformer, with this stackup, in this frequency range. Other structures can behave quite differently. The [overview page](../README.md) collects the other mesh studies.
+
+## The details of this study
 
 - **Model:** `Transformer_IMN_ports.gds`, stackup `SG13G2_200um.xml`
-- **Design target:** 30 GHz. This test structure is the transformer coil pair only — it does **not** include the MIM capacitors that the real matching network uses to compensate the transformer's imaginary part, so its raw S-parameters away from 30 GHz (and any real-load impedance derived from them) are not representative of the final circuit.
+- **Ports:** 5 via ports, Z0 = 50 Ω, de-embedded: 1/2 = primary (TopMetal1), 3 = primary center tap, 4/5 = secondary (TopMetal2)
 - **Solver:** AWS Palace (FEM), order 2, ABC boundaries, 50 µm air margin
-- **Sweep:** 0–200 GHz (auto-shifted to 0.01 GHz start), 1 GHz step, Palace's PROM-based adaptive frequency sweep
-- **Ports:** 5 lumped via ports — 1/2 = primary +/- (Metal3→TopMetal1), 3 = primary center tap (Metal3→Metal5), 4/5 = secondary +/- (Metal3→TopMetal2), all Z0 = 50 Ω
-- **Execution:** remote solve on `hpz2` via `run_palace` (apptainer, Palace 0.17, `-np 16` of 32 cores, 109 GB RAM), jobs run sequentially
+- **Sweep:** 0–200 GHz in 1 GHz steps (adaptive frequency sweep). This report looks at 1–40 GHz, below the primary self-resonance near 48 GHz.
+- **Mesh:** `refined_cellsize` varied as described below. The Metal3 ground plane is always kept at 5 µm (`refined_cellsize_override`).
+- **Execution:** `hpz2`, Palace 0.17, 16 of 32 cores
+- **Scope:** this is the bare coil pair. The real matching network adds MIM capacitors that are not in this model, so no matching or real-load result is reported, only the coil properties.
 
-## 0. Layout and turns ratio
+## 0. Layout
 
-![Transformer layout with port positions labeled, IHP SG13G2 pixel-accurate colors (gds_viewer)](results/plots/transformer_layout_labeled.png)
+![Transformer layout with port positions labeled](results/plots/transformer_layout_labeled.png)
 
-Rendered with `gds_viewer`'s exact layer colors/dither patterns, with port positions overlaid from the GDS marker layers (201–205). Per-layer polygon inspection (not just the port list) shows **both coils are single-turn octagonal spirals** — primary on TopMetal1 (orange, ~46 µm radius, 2 µm trace width, broken at the right side by the center-tap port 3), secondary on TopMetal2 (white/cream, ~50 µm radius, 2 µm trace width, no center tap, break on the left). **Turns ratio Np:Ns = 1:1**, giving a nominal ideal impedance ratio of 1:1 — consistent with the model's uniform `port_Z0=50.0` on all 5 ports. The real, frequency-dependent transformation of a coupled (k<1) transformer like this is better read from the simulated mixed-mode S-parameters (§4) than assumed from turn count alone. The dark red hatched background is the **Metal3** ground/reference plane (large but not full-footprint here, ~43% coverage), which is why `refined_cellsize_override` fixes it at 5 µm regardless of the main mesh setting.
+Both coils are single-turn octagons with **2 µm trace width**: the primary on TopMetal1 (about 46 µm radius, center tap on the right) and the secondary on TopMetal2 (about 50 µm radius). The narrow traces are the finest feature in this model.
 
-## 1. Method
+**What we look at.** From the 5-port Z-matrix we form the differential impedances of the primary (ports 1/2) and the secondary (ports 4/5), with the center tap left open, and read:
 
-Six model variants were generated from a common template (`palace_transformer_imn_mesh2.py`):
+- **Inductance** L = Im(Z)/ω of each coil
+- **Coupling factor** k between the coils
+- **Q factor** Q = Im(Z)/Re(Z) of each coil
 
-- **Uniform mesh sweep:** `refined_cellsize` = 5, 4, 3, 2, 1 µm, `adaptive_mesh_iterations=0`.
-- **Adaptive mesh refinement (AMR):** `refined_cellsize=2` (starting mesh), `adaptive_mesh_iterations=3` — capped at 3 iterations per the D-band balun study's finding that further iterations mostly add cost, not accuracy.
+## 1. Uniform mesh refinement
 
-`refined_cellsize_override=[['Metal3', 5.0]]` is fixed at 5 µm in every variant, matching the D-band balun study's convention.
+We ran the model at `refined_cellsize` = 4, 3, 2 and 1 µm, all at FEM order 2. A 5 µm mesh was also tried, but Palace crashed on it (a NaN inside its error estimation). A cell size of more than twice the 2 µm trace width is likely too coarse for this geometry. The 30 GHz design frequency is marked.
 
-**A solver crash was hit during setup:** the original model crashed Palace with `GetMaxSingularValue()` → SLEPc NaN inside the built-in error-estimation step, reproducible even on a single isolated 150 GHz point (ruling out a low-frequency/near-DC breakdown or the PROM adaptive-sweep mechanism as the cause). After revisions to the model file, it now solves cleanly for every mesh size **except 5 µm**, which still crashes identically — the specific change responsible for the fix was not conclusively isolated. The remaining 5 µm failure points to a coarse-mesh element-quality issue specific to that cell size on this geometry (most likely a sliver/degenerate tetrahedron where a small feature — a via, gap, or the center-tap strap — isn't resolved) rather than a physics or configuration problem. **The 5 µm point is excluded from this study**; the uniform sweep below covers 4, 3, 2, 1 µm.
+![Transformer L, k and Q vs. mesh size](results/plots/story_uniform_LkQ.png)
 
-Model files: `palace_transformer_imn_mesh5/4/3/2/1.py`, `palace_transformer_imn_amr3.py` (all in `more_examples/mesh_convergence/mesh_convergence_transformer/`) — `mesh5.py` is kept for reference but its `_data` output is not part of the result set.
+On this scale, **inductance and coupling look identical for every mesh**, while **Q visibly rises** with each refinement step. The rise gets larger toward higher frequencies.
 
-## 2. Uniform mesh sweep — results
+| Mesh | DOF | Solve time | Peak RAM |
+|---|---:|---:|---:|
+| 4 µm | 171,460 | 4m 2s | 2.72 GB |
+| 2 µm | 312,234 | 7m 4s | 4.19 GB |
+| 1 µm | 576,114 | 14m 4s | 7.51 GB |
 
-| Mesh | DOF | Mesh elements | Solve time | Peak RAM |
-|---|---:|---:|---:|---:|
-| 5 µm | — | — | **crashed** (see §1) | — |
-| 4 µm | 171,460 | 24,752 | 4m 2s | 2.72 GB |
-| 3 µm | 209,202 | 30,155 | 4m 50s | 3.17 GB |
-| 2 µm | 312,234 | 44,544 | 7m 4s | 4.19 GB |
-| 1 µm | 576,114 | 81,956 | 14m 4s | 7.51 GB |
+## 2. Has it settled? The trend at 30 GHz
 
-DOF, time, and RAM all grow smoothly (~3.4× DOF, ~3.5× time, ~2.8× RAM from 4 µm to 1 µm) — no further instability across the working range.
+To see the small changes, the next plot shows each quantity at 30 GHz relative to its 1 µm value, over the size of the model (degrees of freedom). The solid lines are the uniform mesh. The open markers on the right are from step 3.
 
-## 3. Adaptive mesh refinement — results
+![Change of L, k and Q at 30 GHz vs. model size](results/plots/story_convergence.png)
 
-Starting mesh: 2 µm (iteration 1 numbers match the uniform 2 µm run exactly). Capped at 3 iterations.
+Follow the solid lines from left (4 µm) to the 1 µm point:
 
-| Iteration | DOF | Mesh elements | Max \|ΔS\| vs. prev. | Solve time | Peak RAM |
-|---|---:|---:|---:|---:|---:|
-| 1 | 312,234 | 44,544 | n/a | 7m 4s | 4.37 GB |
-| 2 | 676,780 | 116,336 | 0.0197 | 28m 27s | 9.03 GB |
-| **Final** | **2,070,680** | **361,140** | **0.0191** | **1h 46m 56s** | **25.13 GB** |
+- **Inductance and coupling are settled.** They change by about 1% over the whole sweep, in shrinking steps.
+- **Q is not settled.** It rises about 5% from 4 µm to 1 µm, and the step from 2 µm to 1 µm (+1.6%) is no smaller than the step before it. The 1 µm result is still moving.
 
-The same pattern seen in the D-band balun study repeats here, even more starkly over just 3 iterations: **Max ΔS barely moved between iteration 2 and the final iteration (0.0197 → 0.0191)**, while DOF more than tripled (677k → 2.07M) and solve time went from 28m27s to 1h46m56s. Nearly all of the S-parameter-relevant improvement happened by iteration 2; the third iteration bought over an hour of extra compute for a ~3% further reduction in Max ΔS.
+At 1 µm there are only two cells across the 2 µm traces. A plausible reason for the slow Q convergence is that the loss depends on how current distributes across such a narrow trace, which this mesh only coarsely resolves. This study doesn't isolate the cause.
 
-## 4. Mixed-mode S-parameters
+## 3. Cross-check with AMR
 
-The 5-port network is reduced to differential figures of merit for the two coupled coils. Port 3 (primary center tap) is dropped from the S-matrix — equivalent to leaving it terminated in its 50 Ω reference impedance — leaving a 4-port subnetwork on ports 1,2 (primary) and 4,5 (secondary). Mixed-mode parameters are computed directly via the classical Bockelman–Eisenstadt formulas (derived in `analyze_convergence.py`, not via a library's mixed-mode conversion, to avoid any ambiguity in port-ordering convention for this 2-differential-pair case):
+AMR started from the 2 µm mesh and ran 3 iterations, refining wherever Palace's error estimate was largest. It ended at 2.07 million DOF, 3.6× the 1 µm model. These are the open markers in the plot above.
 
-```
-Sdd11 = 0.5 * (S11 - S12 - S21 + S22)   # primary differential return loss
-Sdd21 = 0.5 * (S31 - S32 - S41 + S42)   # primary -> secondary differential transmission
-Sdd22 = 0.5 * (S33 - S34 - S43 + S44)   # secondary differential return loss
-```
+| | Primary L | Coupling k | Primary Q | Secondary Q | Total time | Peak RAM |
+|---|---:|---:|---:|---:|---:|---:|
+| 2 µm uniform | 0.743 nH | 0.716 | 11.97 | 11.07 | 7m 4s | 4.19 GB |
+| 1 µm uniform | 0.739 nH | 0.712 | 12.16 | 11.26 | 14m 4s | 7.51 GB |
+| AMR, 3 iterations | 0.738 nH | 0.711 | 12.60 | 11.66 | 1h 47m | 25.1 GB |
 
-Since every port uses `port_Z0=50.0` (real, equal), this `bd/ad` ratio is exactly the standard mixed-mode S-parameter, referenced to a **100 Ω differential source/load impedance** (2×50 Ω). (The `√2` factor in the formal `ad=(a1-a2)/√2`, `bd=(b1-b2)/√2` definition cancels in the `bd/ad` ratio, so it's omitted above without changing the result or its reference impedance.)
+- **L and k confirm the uniform result**: AMR agrees with 1 µm within 0.3%.
+- **Q continues the upward trend**: AMR is another 3.6% above the 1 µm result, for both coils. This confirms what step 2 suggested. The Q of this transformer is not converged at 1 µm, and the true value is likely at least a few percent higher.
+- AMR's last iteration changed the S-parameters by as much as the one before (Max|ΔS| 0.020, then 0.019), so AMR itself had not settled either. More iterations would cost several more hours here.
 
-**Design frequency: 30 GHz** (this transformer's actual application target — not derived from the simulated response). At 30 GHz (finest, 1 µm mesh): Sdd11 = −3.6 dB, Sdd21 = −3.7 dB, Sdd22 = −3.6 dB — none of the three are anywhere near a good match. That's expected here, not a defect in the structure: this test case is the bare coil pair with no compensating MIM capacitors, and §7 explains why no real-load figure of merit is reported from it.
+## Summary for this transformer
 
-![Sdd11 magnitude and phase vs. mesh](results/plots/sdd11_convergence.png)
-![Sdd21 magnitude and phase vs. mesh](results/plots/sdd21_convergence.png)
-![Sdd22 magnitude and phase vs. mesh](results/plots/sdd22_convergence.png)
+- **For inductance and coupling, 2 µm is enough** (within 0.5% of the finest results, about 7 minutes).
+- **Q is the hard quantity.** Even the finest run here (AMR, almost 2 hours) is still rising. Treat simulated Q at 30 GHz as a lower bound: the 2 µm mesh underestimates it by roughly 5% compared with AMR, and the true value may be higher still.
+- **5 µm is too coarse for this geometry** and crashed the solver. The cell size should not be much larger than the 2 µm trace width.
 
-All five traces (4 uniform meshes + AMR final) are visually indistinguishable in the overlay plots — this is a well-converged structure across the entire working mesh range.
+These numbers belong to this layout. Wider traces or a different frequency range will change them. When Q matters, check it with one finer run, since L and k settling doesn't mean Q has settled.
 
-## 5. Delta-S tables
-
-**Metric:** `Max|ΔS|` is the standard HFSS-style convergence metric — the maximum **linear** complex-magnitude difference over the common frequency band, computed over 1–200 GHz (the two synthetic sub-1GHz points that gds2palace injects to replace a requested DC/0Hz point are excluded from all delta-S calculations and tables — they aren't real solved frequencies of interest, same convention used in the other studies on this page and by `palace_summary.py`'s AMR iterations). The `|dS_dB|` columns are a secondary, intuitive readout at three specific frequencies: the two sweep edges (1 GHz, 200 GHz) and the 30 GHz design frequency (§4). Tables are grouped by parameter first, then by mesh comparison.
-
-### 5a. Successive mesh steps
-
-#### Sdd11
-
-| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---:|---:|---:|---:|
-| 4→3 µm | 0.0156 | 0.0002 | 0.040 | 0.009 |
-| 3→2 µm | 0.0352 | 0.0067 | 0.050 | 0.015 |
-| 2→1 µm | 0.0342 | 0.0002 | 0.045 | 0.017 |
-| 1µm→AMR final | 0.0283 | 0.0015 | 0.034 | 0.024 |
-
-#### Sdd21
-
-| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---:|---:|---:|---:|
-| 4→3 µm | 0.0091 | 0.0049 | 0.029 | 0.075 |
-| 3→2 µm | 0.0132 | 0.0604 | 0.037 | 0.111 |
-| 2→1 µm | 0.0130 | 0.0003 | 0.034 | 0.103 |
-| 1µm→AMR final | 0.0114 | 0.0173 | 0.008 | 0.184 |
-
-#### Sdd22
-
-| Comparison | Max\|ΔS\| (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---:|---:|---:|---:|
-| 4→3 µm | 0.0194 | 0.0005 | 0.041 | 0.006 |
-| 3→2 µm | 0.0188 | 0.0042 | 0.052 | 0.002 |
-| 2→1 µm | 0.0160 | 0.0005 | 0.045 | 0.011 |
-| 1µm→AMR final | 0.0172 | 0.0014 | 0.035 | 0.016 |
-
-All linear Max\|ΔS\| values stay in a tight 0.009–0.035 band across every comparison and every parameter — no null-crossing artifacts here (unlike the balun's S11), since none of Sdd11/Sdd21/Sdd22 dips to a deep null in this band.
-
-### 5b. Every mesh vs. the finest uniform mesh (1 µm) as reference
-
-#### Sdd11
-
-| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---:|---:|---:|---:|
-| 4 µm | 0.0849 | 0.0067 | 0.135 | 0.041 |
-| 3 µm | 0.0693 | 0.0069 | 0.095 | 0.032 |
-| 2 µm | 0.0342 | 0.0002 | 0.045 | 0.017 |
-| AMR final | 0.0283 | 0.0015 | 0.034 | 0.024 |
-
-#### Sdd21
-
-| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---:|---:|---:|---:|
-| 4 µm | 0.0352 | 0.0552 | 0.100 | 0.289 |
-| 3 µm | 0.0261 | 0.0601 | 0.071 | 0.214 |
-| 2 µm | 0.0130 | 0.0003 | 0.034 | 0.103 |
-| AMR final | 0.0114 | 0.0173 | 0.008 | 0.184 |
-
-#### Sdd22
-
-| Mesh | Max\|ΔS\| vs. 1 µm (linear) | \|ΔS\|@1GHz (dB) | \|ΔS\|@30GHz (dB) | \|ΔS\|@200GHz (dB) |
-|---|---:|---:|---:|---:|
-| 4 µm | 0.0542 | 0.0053 | 0.138 | 0.020 |
-| 3 µm | 0.0348 | 0.0048 | 0.096 | 0.013 |
-| 2 µm | 0.0160 | 0.0005 | 0.045 | 0.011 |
-| AMR final | 0.0172 | 0.0014 | 0.035 | 0.016 |
-
-Clean, monotonic convergence toward the 1 µm result as the uniform mesh refines (Sdd11: 0.085→0.069→0.034; Sdd21: 0.035→0.026→0.013; Sdd22: 0.054→0.035→0.016). The AMR final result sits at or slightly better than the 2 µm uniform mesh on Sdd11/Sdd21, and about the same on Sdd22 — for roughly **15× the runtime and 6× the RAM** of the 2 µm uniform run (§6).
-
-## 6. Discussion / recommendation
-
-- **Uniform mesh converges smoothly across the working range (4→1 µm)** — no numerical surprises once the 5 µm point (§1) is excluded. Linear Max\|ΔS\| vs. the 1 µm reference improves steadily: Sdd11 0.085→0.034, Sdd21 0.035→0.013, Sdd22 0.054→0.016 going from 4 µm to 2 µm.
-- **2 µm is a good working point**: within 0.013–0.034 linear ΔS of the 1 µm result on all three mixed-mode parameters, at half the runtime (7m vs 14m) and RAM (4.2 vs 7.5 GB).
-- **AMR (2 µm start, 3 iterations) again shows steep diminishing returns**, this time within the capped budget itself: essentially all the accuracy gain happened by iteration 2 (28m27s), while iteration 3 added over an hour of extra compute for a Max ΔS improvement from 0.0197 to 0.0191 — a difference smaller than run-to-run mesh noise. The final AMR result is comparable to (not clearly better than) the 2 µm uniform mesh's accuracy, at roughly 15× the cost. Capping AMR at 2 iterations here would have captured nearly all the benefit for a fraction of the price.
-- **Practical recommendation for this transformer**: use the 2 µm uniform mesh with the Metal3 override, as in the working template. Skip AMR for this geometry unless a specific concern justifies it — and if used, cap it at 2 iterations, not the full requested budget.
-- **The 5 µm mesh-quality crash (§1) is worth a closer look** if a coarser starting point is ever needed (e.g. for a faster AMR start) — it likely traces to one specific small feature (a via or the center-tap strap) that needs local mesh control independent of the global `refined_cellsize`.
-
-## 7. Why there is no "real load" / floating-impedance analysis here
-
-An earlier version of this report reduced the 5-port Z-matrix under a floating 100 Ω differential load on the secondary, to derive `Zin,diff` at the primary and compare it against the mixed-mode `Sdd11` from §4. That analysis has been removed: this test structure is the transformer coil pair only, at its 30 GHz design target — it does not include the MIM capacitors that the actual matching network uses to compensate the transformer's imaginary part. A bare-coil floating-load impedance (or any "how well does this match a real load" claim built on it) is therefore not representative of the real circuit at any frequency, including 30 GHz, and reporting it invites the wrong conclusion. The mixed-mode S-parameters in §4 remain valid as EM characterization of the coil pair itself (referenced to the ports' own 50 Ω, not a claim about real-load matching), and are the right basis for feeding into a separate matching-network (MIM cap) design step.
-
-## 8. Where everything lives
+## Files
 
 ```
-more_examples/mesh_convergence/mesh_convergence_transformer/
-├── README.md                                     # this report
-├── palace_transformer_imn_mesh5.py … mesh1.py   # uniform mesh model scripts (mesh5 crashes, see §1)
-├── palace_transformer_imn_amr3.py               # AMR model script
-├── palace_model/palace_transformer_imn_<name>_data/   # generated mesh/config + full Palace output
-│     (config.json, .msh, palace.json, port-S.csv, ...)
+mesh_convergence_transformer/
+├── palace_transformer_imn_mesh{5,4,3,2,1}.py    # uniform mesh (mesh5 crashes, kept for reference)
+├── palace_transformer_imn_amr3.py                # AMR, 2 µm start, 3 iterations
+├── palace_model/palace_transformer_imn_<name>_data/   # mesh, config and full Palace output per run
 └── results/
-    ├── delta_S_table.csv                        # §5a
-    ├── delta_S_vs_finest.csv                    # §5b
-    ├── analyze_convergence.py                   # regenerates the CSVs/plots above (mixed-mode formulas, fixed 30 GHz design freq.)
-    ├── render_labeled_layout.py                 # regenerates the labeled layout picture (§0)
-    ├── snp/                                     # de-embedded (and raw) 5-port Touchstone files
-    │     transformer_mesh4um.s5p … transformer_mesh1um.s5p
-    │     transformer_amr3_iter1.s5p, transformer_amr3_iter2.s5p, transformer_amr3_final.s5p
-    │     (each also has a _raw.s5p sibling without port de-embedding)
+    ├── story_plots.py            # the story_*.png plots and numbers in this report
+    ├── analyze_convergence.py    # mixed-mode Sdd ΔS tables (CSV) and Sdd overlays
+    ├── delta_S_table.csv, delta_S_vs_finest.csv
+    ├── snp/                      # 5-port Touchstone files, one per run (_raw = without port de-embedding;
+    │                             #   the AMR iteration files transformer_amr3_iter1..2 are also raw)
     └── plots/
-          transformer_layout.png, transformer_layout_labeled.png   # §0
-          sdd11_convergence.png, sdd21_convergence.png, sdd22_convergence.png
 ```
 
-All `.s5p` files are de-embedded (port parasitic inductance removed) unless suffixed `_raw`. Re-run `python results/analyze_convergence.py` from `more_examples/mesh_convergence/mesh_convergence_transformer/` (in the `d:\venv\palace` venv) any time to regenerate the tables and plots from the archived `.snp` files.
+Run the scripts from this folder in the `d:\venv\palace` venv to regenerate plots and tables from the archived Touchstone files.
