@@ -94,7 +94,7 @@ Top-level structure:
 </Stackup>
 ```
 
-Smallest real example in the repo, `workflow/pcb_ro4003.xml` (full file, verified):
+Smallest real example in the repo, `XML_stackup/legacy/pcb_ro4003.xml` (full file, verified):
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
   <Stackup schemaVersion="2.0">

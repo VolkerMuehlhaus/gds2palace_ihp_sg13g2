@@ -47,7 +47,7 @@ mesh  = 2  # define here, so that we can add this information to output filename
 order = 2  # define here, so that we can add this information to output filenames
 
 
-XML_filename = "SG13G2_nosub.xml"          # stackup
+XML_filename = "../XML_stackup/legacy/SG13G2_nosub.xml"          # stackup
 
 # preprocess GDSII for safe handling of cutouts/holes?
 preprocess_gds = False

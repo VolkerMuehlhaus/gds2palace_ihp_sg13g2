@@ -14,7 +14,7 @@ https://pypi.org/project/gds2palace/
 
 
 # XML technology files
-The *.xml files include the technology description with materials, layer mappings and physical location in the stackup. They look similar to the files used by IHP openEMS workflow, but might be slightly different in the details to enable special "tricks" for Palace.
+The *.xml technology files used by these models are located in [../XML_stackup/legacy](../XML_stackup/legacy), and the models reference them by relative path from there. They include the technology description with materials, layer mappings and physical location in the stackup. They look similar to the files used by IHP openEMS workflow, but might be slightly different in the details to enable special "tricks" for Palace.
 
 # GDSII layout files (including port shapes)
 The *.gds files are the layouts for these examples. They include port shapes on special layers (typically 201 and above) that are referenced by the simulation model code. Note that port shapes for this Palace workflow must be 2D sheets, so vertical via ports are created as zero width boxes in the xy plane. This makes it difficult to see them in the GDSII layout viewer.

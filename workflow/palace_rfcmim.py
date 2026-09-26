@@ -40,7 +40,7 @@ run_command = ['./run_sim']
 # ===================== input files and path settings =======================
 
 gds_filename = "rfcmim_30x15x10_full.gds"   # geometries
-XML_filename = "SG13G2_200um.xml"          # stackup
+XML_filename = "../XML_stackup/legacy/SG13G2_200um.xml"          # stackup
 
 # preprocess GDSII for safe handling of cutouts/holes?
 preprocess_gds = True

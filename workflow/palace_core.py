@@ -41,7 +41,7 @@ run_command = ['./run_sim']
 # ===================== input files and path settings =======================
 
 gds_filename = "50_ghz_mpa_core_no_BJT.gds"   # geometries
-XML_filename = "SG13G2_100um.xml"          # stackup
+XML_filename = "../XML_stackup/legacy/SG13G2_100um.xml"          # stackup
 
 # preprocess GDSII for safe handling of cutouts/holes?
 preprocess_gds = False

@@ -52,7 +52,7 @@ The plot below shows 4 curves:
 
 The measurement does **not** agree yet with our simulation in multiple aspects, including peak Q and SRF, and in this study we will adress (and improve) all of this. For now, focus on the **series resistance** on the bottom right side. 
 
-The ~0.4 Ohm offset from simple via array merging (no correction for fill factor) is confirmed. This error source can be removed, without falling back to the slow individual via simulation: Results with via array merging **plus** the new `settings['fill_factor_correction']=True` option are **visually identical** to the data with no via array merging, but at **lower simulation cost**:
+Conclusion: The ~0.4 Ohm offset from simple via array merging (no correction for fill factor) is confirmed. This error source can be removed, without falling back to the slow individual via simulation: Results with via array merging **plus** the new `settings['fill_factor_correction']=True` option are **visually identical** to the data with no via array merging, but at **lower simulation cost**:
 
 | Via array handling | Conductor model | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
 |---|---|---:|---:|---:|---:|---:|
@@ -64,7 +64,7 @@ The correction factor for effective cross section is calculated by gds2palace as
 
 ![(via_merge)](results/plots/correction_factor_in_mesh.png)
 
-Internally, gds2palace groups fill factor correction factors in buckets where the value agrees within 20%, to avoid creating excessive number of via groups for larger designs.
+Internally, gds2palace groups correction factors in buckets where the value agrees within 20%, to avoid creating excessive number of via groups for larger designs.
 
 
 
@@ -77,7 +77,7 @@ In the User's Guide, there is a detailed analysis on the limitations of that sur
 
 **Be aware that this is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. You would need to mesh into skin effect then, which is numerically expensive. Both loss models have their use cases.**
 
-The next plot compares simulation both done with via array merging plus fill factor correct, at two different conductor loss models and refined_cellzize=2 µm. Blue is the measured baseline, red is the surface loss model and purple is the new volume mesh ("fill inside") model. 
+The next plot compares the two different conductor loss models. Blue is the measured baseline, red is the surface loss model and purple is the new volume mesh ("fill inside") model. Both models use refined_cellzize=2 µm with via array merging plus fill factor correct.  
 
 ![(via_merge)](results/plots/surface_vs_filled.png)
 
@@ -92,7 +92,7 @@ Volume meshing of filled conductors means more mesh cells and more numerical eff
 
 What is not shown in this table: Palace also calculates internal "quality" metrics from the FEM solution. These error indicator values are approximately twice as much for the volume mesh model. This indicates that we might need a smaller refined_cellsize value for the volume mesh model. We will come back to that later, for the "ultimate" final model with best accuracy.
 
-**IMPORTANT NOTE:  For accurate loss calculation, volume mesh requires to mesh into skin effect! In this frequency range here, δ = 0.91µm @ 10 GHz, so we are already on the edge: refined_cellsize = 2µm and TopMetal2 thickness = 3 µm. This gets even harder at higher frequencies where the skin depth becomes much smaller than 1 µm, e.g. 0.41µm @ 50 GHz and 0.2 µm @ 200 GHz.**
+**IMPORTANT NOTE:  For accurate loss calculation, volume mesh requires to mesh into skin effect! In this frequency range here, δ = 0.91µm @ 10 GHz, so we might be already on the edge: mesh refined along the edges is enforced by settings['refined_cellsize']=2 micron here. This gets even harder at higher frequencies where the skin depth becomes much smaller than 1 µm, e.g. 0.41µm @ 50 GHz and 0.2 µm @ 200 GHz.**
 
 
 ## 3. Conformal passivation over TopMetal2
@@ -146,7 +146,7 @@ This model is numerically more expensive because we now create additional mesh c
 
 From here, we can now go two directions: 
 - investigate a "cheaper" model with that places the SiO2 + Passivation correct for the valleys, but skips the dielectrics on top and sides of TopMetal2 
-- investigate a "ultimate accuracy" model with refined_cellsize=1 µm to see how much close this brings us to measurement
+- investigate a "ultimate accuracy" model with refined_cellsize=1 µm to see how much closer this brings us to measurement (hopefully).
 
 ## 4. Cheaper model for TopMetal2 dielectrics
 
@@ -165,19 +165,19 @@ Results are very similar to the full 3D conformal simulation, both in effort and
 
 Below is a comparison of the resulting mesh, cutting plane near the middle of the model, fdump=6 GHz.
 
-Top view of overall mesh:
+Top view of overall mesh:  
 ![(Passivation)](results/plots/passicut_mesh_top.png)
 
-Side view of the overall mesh, the "hanging"" mesh lines on the periphery are the air layersurrounding the SG13G2 stackup:
+Side view of the overall mesh, the "hanging"" mesh lines on the periphery is from airbox surrounding the SG13G2 stackup:  
 ![(Passivation)](results/plots/passicut_mesh_sideview.png)
 
-Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "3D conformal". We can clearly see the top cover and side walls in the mesh lines:
+Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "3D conformal". We can clearly see the dielectric top cover and side walls in the mesh lines:  
 ![(Passivation)](results/plots/volume_3D_conformal.png)
 
-Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "passicut" which was meant to be "cheaper" alternative to true 3D conformal passivation:
+Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "passicut" which was meant to be "cheaper" alternative to true 3D conformal passivation. Note the passivation at approximately half the TopMetal2 height, with air above:  
 ![(Passivation)](results/plots/volume_passicut.png)
 
-Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "SG13G2_200um" which is the present default, with thick planar layer of dielectric. We can clearly identify the big SiO2 block extending further up, with the thin Passivation layer on top.
+Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "SG13G2_200um" which is the present default, with thick planar layer of dielectric. We can clearly identify the big SiO2 block extending further up, with the thin Passivation layer on top. Due to the log scale used in this plot, we can't really see much difference in fields above/around TopMetal2.
 ![(Passivation)](results/plots/volume_regular.png)
 
 For the sake of completeness, we can also compare the mesh and fields resulting for that "SG13G2_200um" stackup with hollow conductors using the default "surface impedance" model. 
@@ -186,11 +186,11 @@ This surface impedance model took 15m 31s and 961,766 DOF, the more accurate 3D 
 
 ## 5. Cheaper model, revisited
 
-We have seen that all models create really dense mesh in the gap between conductors, and also on the conductor edges, so here is another idea to get a "cheap" model: can we use refined_cellsize = 5 micron, for less mesh vertices along the conductors, while getting dense mesh in the critical region (perpendicular to the metal surface) from conformal passivation stackup? Let's try this!
+We have seen that all models create really dense mesh in the gap between conductors, and also on the conductor edges, much finer than the 2 µm refined cellsize value enforced in the model. So here is another idea to get a "cheap" model: can we use refined_cellsize = 5 micron, for less  mesh vertices along the conductors (where fields changes only slowly) and get dense mesh in the critical region (perpendicular to the metal surface) from conformal passivation stackup? Let's try this!
 
 ![(Passivation)](results/plots/passi3D_5um.png)
 
-Compared to the 2 micron mesh, we loose accuracy in peak Q and also in SRF. But at the same time, this runs ~ 3x faster and uses only 1/3rd of the memory. At only 10 minutes simulation time, this could be reasonable approach for the development phase, with some high accuracy run done later.
+Compared to the 2 micron mesh, we loose accuracy in peak Q and also a little bit in SRF. But at the same time, this runs ~ 3x faster and uses only 1/3rd of the memory. At only 10 minutes simulation time for the sweep, this could be reasonable "daily driver" for the development phase, with some high accuracy check done later.
 
  Stackup | Via array handling | Conductor model | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
 |---|---|---|---:|---:|---:|---:|---:|
@@ -208,14 +208,15 @@ The idea with the side wall dielectric as an additional mesh refinement **around
 ## 6. The ultimate model?
 
 If we are striving for most accurate results, regardless of simulation "cost", we can combine
-- viar array merging with correction factor, to get effective cross section right
+
+- via array merging with correction factor, to get effective cross section right  
 - conformal passivation stackup, to get the true sidewall coverage above TopMetal2
 - filled metals with volume meshing in this rather low frequency case
-- small refined_cellsize to make sure field resolution can capture skin effectz properly
+- small refined_cellsize to make sure field resolution can capture skin effect properly
 
 For our inductor testcase, this was implemented using refined_cellsize = 1 µm instead of the 2 µm mesh resolution used above.
 
-Results show only a very minor change between the refined_cellsize=1 micron (purple) and 2 micron (red) results. This is not worth the simulation effort, but only **after** this check, we know for sure.
+Results show only a very minor change between the refined_cellsize=1 micron (purple) and 2 micron (red) results. This is not worth the simulation effort, but only **after** this check, we know for sure!
 
 ![(Passivation)](results/plots/passi3D_1um.png)
 
@@ -225,3 +226,5 @@ This is still a feasible simulation on a machine with 64 GB RAM or more. Such a 
 |---|---|---|---:|---:|---:|---:|---:|
 | Conformal | merge + correction | Volume | 2 µm | 1,443,950 | 227,770 | 34m 1s | 21.12 GB |
 | Conformal | merge + correction | Volume | 1 µm | 2,919,066 | 460,289 | 1h 21m 33s | 43.14 GB |
+
+If you like the field and mesh plots in this study: they were all created using the built-in fields viewer in setupEM, based on simulation model data with just one `fdump`frequency. That's enough for visualization.  

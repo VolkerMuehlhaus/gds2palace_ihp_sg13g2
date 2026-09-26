@@ -2,7 +2,7 @@
 
 Volker Mühlhaus,volker@muehlhaus.com
 ---
-Document version: 2026-08-17
+Document version: 2026-09-25
 
 ## Contents
 [What's New](#whats-new)  
