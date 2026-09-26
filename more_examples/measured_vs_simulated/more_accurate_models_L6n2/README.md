@@ -42,10 +42,10 @@ The effect of via array merging was investigated for this inductor because we ha
 With 8 via arrays and 16 vias each, we have a total of 8/16*1.1 Ohm nominal resistance from the vias = 0.55 Ohm. Via array merging replaces the individual vias by the overall bounding box, roughly a 4x increase in effective cross section. We expect to see a difference of ~ 0.4 Ohm, which sounds like a small effect only, but that is already ~10% of the total inductor resistance in this case (looking at DC values).
 
 The plot below shows 4 curves:
-- blue baseline: measurement results 
-- red: simulation result **with** via array merging, **no** fill factor correction
-- purple: simulation result **without** via array merging
-- green: simulation result **with** via array merging, **with** fill factor correction
+- baseline: measurement results 
+- simulation result **with** via array merging, **no** fill factor correction
+- simulation result **without** via array merging
+- simulation result **with** via array merging, **with** fill factor correction
 
 
 ![(via_merge)](results/plots/via_array_merging.png)
@@ -120,7 +120,7 @@ There is still one simplification built into that "3D conformal" stackup: IHP on
 
 ![(Passivation)](results/plots/derived2.png)
 
-The stackup preview in setupEM (the GUII for gds2palace) is somewhat limited to show the result, but maybe you get the idea.
+The stackup preview in setupEM (the GUII for gds2palace) is somewhat limited to show the result, but maybe you get the idea. TopMetal2 is drawn there inside SiO2 because the bottom side starts inside that dielectric. The top side of TopMetal2 is actually 1.5µm **above** the SiO2 dielectric, shown here as negative distance to the dielectric above.
 
 ![(Passivation)](results/plots/stackup_preview_conformal.png)
 
@@ -142,7 +142,7 @@ This model is numerically more expensive because we now create additional mesh c
  Stackup | Via array handling | Conductor model | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
 |---|---|---|---:|---:|---:|---:|---:|
 | Planar | merge + correction | Volume | 2 µm | 1,163,958 | 183,440 | 18m 33s | 15.67 GB |
-| Conformal | merge + correction | Volume | 2 µm | 1,443,950 | 227,770 | 34m 1s | 21.12 GB |
+| Conformal | merge + correction | Volume | 2 µm | 1,442,856 | 227,614 | 34m 29s | 21.17 GB |
 
 From here, we can now go two directions: 
 - investigate a "cheaper" model with that places the SiO2 + Passivation correct for the valleys, but skips the dielectrics on top and sides of TopMetal2 
@@ -156,8 +156,8 @@ In reality, it turns out that the dielectrics hitting TopMetal2 half way on the 
 
  Stackup | Via array handling | Conductor model | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
 |---|---|---|---:|---:|---:|---:|---:|
-| Conformal | merge + correction | Volume | 2 µm | 1,443,950 | 227,770 | 34m 1s | 21.12 GB |
-| PassiCut | merge + correction | Volume | 2 µm | 1,463,206 | 230,506 | 29m 4s | 21.81 GBB |
+| Conformal | merge + correction | Volume | 2 µm | 1,442,856 | 227,614 | 34m 29s | 21.17 GB |
+| PassiCut | merge + correction | Volume | 2 µm | 1,463,206 | 230,506 | 29m 4s | 21.81 GB |
 
 Results are very similar to the full 3D conformal simulation, both in effort and results.
 
@@ -168,7 +168,7 @@ Below is a comparison of the resulting mesh, cutting plane near the middle of th
 Top view of overall mesh:  
 ![(Passivation)](results/plots/passicut_mesh_top.png)
 
-Side view of the overall mesh, the "hanging"" mesh lines on the periphery is from airbox surrounding the SG13G2 stackup:  
+Side view of the overall mesh, the "tilted" mesh lines on the periphery are from airbox surrounding the SG13G2 stackup:  
 ![(Passivation)](results/plots/passicut_mesh_sideview.png)
 
 Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "3D conformal". We can clearly see the dielectric top cover and side walls in the mesh lines:  
@@ -182,7 +182,7 @@ Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "SG13G2_2
 
 For the sake of completeness, we can also compare the mesh and fields resulting for that "SG13G2_200um" stackup with hollow conductors using the default "surface impedance" model. 
 ![(Passivation)](results/plots/sheet_regular.png)
-This surface impedance model took 15m 31s and 961,766 DOF, the more accurate 3D conformal passivation model took 34m 1s and 1,443,950 DOF.  
+This surface impedance model took 15m 31s and 961,766 DOF, the more accurate 3D conformal passivation model took 34m 29s and 1,442,856 DOF.  
 
 ## 5. Cheaper model, revisited
 
@@ -194,8 +194,8 @@ Compared to the 2 micron mesh, we loose accuracy in peak Q and also a little bit
 
  Stackup | Via array handling | Conductor model | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
 |---|---|---|---:|---:|---:|---:|---:|
-| Conformal | merge + correction | Volume | 2 µm | 1,443,950 | 227,770 | 34m 1s | 21.12 GB |
-| Conformal | merge + correction | Volume | 5 µm | 558,750 | 88,179 | 10m 20s | 7.26 GB |
+| Conformal | merge + correction | Volume | 2 µm | 1,442,856 | 227,614 | 34m 29s | 21.17 GB |
+| Conformal | merge + correction | Volume | 5 µm | 555,950 | 87,739 | 10m 31s | 7.39 GB |
 
 Detail view cut at y=40 µm plane, E field  with mesh overlay, stackup "3D conformal". We can clearly see the top cover and side walls in the mesh lines:
 ![(Passivation)](results/plots/volume_3D_conformal_5um.png)
@@ -224,7 +224,9 @@ This is still a feasible simulation on a machine with 64 GB RAM or more. Such a 
 
  Stackup | Via array handling | Conductor model | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
 |---|---|---|---:|---:|---:|---:|---:|
-| Conformal | merge + correction | Volume | 2 µm | 1,443,950 | 227,770 | 34m 1s | 21.12 GB |
-| Conformal | merge + correction | Volume | 1 µm | 2,919,066 | 460,289 | 1h 21m 33s | 43.14 GB |
+| Conformal | merge + correction | Volume | 2 µm | 1,442,856 | 227,614 | 34m 29s | 21.17 GB |
+| Conformal | merge + correction | Volume | 1 µm | 2,875,590 | 453,423 | 1h 14m 15s | 42.67 GB |
 
-If you like the field and mesh plots in this study: they were all created using the built-in fields viewer in setupEM, based on simulation model data with just one `fdump`frequency. That's enough for visualization.  
+If you like the field and mesh plots in this study: they were all created using the built-in field viewer in setupEM, based on simulation model data with just one `fdump`frequency. That's enough for visualization, simulating fast.  
+
+ **Be aware that "filled metals" with volume mesh is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. Both loss models have their use cases.**  

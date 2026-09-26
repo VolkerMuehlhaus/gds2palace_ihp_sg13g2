@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <Stackup schemaVersion="3.1">
-  <!-- Created/modified using the XML Stackup Editor in setupEM -->
+  <!-- Created/modified using the XML Stackup Editor in Stackup Editor -->
   <!-- ============================================================ -->
   <!-- Model for use with gds2palace S-Parameter simulation: -->
-  <!-- IHP SG13G2 with 200 um final chip height (including BEOL). Resistors not included. -->
+  <!-- IHP SG13G2 with 200 um final chip, conformal 3D passivation above TopMetal2 using derived layers. This is more effort to simulate, but closer to reality than a planar passivation model that also fills the "valleys" between TopMetal2 traces. -->
   <!-- ============================================================ -->
   <!-- Reference-relative positioning requires gds2palace util_stackup_reader.py version 1.9.4 or newer -->
   <!-- <Variables>/"=" expressions require gds2palace util_stackup_reader.py version 1.9.4 or newer -->
@@ -41,7 +41,7 @@
       <Dielectric Name="Substrate" Material="Substrate" Thickness="180.0000" />
     </Dielectrics>
     <Layers>
-      <Layer Name="TM2_above" Type="dielectric" Reference="TopMetal2" Material="SiO2" Layer="900" Zmin="0" Zmax="1.5" />
+      <Layer Name="TM2_above" Type="dielectric" Reference="TopMetal2" Material="SiO2" Layer="900" Zmin="0" Zmax="=1.5+0.4" />
       <Layer Name="TopMetal2" Type="conductor" Reference="TopVia2" ReferenceEdge="Top" Material="TopMetal2" Layer="134" Zmin="0.0000" Zmax="3.0000" />
       <Layer Name="TM2_sides" Type="dielectric" Reference="TopMetal2" ReferenceEdge="Bottom" Material="SiO2" Layer="901" Zmin="0" Zmax="3" />
       <Layer Name="TopVia2" Type="via" Reference="TopMetal1" ReferenceEdge="Top" Material="TopVia2" Layer="133" Zmin="0.0000" Zmax="2.8000" />

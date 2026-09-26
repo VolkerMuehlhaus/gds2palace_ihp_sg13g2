@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <Stackup schemaVersion="3.1">
-  <!-- Created/modified using the XML Stackup Editor in setupEM -->
+  <!-- Created/modified using the XML Stackup Editor in Stackup Editor -->
   <!-- ============================================================ -->
   <!-- Model for use with gds2palace S-Parameter simulation: -->
-  <!-- IHP SG13G2 with 200 um final chip height (including BEOL). Resistors not included. -->
+  <!-- IHP SG13G2 with SiO2 + passivation NOT creating a thick dielectric block that extends another 1.5µm + 0.4µm above TopMetal2. Insteas, SiO2 height is sized for the "valleys" outside TopMetal2, and cut  TopMetal2 approximately half way. This avoids an over-estimate of sidewall capacitance between closely spaced TopMetal2 traces. -->
   <!-- ============================================================ -->
   <!-- Reference-relative positioning requires gds2palace util_stackup_reader.py version 1.9.4 or newer -->
   <!-- <Variables>/"=" expressions require gds2palace util_stackup_reader.py version 1.9.4 or newer -->
