@@ -1,134 +1,106 @@
-# Mesh Convergence Study: MIM-loaded balun (trans_100diff_to_80se_ports, IHP SG13G2)
+# How fine a mesh does this MIM-loaded balun need? (IHP SG13G2)
+
+This study asks a practical question for one specific layout: a complete 17–22 GHz balun, including its MIM capacitors, that converts an 80 Ω single-ended port into a 100 Ω differential pair. How fine must the Palace mesh be to trust its loss, match and balance? And how close does the simulation get to the nominal value of one of its MIM capacitors?
+
+We answer this in three steps:
+
+1. **Refine a uniform mesh** from 3 µm to 1 µm and see which balun properties move.
+2. **Cross-check the finest result** with adaptive mesh refinement (AMR).
+3. **Check one MIM capacitor on its own**, against its nominal value.
+
+The findings apply to this balun, with this stackup, in this frequency range. Other structures can behave quite differently. The [overview page](../README.md) collects the other mesh studies.
+
+## The details of this study
 
 - **Model:** `trans_100diff_to_80se_ports.gds`, stackup `SG13G2_200um.xml`
-- **Solver:** AWS Palace (FEM), order 2, ABC boundaries, 100 µm margin + 20 µm air-around
-- **Sweep:** 17–22 GHz, 0.1 GHz step, Palace's PROM-based adaptive frequency sweep
-- **Ports:** 3 via ports (Metal3→TopMetal2), Z0 = 50 Ω — port 1 single-ended, ports 2/3 a differential pair (no center tap)
-- **Execution:** remote solve on `hpz2` (`mpirun -n 16`), variants run sequentially
+- **Ports:** 3 via ports (Metal3 → TopMetal2), simulated at 50 Ω and re-referenced afterwards to the true system impedances: port 1 single-ended at 80 Ω, ports 2/3 differential at 100 Ω. Raw S-parameters are used (no port de-embedding), for all runs alike.
+- **Solver:** AWS Palace (FEM), order 2, ABC boundaries, 100 µm margin + 20 µm air
+- **Sweep:** 17–22 GHz in 0.1 GHz steps (adaptive frequency sweep)
+- **Mesh:** `refined_cellsize` varied as described below. Metal3 is always kept at 5 µm (`refined_cellsize_override`), and via arrays are merged identically in all runs.
+- **Execution:** `hpz2`, 16 cores
 
 ## 0. Layout
 
-![trans_100diff_to_80se_ports layout with port positions and MIM capacitor values labeled, IHP SG13G2 pixel-accurate colors](results/plots/trans_100diff_to_80se_ports_layout_labeled.png)
+![Balun layout with port positions and MIM capacitor values labeled](results/plots/trans_100diff_to_80se_ports_layout_labeled.png)
 
-Measured directly from the GDS: a single-turn racetrack coil, 350×660 µm cell. **P1** (single-ended, target 80 Ω external) breaks out on the left; **P2/P3** (differential pair, target 100 Ω external differential) break out on the right. Three MIM capacitors are present, with nominal values read from their GDS text labels: one 280.026 fF cap near P1, and two 349.908 fF caps near P2/P3.
+A single-turn racetrack coil in a 350 × 660 µm cell. **P1** (single-ended) is on the left, **P2/P3** (differential pair) on the right. Three MIM capacitors complete the matching: 280 fF near P1 and 2 × 350 fF near P2/P3 (nominal values from the GDS text labels).
 
-## 1. Method
+**What we look at.** At the true system impedances:
 
-Four model variants: `refined_cellsize` = 3 µm (initial check), 2 µm, 1 µm (all uniform, order 2), plus AMR (2 iterations, starting mesh 2 µm). No order=1 comparison for this study. Metal3 is pinned to a fixed 5 µm `refined_cellsize_override` in every variant, independent of the swept global cell size. TopVia2/Vmim arrays are merged into one polygon per via cluster (`merge_polygon_size = 3 µm`), identical across all variants.
+- **Insertion loss**: transmission from the single-ended input to the differential output
+- **Input match** |Sss11| at 80 Ω and **output match** |Sdd22| at 100 Ω differential
+- **Amplitude and phase imbalance** between the two outputs (ideal: 0 dB, 180°)
 
-All 3 ports were simulated at `port_Z0 = 50 Ω`; the true external system impedances (80 Ω single-ended at port 1, 100 Ω differential across ports 2/3) are applied afterward by re-referencing the S-parameters (§3). All S-parameter results in this report use the **raw** Touchstone files, not the port-inductance-de-embedded ones — see §4.
+## 1. Uniform mesh refinement
 
-## 2. Mesh sweep — results
+We ran the model at `refined_cellsize` = 3, 2 and 1 µm, all at FEM order 2. The dotted line is the AMR result from step 2. Note the zoomed axes: the differences are all small.
 
-| Mesh | DOF | Mesh elements | Solve time | Peak RAM |
+![Balun properties vs. mesh size](results/plots/story_balun.png)
+
+- **Insertion loss is robust**: 1.18–1.32 dB across the band for every mesh. Refining lowers it by at most 0.05 dB, at the upper band edge.
+- **Balance is robust**: amplitude imbalance stays within ±0.15 dB for every mesh (not plotted). Phase imbalance shifts by about 0.3° between meshes and stays within ±1.3°.
+- **The match moves the most, but stays good.** The input-match null moves from 18.0 GHz (3 µm) to 18.4 GHz (1 µm). The worst in-band input match (at 22 GHz) improves from −15.5 to −17.0 dB, and the output match from −19.6 to −21.3 dB.
+
+3 µm and 2 µm are close to each other. The larger step comes from 2 µm to 1 µm, where the matching curves move toward the AMR result.
+
+| Mesh | DOF | Solve time | Peak RAM |
+|---|---:|---:|---:|
+| 3 µm | 696,908 | 9m 6s | 7.02 GB |
+| 2 µm | 948,860 | 13m 19s | 9.30 GB |
+| 1 µm | 1,951,380 | 25m 42s | 17.52 GB |
+
+## 2. Cross-check with AMR
+
+AMR started from the 2 µm mesh and ran 2 refinement iterations, ending at 3.1 million DOF. In the plot above it is the dotted line, and it lies on top of the 1 µm curve in the match and phase panels.
+
+| | Max\|ΔS\| vs. AMR | Worst input match | Total time | Peak RAM |
 |---|---:|---:|---:|---:|
-| 3 µm (initial check) | 696,908 | 99,773 | 9m 6s | 7.02 GB |
-| 2 µm | 948,860 | 134,844 | 13m 19s | 9.30 GB |
-| 1 µm | 1,951,380 | 274,919 | 25m 42s | 17.52 GB |
+| 3 µm | 0.033 | −15.5 dB | 9m 6s | 7.02 GB |
+| 2 µm | 0.024 | −15.9 dB | 13m 19s | 9.30 GB |
+| 1 µm | 0.003 | −17.0 dB | 25m 42s | 17.52 GB |
+| AMR, 2 iterations | (reference) | −16.9 dB | 1h 54m | 30.0 GB |
 
-No crashes or fatal mesh-quality failures anywhere in this range; gmsh flagged a handful of non-fatal "ill-shaped tets" warnings at every setting (4-8 out of >100k elements), consistent with the small MIM-via geometry rather than a config issue.
+(Max|ΔS| is taken over the mixed-mode parameters Sss11, Sds21 and Sdd22 at the true system impedances.)
 
-### 2a. Adaptive mesh refinement
+The 1 µm uniform mesh and AMR agree within Max|ΔS| = 0.003, so we consider 1 µm converged for this balun. AMR adds a useful confirmation, but at 4.5× the time of the 1 µm run it doesn't change the answer. AMR's insertion loss sits about 0.015 dB below the 1 µm curve, which is negligible for design.
 
-Starting mesh: 2 µm. Requested `adaptive_mesh_iterations=2`.
+## 3. Side check: one MIM capacitor vs. its nominal value
 
-| Iteration | DOF | Mesh elements | Max \|ΔS\| vs. prev. | Time (cumulative) | Peak RAM |
-|---|---:|---:|---:|---:|---:|
-| 1 | 948,860 | 134,844 | n/a | 13m 42s | 9.92 GB |
-| 2 | 1,304,880 | 206,468 | 0.0112 | 38m 8s | 13.54 GB |
-| **Final** | **3,112,276** | **537,603** | **0.0066** | **1h 54m 12s** | **29.99 GB** |
+Separately from the mesh sweep, the 280 fF capacitor near P1 was simulated alone (`verify_MIM_nominal_280.gds`), with a 1-port across its plates. Its capacitance C = Im(Y11)/ω was evaluated at 1 GHz:
 
-Iteration 1 matches the 2 µm uniform mesh exactly, as expected. Max|ΔS| keeps improving through the final iteration — it roughly halves from 0.0112 to 0.0066, no plateau within this 2-iteration budget.
+| Mesh | Simulated C | Nominal C | Difference |
+|---|---:|---:|---:|
+| 2 µm | 303.1 fF | 280.0 fF | +8.2% |
+| 1 µm | 295.9 fF | 280.0 fF | +5.7% |
 
-## 3. Mixed-mode S-parameters at the true system impedance (80 Ω SE / 100 Ω differential)
+Refining the mesh closes about a third of the gap. The rest is plausibly real: the port sits 20–30 µm away from the capacitor, on a Metal3 connection whose own capacitance the EM model includes but the nominal value does not. This was not investigated further.
 
-Port 1 is single-ended; ports 2/3 form a differential pair. The native 3-port Z-matrix is reduced to a single-ended/differential-mode 2-port equivalent (port a = SE port 1, port b = differential mode of ports 2/3) using the plain differential-impedance convention `Zdiff = Vdiff/I` (I = the current in one leg, driven with I2=-I3), the same convention already validated in the balun2x1 and transformer studies — **not** the Bockelman-Eisenstadt power-normalized convention, whose own `Zbb` term is exactly half of this and would silently impose a 2×Z02 differential termination if paired with Z02 directly:
+## Summary for this balun
+
+- **Loss and balance are insensitive to the mesh** in this study. Even 3 µm predicts them within about 0.06 dB and 0.3° of the finest result.
+- **1 µm is needed for the final match numbers.** It agrees with AMR, while 2 µm is about 1 dB pessimistic on the worst-case match. For design iterations, 2 µm (13 minutes) gets everything else right.
+- **AMR confirms the 1 µm result**, at 4.5× its cost.
+- **Expect simulated MIM capacitance to come out a few percent above nominal** in this setup. Part of that is mesh, part is the port connection.
+
+These numbers belong to this layout. Other coil sizes, capacitor arrangements or frequency ranges will change them.
+
+## Files
 
 ```
-Zaa = Z11
-Zab = Z12 - Z13
-Zba = Z21 - Z31
-Zbb = Z22 - Z23 - Z32 + Z33
-
-D     = (Zaa+Z01)*(Zbb+Z02) - Zab*Zba
-Sss11 = ((Zaa-Z01)*(Zbb+Z02) - Zab*Zba) / D
-Sdd22 = ((Zaa+Z01)*(Zbb-Z02) - Zab*Zba) / D
-Sds21 = 2*Zba*sqrt(Z01*Z02) / D
+mesh_convergence_balun_mim/
+├── trans_100diff_to_80se_ports.py           # 3 µm (initial check)
+├── trans_100diff_to_80se_ports_mesh{2,1}.py  # uniform mesh, order 2
+├── trans_100diff_to_80se_ports_amr2.py      # AMR, 2 µm start, 2 iterations
+├── verify_MIM_nominal_280.gds / .py         # MIM capacitor side check (§3)
+├── palace_model/<name>_data/                # mesh, config and full Palace output per run
+└── results/
+    ├── story_plots.py             # the story_balun.png plot and numbers in this report
+    ├── analyze_convergence.py     # mixed-mode ΔS tables (CSV), per-parameter overlays, balance plots
+    ├── analyze_baseline.py        # plots of the initial 3 µm run
+    ├── verify_mim_capacitance.py  # capacitance from the MIM side check
+    ├── delta_S_table.csv, delta_S_vs_finest.csv, s_parameter_table.csv, s_parameter_magnitude_table.csv
+    ├── snp/                       # raw Touchstone files, one per run
+    └── plots/
 ```
 
-with `Z01 = 80 Ω`, `Z02 = 100 Ω`. **Confirmed:** this terminates the differential pair at 100 Ω, not 100+100=200 Ω — derived directly from `Vdiff/I` with `I` the actual leg current, not a per-leg-then-summed quantity.
-
-![Sss11 vs. mesh refinement](results/plots/sss11_convergence.png)
-![Sds21 vs. mesh refinement](results/plots/sds21_convergence.png)
-![Sdd22 vs. mesh refinement](results/plots/sdd22_convergence.png)
-
-| Param | Mesh | 17 GHz \|S\| (dB) | 19.5 GHz \|S\| (dB) | 22 GHz \|S\| (dB) |
-|---|---|---:|---:|---:|
-| Sss11 | 3 µm | -25.52 | -22.66 | -15.45 |
-| Sss11 | 2 µm | -24.92 | -23.50 | -15.86 |
-| Sss11 | 1 µm | -23.20 | -26.03 | -16.97 |
-| Sss11 | AMR final | -23.51 | -25.66 | -16.88 |
-| Sds21 | 3 µm | -1.22 | -1.20 | -1.32 |
-| Sds21 | 2 µm | -1.22 | -1.20 | -1.31 |
-| Sds21 | 1 µm | -1.23 | -1.18 | -1.27 |
-| Sds21 | AMR final | -1.21 | -1.17 | -1.26 |
-| Sdd22 | 3 µm | -23.89 | -23.64 | -19.60 |
-| Sdd22 | 2 µm | -23.52 | -24.02 | -20.10 |
-| Sdd22 | 1 µm | -22.27 | -24.57 | -21.35 |
-| Sdd22 | AMR final | -22.38 | -24.15 | -21.04 |
-
-Both ports are well matched at their true impedances (Sss11, Sdd22 below -15 dB across the whole band, with a match null near -35 dB around 18.3 GHz), and insertion loss Sds21 is flat at ~1.2-1.3 dB.
-
-### 3a. Convergence vs. finest (AMR final)
-
-#### Sss11
-
-| Mesh | Max\|ΔS\| vs. AMR final (linear) |
-|---|---:|
-| 3 µm | 0.0268 |
-| 2 µm | 0.0185 |
-| 1 µm | 0.0025 |
-
-#### Sds21
-
-| Mesh | Max\|ΔS\| vs. AMR final (linear) |
-|---|---:|
-| 3 µm | 0.0331 |
-| 2 µm | 0.0244 |
-| 1 µm | 0.0021 |
-
-#### Sdd22
-
-| Mesh | Max\|ΔS\| vs. AMR final (linear) |
-|---|---:|
-| 3 µm | 0.0260 |
-| 2 µm | 0.0184 |
-| 1 µm | 0.0034 |
-
-Monotonic convergence toward the AMR final result at every mesh step. The 1 µm uniform mesh alone already comes within ~0.003 of the AMR final answer — AMR mainly buys a cross-check here rather than a materially different result.
-
-### 3b. Amplitude and phase balance (port 2 vs. port 3)
-
-A balun's two differential outputs should be equal in amplitude and 180° apart in phase. Both S21 and S31 are renormalized to the true impedance per physical port (port 1 → 80 Ω, ports 2/3 left at 50 Ω each — the natural per-leg reference for a 100 Ω differential pair with equal legs) via `skrf.Network.renormalize`, then compared directly (`results/analyze_convergence.py`). The phase trace is unwrapped along frequency and shifted by whole 360° turns to sit near 180°, avoiding the display artifact of a raw phase difference crossing the ±180° branch cut.
-
-![Amplitude imbalance, port 2 vs. port 3](results/plots/amplitude_imbalance.png)
-![Phase difference, port 2 vs. port 3](results/plots/phase_difference.png)
-
-Both are excellent across the band: amplitude imbalance stays within ±0.15 dB, and phase difference stays within about 1.3° of the ideal 180° — consistent across every mesh variant.
-
-## 4. Why raw, not de-embedded, S-parameters
-
-This report uses the raw Touchstone output (the S-parameters as computed at the port reference plane) rather than the port-inductance-de-embedded variant that `combine_snp` also produces. The de-embedding step cascades out a small negative series inductance per port (a few pH, from the port's own geometry) to shift the reference plane closer to the structure — useful when comparing to a probe-tip or pad-referenced measurement, but an extra processing step on top of the solver's direct output. For this mesh convergence study, the raw S-parameters are the more direct and reproducible quantity to track across mesh variants.
-
-## 5. MIM capacitor verification (separate check)
-
-Independent of the mesh sweep above: `verify_MIM_nominal_280.gds`/`.py` is a standalone 1-port test structure isolating the 280.026 fF MIM capacitor (the one near port 1 in the full model), to check the EM-simulated capacitance against its nominal GDS-text-label value. Port 1 is a lumped via port bridging the capacitor's two plates directly (Metal3 bottom-plate net to TopMetal2 top-plate net), so `C = Im(Y11)/(2*pi*f)` from the 1-port Y-parameter is the capacitance directly (`results/verify_mim_capacitance.py`).
-
-Two mesh sizes were checked, evaluated at 0.1 GHz and 1 GHz:
-
-| refined_cellsize | 0.1 GHz simulated C | 1 GHz simulated C | Nominal C | Error (1 GHz) |
-|---|---:|---:|---:|---:|
-| 2 µm | — | 303.10 fF | 280.03 fF | +8.24% |
-| 1 µm | 295.86 fF | 295.90 fF | 280.03 fF | +5.67% |
-
-The two frequencies agree to within 0.04 fF at 1 µm, confirming a genuinely capacitive (not numerical-noise) result. Halving the mesh size reduced the error from +8.24% to +5.67%, so mesh discretization is a real but partial contributor. The remaining gap is consistent with port 1 sitting ~20–30 µm from the actual MIM plate footprint (connected via a Metal3 trace): the EM simulation necessarily includes that trace's own parasitic capacitance to substrate, which the nominal (compact-model) value does not include. This was not investigated further (out of scope for the mesh convergence study); the full-model port assignment and layer overlap were independently confirmed correct (see `trans_100diff_to_80se_ports.py` docstring).
+Run the scripts from this folder in the `d:\venv\palace` venv to regenerate plots and tables from the archived Touchstone files.

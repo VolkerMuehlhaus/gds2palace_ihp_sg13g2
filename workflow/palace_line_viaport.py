@@ -23,7 +23,7 @@ import sys
 import subprocess
 
 # we expect gds2palace in the same directory as this model file
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname('d:/perforce/volker_OMEN15_7389/volker_OMEN15_7389/Palace_Python_OPDK/Palace'), 'gds2palace')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'gds2palace')))
 from gds2palace import *
 
 # Model comments
@@ -40,7 +40,7 @@ run_command = ['./run_sim']
 # ===================== input files and path settings =======================
 
 gds_filename = "line_simple_viaport.gds"   # geometries
-XML_filename = "SG13G2_nosub.xml"          # stackup
+XML_filename = "../XML_stackup/legacy/SG13G2_nosub.xml"          # stackup
 
 # preprocess GDSII for safe handling of cutouts/holes?
 preprocess_gds = False

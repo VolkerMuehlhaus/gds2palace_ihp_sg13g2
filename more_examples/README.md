@@ -18,7 +18,7 @@ These are extra, more advanced gds2palace examples. Each one shows a specific fe
 
 | Example | What it shows |
 |---|---|
-| [`measured_vs_simulated/inductor_L6n2_filledmetals_passivation3D`](measured_vs_simulated/inductor_L6n2_filledmetals_passivation3D) | A 4-turn inductor, simulated L, Q and R compared to measurement. Compares a planar and a conformal passivation stackup, surface impedance and `filled_metals` (solid metal volumes), and mesh sizes from 5 to 1 µm. Also shows a cheaper "passicut" stackup that gets almost the same accuracy as the conformal one |
+| [`measured_vs_simulated/more_accurate_models_L6n2`](measured_vs_simulated/more_accurate_models_L6n2) | A 4-turn inductor, simulated L, Q and R compared to measurement. Steps through three model improvements: via array merging with `fill_factor_correction`, `filled_metals` (solid metal volumes) instead of surface impedance, and a conformal passivation stackup. Together they bring self-resonance and peak Q close to the measured values. Also tests a "passicut" stackup variant |
 
 ## Mesh convergence
 

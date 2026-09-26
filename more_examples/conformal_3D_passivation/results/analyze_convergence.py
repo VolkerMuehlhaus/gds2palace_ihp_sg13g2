@@ -92,7 +92,7 @@ def band_edge_delta_db(nw_a, nw_b, m, n):
     return float(d_lo), float(d_hi)
 
 
-DESIGN_FREQ_HZ = 155.0e9  # center of this balun's 140-170 GHz target band
+DESIGN_FREQ_HZ = 140.0e9  # center of this balun's 120-160 GHz target band
 
 
 def delta_db_at_freq(nw_a, nw_b, m, n, freq_hz):
@@ -113,7 +113,7 @@ def write_delta_table(csv_path, comparisons, ref_col_label):
         writer = csv.writer(f)
         writer.writerow([
             "Param", "Comparison", f"Max|dS| (linear){ref_col_label}",
-            "|dS_dB| at 100 GHz", "|dS_dB| at 155 GHz (design freq.)", "|dS_dB| at 200 GHz"
+            "|dS_dB| at 100 GHz", "|dS_dB| at 140 GHz (design freq.)", "|dS_dB| at 200 GHz"
         ])
         for m, n, pname in SPARAMS:
             for label_a, nw_a, label_b, nw_b in comparisons:

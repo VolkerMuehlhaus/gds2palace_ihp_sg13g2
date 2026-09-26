@@ -27,6 +27,8 @@ script_path = utilities.get_script_path(__file__)
 model_basename = utilities.get_basename(__file__)
 # set and create directory for simulation output
 sim_path = utilities.create_sim_path (script_path,model_basename)
+# change to script directory, so that input files are found relative to this script
+os.chdir(script_path)
 
 # ========================= workflow settings ==========================
 # preview model/mesh only, without running solver?
@@ -39,7 +41,7 @@ run_command = ['./run_sim']         # Linux
 # ===================== input files and settings =======================
 settings={}
 settings['GdsFile'] = 'inductor_500pH_with_ports.gds'
-settings['SubstrateFile'] = 'SG13G2_200um.xml'
+settings['SubstrateFile'] = '../XML_stackup/legacy/SG13G2_200um.xml'
 settings['preprocess_gds'] = True  # preprocess GDSII for safe handling of cutouts/holes
 settings['merge_polygon_size'] = 0.0   # merge via polygons with distance less than .. microns, set to 0 to disable via merging.
 settings['purpose'] = [0]  # GDSII data type that is read from file (all other data type is skipped)

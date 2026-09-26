@@ -46,7 +46,7 @@ run_command = ['start', 'wsl.exe']
 # ===================== input files and path settings =======================
 
 gds_filename = "BM_Ardavan_Rahimian_with_ports.gds"   # geometries
-XML_filename = "SG13G2_nosub.xml"          # stackup
+XML_filename = "../XML_stackup/legacy/SG13G2_nosub.xml"          # stackup
 
 # preprocess GDSII for safe handling of cutouts/holes?
 preprocess_gds = True
