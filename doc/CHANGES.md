@@ -2,7 +2,9 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 25-September-2026
+## 25-26 September-2026
+**XML stackup files moved to separate folder**  
+The stackup files are moved from the workflow folder to a separate XML_stackup folder, with a clear separation between legacy stackups (for compatibility) and latest stackups (recommended for new models).
 
 **Examples and documentation**  
 New [study on getting most accurate models for a 6nH octagon inductor](../more_examples/measured_vs_simulated/more_accurate_models_L6n2/README.md), with comparison to measured data. Besides the `filled_metals` option, this study also covers two other new features for improving accuracy: 
@@ -14,7 +16,7 @@ All mesh convergence studies in the more_examples folder were re-written complet
 **New features**  
 `settings['fill_factor_correction']` is a new option for improved accuracy when using via array merging. It is used together with via array merging (`merge_polygon_size > 0`) and is **not** active by default. Merging fills the gaps between vias with via material, so the merged via block has increased cross section = lower resistance than the real via array. With this option, each merged via polygon's conductivity is **multiplied by its fill factor** (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials when their fill factors differ by more than 20%, and each group uses its mean fill factor. The fill factors are only computed when the option is enabled, so `read_gds()` is not slowed down otherwise. The correction applies to Palace and to Elmer: Elmer EM scales the electrical conductivity, Elmer thermal the heat conductivity (including temperature table values).
 
-**Changes**  
+**API Changes**  
 `gds_polygon.is_via` and the `is_via` parameter of `all_polygons_list.add_rectangle()`/`add_polygon()` were removed: they were never set when reading GDSII and never used. Scripts that pass `is_via=` to these functions need to drop that argument.
 
 ## 22-23 September-2026
