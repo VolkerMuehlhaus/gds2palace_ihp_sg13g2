@@ -336,7 +336,7 @@ For via arrays that are oriented along the xy-axis, this will give the resulting
 
 Merging turns the gaps between the vias into solid via material, so the merged polygon contains more via metal than the real via array. By default, it still gets the full via conductivity from the XML stackup, which overestimates the conductivity of the via array: in the IHP stackup files, via conductivity is calculated from the resistance per via in the process specification, so it describes a single via, not a via array. With settings['fill_factor_correction'] = True (see [settings](#settings)), the conductivity of each merged via polygon is multiplied by its fill factor (original via area / merged polygon area).  
 
-This correction only knows about merging done here, by merge_polygon_size. If the via arrays were already merged before, e.g. with gds_viamerge or gds_prepare_for_EM, they arrive as solid polygons with fill factor 1.0, and their conductivity is not corrected.  
+This correction only knows about merging done here, by merge_polygon_size. If the via arrays were already merged before, e.g. with gds_prepare_for_EM, they arrive as solid polygons with fill factor 1.0, and their conductivity is not corrected.  
 
 ### settings ###
 
