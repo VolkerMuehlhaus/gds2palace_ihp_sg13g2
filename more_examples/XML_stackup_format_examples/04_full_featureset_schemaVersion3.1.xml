@@ -31,7 +31,7 @@
     <Variable Name="thermal_table_choice" Value="Si_vs_T_IHP" Type="string" />
   </Variables>
   <Materials>
-    <Material Name="Activ" Type="Conductor" Conductivity="357141.0" ThermalConductivity="237" Color="00ff00" />
+    <Material Name="Activ" Type="Conductor" Conductivity="357141.0" ThermalConductivity="50" Color="00ff00" />
     <Material Name="Metal1" Type="Conductor" Conductivity="21640000.0" ThermalConductivity="237" Color="39bfff" />
     <Material Name="Metal2" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Color="ccccd9" />
     <Material Name="Metal3" Type="Conductor" Conductivity="23190000.0" ThermalConductivity="237" Color="d80000" />

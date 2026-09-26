@@ -27,6 +27,8 @@ UNIFORM_SERIES = [
     ("mesh1", "1 um (uniform)", "balun_mesh1um.s3p"),
 ]
 AMR_ENTRY = ("amr5", "AMR (5 um start, 5 it.)", "balun_amr5_final.s3p")
+# order-3 alternative at the same 2 um cell size as MESH2, order 2 otherwise everywhere else
+ORDER_ENTRY = ("mesh2_order3", "2 um, order 3", "balun_mesh2um_order3.s3p")
 
 SPARAMS = [(1, 1, "S11"), (2, 1, "S21"), (2, 3, "S23")]
 
@@ -85,7 +87,7 @@ def band_edge_delta_db(nw_a, nw_b, m, n):
     return float(d_lo), float(d_hi)
 
 
-DESIGN_FREQ_HZ = 155.0e9  # center of this balun's actual 140-170 GHz target band (per its GDS filename)
+DESIGN_FREQ_HZ = 140.0e9  # center of this balun's 120-160 GHz target band
 
 
 def delta_db_at_freq(nw_a, nw_b, m, n, freq_hz):
@@ -108,6 +110,7 @@ def main():
             print(f"WARNING: missing {entry[2]}, skipping")
 
     amr_result = load(AMR_ENTRY)
+    order_result = load(ORDER_ENTRY)
 
     if len(loaded) < 2:
         print("Need at least two uniform-mesh results to compute deltas; exiting.")
@@ -121,13 +124,18 @@ def main():
     comparisons = [(loaded[i - 1], loaded[i]) for i in range(1, len(loaded))]
     if amr_result:
         comparisons.append((loaded[-1], amr_result))
+    if order_result:
+        # isolate the order effect: same 2 um cell size, order 2 vs order 3
+        mesh2_result = next((entry for entry in loaded if entry[0] == "mesh2"), None)
+        if mesh2_result:
+            comparisons.append((mesh2_result, order_result))
 
     csv_path = os.path.join(HERE, "delta_S_table.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
             "Param", "Comparison", "Max|dS| (linear)",
-            "|dS_dB| at 100 GHz", "|dS_dB| at 155 GHz (design freq.)", "|dS_dB| at 200 GHz"
+            "|dS_dB| at 100 GHz", "|dS_dB| at 140 GHz (design freq.)", "|dS_dB| at 200 GHz"
         ])
         for m, n, pname in SPARAMS:
             for (key_a, label_a, nw_a), (key_b, label_b, nw_b) in comparisons:
@@ -143,13 +151,15 @@ def main():
     vs_finest = [(key, label, nw) for key, label, nw in loaded[:-1]]
     if amr_result:
         vs_finest.append(amr_result)
+    if order_result:
+        vs_finest.append(order_result)
 
     csv_path_ref = os.path.join(HERE, "delta_S_vs_finest.csv")
     with open(csv_path_ref, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
             "Param", "Mesh", f"Max|dS| vs. {ref_label} (linear)",
-            "|dS_dB| at 100 GHz", "|dS_dB| at 155 GHz (design freq.)", "|dS_dB| at 200 GHz"
+            "|dS_dB| at 100 GHz", "|dS_dB| at 140 GHz (design freq.)", "|dS_dB| at 200 GHz"
         ])
         for m, n, pname in SPARAMS:
             for key, label, nw in vs_finest:
@@ -164,12 +174,14 @@ def main():
     all_series = list(loaded)
     if amr_result:
         all_series.append(amr_result)
+    if order_result:
+        all_series.append(order_result)
 
     for m, n, pname in SPARAMS:
         fig, (ax_mag, ax_phase) = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
         for idx, (key, label, nw) in enumerate(all_series):
             color = COLORS[idx % len(COLORS)]
-            style = "--" if key == "amr5" else "-"
+            style = "--" if key == "amr5" else (":" if key == "mesh2_order3" else "-")
             freq_ghz = nw.frequency.f / 1e9
             ax_mag.plot(freq_ghz, db(nw.s[:, m - 1, n - 1]), color=color, linestyle=style, label=label)
             ax_phase.plot(freq_ghz, deg(nw.s[:, m - 1, n - 1]), color=color, linestyle=style, label=label)

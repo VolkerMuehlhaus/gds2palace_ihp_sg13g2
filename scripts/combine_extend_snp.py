@@ -23,7 +23,12 @@
 # updated 19-Oct-2025 Mue: support more than 9 ports
 # updated 08-Nov-2025 Mue: added evaluation for optional port impedance file port_information.json that is created by new gds2palace code
 # updated 13-Nov-2025 Mue: added simple de-embedding of parasitic port inductance (flat ribbon calculation)
-# updated 26-Nov-2025 Mue: also read Elmer FEM files 
+# updated 26-Nov-2025 Mue: also read Elmer FEM files
+# updated 22-Sep-2026 Mue: handle an interrupted Palace run (e.g. killed by setupEM's
+#   memory limit, or OOM-killed) - a blank/truncated trailing CSV line, or Palace's own
+#   "NULL" placeholder for an unsolved excitation, no longer crashes with an IndexError
+#   or gets silently written into the Touchstone file; affected S-parameters are set to
+#   0.0 dB / 0 deg and flagged both on stdout and in a comment line in the output file
 
 import os,re, json, math
 import skrf as rf
@@ -173,6 +178,12 @@ def parse_palace_csv (input_filename, freq, S_dB, S_arg):
                 print('Number of ports: ', num_ports)
 
             else:
+                aline = aline.strip()
+                if not aline:
+                    # blank/truncated trailing line, e.g. the solver run was
+                    # interrupted (OOM-killed) mid-write and never finished it
+                    continue
+
                 # process data line
                 items = aline.split()
                 f = items[0]
@@ -180,8 +191,16 @@ def parse_palace_csv (input_filename, freq, S_dB, S_arg):
                     dB_index = 2*params.index(param) + 1
                     arg_index = dB_index+1
 
-                    dB[param] = items[dB_index]
-                    arg[param] = items[arg_index]
+                    # an interrupted solver run can leave a data line that is
+                    # missing trailing columns entirely (not even a "NULL"
+                    # placeholder) - treat those the same as Palace's own
+                    # "NULL" for a value it had not computed yet, rather than
+                    # raising an IndexError here
+                    dB_value  = items[dB_index]  if dB_index  < len(items) else 'NULL'
+                    arg_value = items[arg_index] if arg_index < len(items) else 'NULL'
+
+                    dB[param] = dB_value
+                    arg[param] = arg_value
 
                     # do we already have the frequency point?
                     if f in freq:
@@ -189,8 +208,8 @@ def parse_palace_csv (input_filename, freq, S_dB, S_arg):
                         dB_dict = S_dB[f_index]
                         arg_dict = S_arg[f_index]
 
-                        dB_dict[param] = items[dB_index]
-                        arg_dict[param] = items[arg_index]
+                        dB_dict[param] = dB_value
+                        arg_dict[param] = arg_value
 
                     else:
                         freq.append(f)
@@ -402,8 +421,10 @@ def _process_datafile(found_filename):
 
     data_lines = []
     
+    incomplete_points = []
+
     for frequency in freq:
-        # line = str(frequency) 
+        # line = str(frequency)
 
         index = freq.index(frequency)
         data_line = [frequency]
@@ -411,25 +432,38 @@ def _process_datafile(found_filename):
         for i in range(1,num_ports+1):
             for j in range(1, num_ports+1):
 
-                # special case 2-port data: the output is S11 S21 S12 S22 
+                # special case 2-port data: the output is S11 S21 S12 S22
                 if num_ports==2:
                     param = str(j) + ' ' + str(i)
-                else: 
+                else:
                     param = str(i) + ' ' + str(j)
 
                 found_params = S_dB[index].keys()
-                # assume that we also have phase data then
-                if param in found_params:
-                    Sij_dB  = S_dB[index].get(param)
+                raw_dB = S_dB[index].get(param) if param in found_params else None
+                # Palace writes the literal string "NULL" for an excitation that
+                # had not been solved yet when the solver run was interrupted
+                # (e.g. terminated after exceeding a memory limit). Treat that
+                # the same as a genuinely missing parameter below, rather than
+                # writing "NULL" into the Touchstone file, where it would only
+                # surface later as an unhandled parse error in skrf
+                if raw_dB is not None and raw_dB != 'NULL':
+                    Sij_dB  = raw_dB
                     Sij_arg = S_arg[index].get(param)
                 else:
                     Sij_dB  = 0.0
                     Sij_arg = 0.0
+                    if raw_dB == 'NULL':
+                        incomplete_points.append((frequency, param))
                 # write Sij data
                 data_line.append (Sij_dB)
                 data_line.append( Sij_arg)
-        
+
         data_lines.append(data_line)
+
+    if incomplete_points:
+        print(f'WARNING: solver run was interrupted before all excitations finished - '
+              f'{len(incomplete_points)} S-parameter value(s) were not computed and were '
+              f'set to 0.0 dB / 0 deg instead: {incomplete_points}')
 
     # sort data_lines by frequency (first value)
     data_lines.sort(key=lambda x:float(x[0]))
@@ -452,7 +486,13 @@ def _process_datafile(found_filename):
     output_filename = os.path.join(output_path, output_filename)
 
 
-    output_file = open(output_filename, "w") 
+    output_file = open(output_filename, "w")
+    # comment lines must come before the option ('#') line for compatibility
+    # with strict Touchstone readers
+    if incomplete_points:
+        incomplete_params = sorted({'S' + param.replace(' ', '') for _freq, param in incomplete_points})
+        output_file.write(f"! WARNING: incomplete S-parameters, solver run was interrupted - "
+                           f"{', '.join(incomplete_params)} set to 0.0 dB / 0 deg\n")
     # write Touchstone header line
     output_file.write(f"#  {freq_unit.upper()} S DB R {Z0_string}\n")
 

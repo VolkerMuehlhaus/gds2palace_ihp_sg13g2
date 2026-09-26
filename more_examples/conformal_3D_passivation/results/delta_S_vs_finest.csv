@@ -1,0 +1,7 @@
+Param,Comparison,Max|dS| (linear) vs. 1 um (conformal),|dS_dB| at 100 GHz,|dS_dB| at 140 GHz (design freq.),|dS_dB| at 200 GHz
+S11,4 um (conformal) -> 1 um (conformal),0.0638,0.6550,8.8739,0.5443
+S11,2 um (conformal) -> 1 um (conformal),0.0304,0.2888,3.0741,0.2495
+S21,4 um (conformal) -> 1 um (conformal),0.0292,0.1754,0.0019,0.0720
+S21,2 um (conformal) -> 1 um (conformal),0.0131,0.0817,0.0026,0.0404
+S31,4 um (conformal) -> 1 um (conformal),0.0377,0.1255,0.0073,0.0116
+S31,2 um (conformal) -> 1 um (conformal),0.0165,0.0550,0.0002,0.0009

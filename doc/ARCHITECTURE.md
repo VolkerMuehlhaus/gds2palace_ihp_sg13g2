@@ -94,7 +94,7 @@ Top-level structure:
 </Stackup>
 ```
 
-Smallest real example in the repo, `workflow/pcb_ro4003.xml` (full file, verified):
+Smallest real example in the repo, `XML_stackup/legacy/pcb_ro4003.xml` (full file, verified):
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
   <Stackup schemaVersion="2.0">
@@ -383,14 +383,18 @@ utilities.create_run_script(sim_path)
 
 - **`gds_reader.read_gds(filename, layerlist, purposelist, metals_list, preprocess=False,
   merge_polygon_size=0, mirror=False, offset_x=0, offset_y=0, gds_boundary_layers=[],
-  layernumber_offset=0, cellname="", derived_layers=None)`** (`util_gds_reader.py:502-524`) opens
+  layernumber_offset=0, cellname="", derived_layers=None)`** (`util_gds_reader.py:700`) opens
   the GDS via `gdspy.GdsLibrary`, flattens the top-level cell, and for each requested layer number
   extracts layer/datatype polygons matching `purposelist`. Via-array polygons get merged when
-  `metal.is_via` and `merge_polygon_size > 0` (`merge_via_array`, `:596-597`). **Known
+  `metal.is_via` and `merge_polygon_size > 0` (`merge_via_array`, `:796-797`). The unmerged vias
+  are kept in `all_polygons.via_originals` (keyed by layer number); `create_model()` uses them only
+  when `settings['fill_factor_correction']` is set, calling `all_polygons_list.compute_via_fill_factors()`
+  (`:216`) to set each merged via polygon's `fill_factor`, so reading GDSII costs nothing extra
+  otherwise. **Known
   documentation drift worth flagging**: the `preprocess` argument is currently a no-op that just
-  prints a message (docstring/comment at `:511`/`:534-536` says polygon-cutout handling is
+  prints a message (docstring/comment at `:709`/`:732-734` says polygon-cutout handling is
   "obsolete, cutouts are handled safely downstream after flattening") — but
-  `doc/userguide_md_format/gds2palace_workflow_userguide.md:321` still describes it as an active
+  `doc/userguide_md_format/gds2palace_workflow_userguide.md:329` still describes it as an active
   preprocessing step. If you're an agent reasoning from the user guide alone, don't assume
   `preprocess_gds=True/False` changes behavior; check the current source before relying on it.
 
@@ -615,9 +619,11 @@ against the source, e.g. `get_optional_setting` defaults in `util_simulation_set
 | `substrate_refinement` | `False` | Extra mesh refinement into the substrate |
 | `adaptive_sweep` | `True` | Enable Palace's adaptive frequency sweep |
 | `adaptive_mesh_iterations` | 0 | AMR iterations — often unnecessary with a fine initial mesh |
+| `adaptive_mesh_conformal` | `False` | Use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement |
 | `save_adaptive_mesh` | `False` | Save the AMR-iteration mesh for reuse |
 | `save_gmsh_unrolled` | `False` | Also save the unmeshed gmsh geometry, for inspection |
-| `z_thickness_factor` | 1 | Factor on metal-thickness for conductor side walls (relevant when skin depth exceeds metal thickness) |
+| `z_thickness_factor` | 1 | Factor on metal-thickness for conductor side walls (relevant when skin depth exceeds metal thickness; no effect on a layer modeled as a solid volume via `filled_metals`, since that layer has no surface-impedance boundary to apply it to) |
+| `filled_metals` | `False` | Model conductors as solid bulk-conductivity volumes instead of thin surface-impedance surfaces (EM only — Palace and Elmer; no effect on Elmer thermal, which always models metal as solid volumes internally regardless of this setting). There is no automatic near-surface mesh refinement for this mode — Palace/Elmer's analytic skin-effect shortcut no longer applies once metal is a real volume, so mesh resolution near/inside the conductor now directly determines accuracy; tune `refined_cellsize`/`refined_cellsize_override` yourself. (An automatic skin-depth-graded mesh field was prototyped and found impractical: isotropic refinement fine enough to resolve skin depth across a conductor's whole surface area — not just its edges — produces an unworkably large mesh for realistically-sized traces; true anisotropic boundary-layer meshing would be the correct fix but is a separate, unimplemented effort.) Where a via and a conductor geometrically overlap (e.g. a via drawn to extend slightly into its pad, for a watertight boolean), the conductor's material wins the shared region. |
 | `no_gui` | `False` | Don't show the gmsh UI — for unattended/scripted runs |
 | `no_preview` | `False` | Skip the unmeshed-geometry preview, go straight to showing the meshed model |
 

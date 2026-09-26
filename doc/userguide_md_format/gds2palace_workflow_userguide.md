@@ -2,7 +2,7 @@
 
 Volker Mühlhaus,volker@muehlhaus.com
 ---
-Document version: 2026-08-17
+Document version: 2026-09-25
 
 ## Contents
 [What's New](#whats-new)  
@@ -334,6 +334,10 @@ When enabled with a non-zero value, the code will merge polygons on these layers
 
 For via arrays that are oriented along the xy-axis, this will give the resulting bounding box if the maximum via spacing is no larger than the given value. 
 
+Merging turns the gaps between the vias into solid via material, so the merged polygon contains more via metal than the real via array. By default, it still gets the full via conductivity from the XML stackup, which overestimates the conductivity of the via array: in the IHP stackup files, via conductivity is calculated from the resistance per via in the process specification, so it describes a single via, not a via array. With settings['fill_factor_correction'] = True (see [settings](#settings)), the conductivity of each merged via polygon is multiplied by its fill factor (original via area / merged polygon area).  
+
+This correction only knows about merging done here, by merge_polygon_size. If the via arrays were already merged before, e.g. with gds_prepare_for_EM, they arrive as solid polygons with fill factor 1.0, and their conductivity is not corrected.  
+
 ### settings ###
 
 settings for meshing and simulation control are implemented as a Python dictionary, which is passed to the simulation_setup.create_palace function. Some settings are required, other are optional with a meaningful default value.  
@@ -347,29 +351,62 @@ These settings are always required:
 **settings['fstep']:** Frequency step in Hz for output, not all of them need to be EM simulated due to adaptive frequency sweep  
 **settings['refined_cellsize']:** Target mesh size at polygon edges  
 
-There are additional **optional** settings to specify fixed discrete frequencies, which you can use in addition to fstart/fstop and fstep, or instead of fstart/fstop and fstep:  
+All other settings are optional, grouped here by what they control.  
+
+#### Frequencies
+
+Discrete frequencies can be used in addition to fstart/fstop and fstep, or instead of fstart/fstop and fstep:  
 
 **settings['fpoint']:** Discrete frequency/frequencies, values enclosed in [ ]. Example: settings['fpoint']=[10e9, 15e9]  
 **settings['fdump']:** Same as fpoint, but Palace is configured to write a field dump for Paraview at this frequency/these frequencies. Example: settings['fdump']=[10e9]  
+**settings['adaptive_sweep']:** Enable adaptive frequency sweep, default is True  
 
-These other settings are optional:  
+#### Mesh size and accuracy
 
 **settings['cells_per_wavelength']:** Calculated at highest frequency,value must be 10 or more, default is 10  
 **settings['meshsize_max']:** Maximum mesh size limit, in addition to cells, default is 70  
 **settings['refined_cellsize_override']:** Optional per-layer override of refined_cellsize,example: settings['refined_cellsize_override']=[['Metal3',10],['Metal2',2]]  
+**settings['substrate_refinement']:** Extra mesh refinement into substrate, usually not required, default is False  
+**settings['order']:** Order of basis function for FEM solver (order 2 is more accurate,order 1 is only for quick & dirty results). Default is 2  
+
+#### Adaptive mesh refinement
+
+**settings['adaptive_mesh_iterations']:** Iterations for adaptive mesh refinement, often not required when using fine initial mesh, default is 0  
+**settings['adaptive_mesh_conformal']:** Use conformal AMR refinement instead of Palace's default nonconformal (hanging-node) refinement, default is False  
+**settings['amr_tol']:** Target relative error for adaptive mesh refinement: refinement stops once the error estimate is below this value. Only used with adaptive_mesh_iterations > 0, default is 0.01  
+**settings['amr_max_dof']:** Maximum number of unknowns for adaptive mesh refinement: refinement stops once the model reaches this size. Only used with adaptive_mesh_iterations > 0, default is 2e6  
+**settings['save_adaptive_mesh']:** Save mesh file from adaptive iteration for possible re-use, default is False  
+
+#### Simulation boundary
+
 **settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  
 **settings['air_around']:** Other spacing of air around dielectrics, default is same as margin. Can be a single value or a list of 6 values [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 is allowed on any side, placing the simulation boundary flush with the dielectric/metal stack on that side (e.g. a backside ground plane serving directly as the PEC/ABC boundary, with no wasted air layer below it).  
-**settings['order']:** Order of basis function for FEM solver (order 2 is more accurate,order 1 is only for quick & dirty results). Default is 2  
-**settings['substrate_refinement']:** Extra mesh refinement into substrate, usually not required, default is False  
-**settings['adaptive_sweep']:** Enable adaptive frequency sweep, default is True  
-**settings['adaptive_mesh_iterations']:** Iterations for adaptive mesh refinement, often not required when using fine initial mesh, default is 0  
-**settings['save_adaptive_mesh']:** Save mesh file from adaptive iteration for possible re-use, default is False  
-**settings['save_gmsh_unrolled']:** Also save gmsh geometry file without meshing, for later inspection, default is False  
-**settings['z_thickness_factor']:** Factor for metal thickness value on conductor side walls (see footnote), default is 1  
+
+#### Conductor modelling
+
+**settings['filled_metals']:** Model conductors as solid volumes with bulk conductivity (volume mesh) instead of the default surface impedance on the conductor surfaces. This gives more accurate conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section. Not recommended as a default: it needs more RAM and simulation time, and becomes inaccurate at higher frequencies unless the mesh resolves the skin depth. Tested with Palace, Elmer thermal models always use solid conductor volumes. Default is False  
+**settings['fill_factor_correction']:** Only has an effect with merge_polygon_size > 0. Via array merging fills the gaps between vias with via material, so each merged via polygon is scaled down to its real via conductivity: its conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials, starting a new group when the fill factor is more than 20% below the group's highest value, and each group uses its mean fill factor. Vias with the reserved PEC material are grouped but not scaled. Applies to Palace and Elmer EM (electrical conductivity) and to Elmer thermal (heat conductivity, including temperature table values). Default is False  
+**settings['z_thickness_factor']:** This optional setting can tweak the conductor loss modelling when using the default "hollow body with skin-effect-aware surface impedance" approach, also known as "do not solve inside". This factor will be applied for metal thickness value on conductor side walls (see footnote), default is 1.  
+
+footnote on z_thickness_factor: See chapter on metal loss at low frequency, where skin depth is larger than metal thickness.  
+
+#### Script control and output files
+
 **settings['no_gui']:** Run script without showing gmsh user interface, useful for automated processing, default is False  
 **settings['no_preview']:** don't show unmeshed geometry, immediately show meshed model, default is False  
+**settings['preview_only']:** Only show the unmeshed geometry in gmsh, then stop without generating a mesh, default is False  
+**settings['save_gmsh_unrolled']:** Also save gmsh geometry file without meshing, for later inspection, default is False  
+**settings['config_suffix']:** Text appended to the names of the generated config.json and port_information.json files, e.g. '_fine' gives config_fine.json, default is '' (no suffix)  
 
-footnote on z_thickness_factor: See chapter on metal loss at low frequency, where skin depth is larger than metal thickness   
+#### Model data set by the script
+
+The model script also passes the stackup and layout data in the settings dictionary. These are not options: the script sets them after reading the XML stackup and the GDSII file.  
+
+**settings['materials_list'], settings['dielectrics_list'], settings['metals_list']:** Stackup data, as returned by stackup_reader.read_substrate()  
+**settings['allpolygons']:** Layout polygons, as returned by gds_reader.read_gds()  
+**settings['simulation_ports']:** Port definitions, created with simulation_setup.all_simulation_ports()  
+**settings['sim_path']:** Output directory for the generated model files  
+**settings['model_basename']:** Base name of the generated model files, e.g. the mesh file model_basename.msh  
 
 ### Port configuration ###
 
@@ -708,7 +745,9 @@ If you prefer to use another value for loss tangent, that is fully supported by 
 
 ### Conclusion regarding z_thickness_factor 
 
-Reduced thickness for the side walls looked like a simple, effective correction to prevent an over-estimate of low frequency conductor cross section, but this effect spreads out into the microwave frequency range. Further investigation is needed on this topic, to see which default setting is most appropriate.  
+Reduced thickness for the side walls looked like a simple, effective correction to prevent an over-estimate of low frequency conductor cross section, but this effect spreads out into the microwave frequency range.  
+
+If you have a need to model conductor loss accurately at low frequency, consider using the settings['filled_metals'] option. 
 
 ## Dielectric loss modelling 
 
@@ -1023,6 +1062,8 @@ Palace offers a wide range of options to assign material properties to volumes a
 
 
 To account for the z-directed nature of via arrays, which allows current flow predominantly in z direction, the conductivity from XML is only assigned to z-direction, and the value in xydirection is reduced by a factor of 10. This avoids issues with “unreal” currents flowing on the side walls of merged via polygons after via array merging.  
+
+With settings['fill_factor_correction'] = True, the conductivity of merged via polygons is additionally multiplied by their fill factor, in all directions. Via polygons on the same layer with different fill factors then get separate materials, in physical groups named after the layer and the fill factor, e.g. TopVia2_x0.49. The same applies to Elmer output: Elmer EM scales the (scalar) electrical conductivity, Elmer thermal the heat conductivity, and the Elmer bodies are named after these physical groups.  
 
 **Metal layers** (Type=”conductor”) are created as hollow elements surrounded by surfaces, with surface impedance to define metal loss. The conductivity and thickness are obtained from the XML file.  
 

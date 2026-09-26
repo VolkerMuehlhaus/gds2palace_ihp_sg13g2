@@ -57,7 +57,7 @@ this document is about *how* to produce more studies like it.
   `palace.json` yourself unless you need a field it doesn't already expose.
 - **The five existing studies are worked templates.** Before writing
   anything from scratch, look at the model scripts, `results/*.py`
-  analysis scripts, and `mesh_convergence_report.md` in whichever study is
+  analysis scripts, and `README.md` in whichever study is
   structurally closest to your new layout:
   - a single coil → `mesh_convergence_inductor/`
   - a multi-port coupled structure with a center tap → `mesh_convergence_transformer/`
@@ -193,10 +193,14 @@ Reasonable defaults, confirmed against the existing studies:
 - **Via-array merging**, if the layout has dense via arrays (e.g. under a
   MIM capacitor): `settings['merge_polygon_size']` controls how close
   polygons need to be before gds2palace merges them into one. Too small
-  and each individual via becomes its own tiny mesh feature (expensive,
-  no accuracy benefit); too large and it can accidentally merge two
-  physically separate via arrays into one. Measure the actual via pitch
-  and the minimum gap between separate arrays first (same KLayout
+  and each individual via becomes its own tiny mesh feature (expensive);
+  too large and it can accidentally merge two physically separate via
+  arrays into one. Merging also fills the gaps between vias with via
+  material, so a merged array gets more via conductivity than the real
+  array, unless `settings['fill_factor_correction'] = True` scales it
+  back by the fill factor (original via area / merged area). Measure
+  the actual via pitch and the minimum gap between separate arrays
+  first (same KLayout
   `Region#sized`/merge-and-compare technique as §2.1's trace/gap
   measurement, just applied at a few candidate merge distances to see
   where the polygon count jumps) and pick a value with margin on both
@@ -299,7 +303,10 @@ completed run.
 
 For each variant, copy the de-embedded `.snp` file into a `results/snp/`
 folder with a short, clear name (e.g. `<name>_mesh2.s2p`, not the raw
-generated filename). Then:
+generated filename). For AMR iterations, copy the `iterationN_deembedded`
+file, not `iterationN.snp`: the iteration files archived in the existing
+studies are raw by mistake, so don't overlay them on de-embedded results.
+Then:
 
 - **S-parameter convergence** (always do this): overlay magnitude/phase
   plots across mesh variants, plus a delta-S table — `Max|ΔS|` as the
@@ -341,8 +348,7 @@ generated filename). Then:
   produces a plausible-looking but wrong result — it silently imposes a
   termination of `2×Z02`, not `Z02`. This exact bug was found and fixed
   in the balun_mim study (see that study's `analyze_baseline.py`
-  docstring for the full derivation, and the report's §3 for the
-  before/after numbers) — when a port set mixes single-ended and
+  docstring for the full derivation) — when a port set mixes single-ended and
   differential-pair ports (not two full differential pairs like the
   transformer/balun2x1 studies), derive the reduced 2-port from scratch
   by imposing the actual current constraint (`I_a=-I_b` on the pair, `I`
@@ -379,8 +385,8 @@ generated filename). Then:
   invites the reader to draw a real-circuit-performance conclusion the
   simulation can't support. The transformer and balun2x1 studies
   originally included this analysis and later had it removed for exactly
-  this reason (see those reports' "why there is no real load analysis"
-  section) — if the model doesn't include the compensation network, stick
+  this reason (their reports now state this in the "details" scope
+  bullet) — if the model doesn't include the compensation network, stick
   to reporting the bare structure's mixed-mode S-parameters at its own
   port reference impedances, not a real-load-implied number.
 - **Verifying a labeled component value against its EM simulation**, if
@@ -415,42 +421,59 @@ generated filename). Then:
 
 ### 2.7 Write the report
 
-Match the structure used by the existing reports (each one's opening
-`mesh_convergence_report.md` is a directly readable template):
+Write the report as a short, stepwise story, not a data dump. The model
+is [`../measured_vs_simulated/more_accurate_models_L6n2/README.md`](../measured_vs_simulated/more_accurate_models_L6n2/README.md),
+and every study README in this folder is a directly readable template.
+Each study also has a `results/story_plots.py` that makes the report's
+plots and prints every number the text quotes; start from the one closest
+to your structure.
 
-1. A bullet-list header: model/stackup filenames, solver + key settings,
-   frequency sweep, port definitions, execution notes. If the structure
-   has a stated design/application target (e.g. a specific frequency, or
-   whether compensation components like MIM caps are included in this
-   particular test structure), say so here — don't bury it in a later
-   section where it looks like an afterthought.
-2. **Layout** — measured dimensions (trace width, gaps, footprint, port
-   layout) from §2.1, not just a description of how the picture was
-   rendered.
-3. **Method** — which variants were generated and why.
-4. **Uniform mesh sweep results** — a table with DOF, mesh elements,
-   solve time, and peak RAM per mesh size (all read straight from
-   `palace.json` — see `palace_summary.py`'s field names if unsure which
-   JSON keys these are). Don't include Palace's own error-indicator
-   Norm/Max (`error-indicators.csv`) in the report — it's a relative,
-   energy-normalized FEM residual, not a mesh-quality score or Delta-S-like
-   convergence criterion, and showing it alongside S-parameter/derived-
-   quantity results has caused more confusion than it resolved for users
-   coming from other solvers. Judge convergence from `Max|ΔS|` (§2.6) and
-   the structure's own target quantity instead.
-5. **AMR results** — the same fields (DOF, mesh elements, solve time, peak
-   RAM) per iteration, plus the `amr*_convergence.png` chart, plus
-   Max|ΔS| between successive iterations.
-6. **S-parameter overlays + delta-S tables** (§2.6).
-7. Any structure-specific results section (§2.6).
-8. **Discussion/recommendation** — state a concrete, numbers-grounded
-   recommendation (which mesh size, whether AMR helped, whether order 1
-   is usable) for *this* structure. Don't reuse another study's verdict.
-9. **"Where everything lives"** — a file tree of what's in the study
-   folder and what each file/script regenerates.
+1. **Title as the question** ("How fine a mesh does this ... need?"), one
+   paragraph stating the practical question, then **3 numbered steps**
+   the report will walk through, and one sentence scoping the findings to
+   this structure (never present them as universal).
+2. **The details of this study** — bullet list: model/stackup, ports
+   (including raw vs. de-embedded), solver settings, sweep, execution. If
+   the structure has a design target (frequency band, system impedances)
+   or lacks compensation components (MIM caps), say so here. Confirm the
+   target band with the user; don't infer it from a file name.
+3. **Layout** — the labeled picture, measured dimensions (§2.1), and a
+   short "what we look at" list: the figures of merit a designer uses for
+   this structure (balun: insertion loss, match, amplitude/phase
+   imbalance; inductor/transformer: L, k, Q; capacitor: C). Use
+   `Max|ΔS|` only as one summary number, not as the main story.
+4. **One section per step**, each with **one plot**, a few bullets telling
+   the reader what to look at and what it means, and a small cost table
+   (DOF, solve time, peak RAM). Typical steps: uniform mesh refinement →
+   cross-check the finest result with an independent route (higher order,
+   AMR) → accuracy vs. cost (including order 1 if run).
+5. **Summary for this structure** — a concrete working point with its
+   numbers, plus one sentence that the numbers belong to this layout.
+6. **Files** — a short tree; detailed per-S-parameter ΔS tables stay in
+   the CSVs written by `analyze_convergence.py`, not in the README.
+
+Rules that keep the story honest:
+
+- Don't include Palace's own error-indicator Norm/Max
+  (`error-indicators.csv`). It's a relative, energy-normalized FEM
+  residual, not a convergence criterion for S-parameters, and has caused
+  more confusion than it resolved. Judge convergence from the figures of
+  merit and `Max|ΔS|`.
+- A finest-mesh run used as the reference can't show that it is itself
+  converged. Say so, and cross-check with an independent route instead of
+  claiming one variant is "closer to the reference" than the reference.
+- Look at whether step sizes shrink. Equal successive steps (in a uniform
+  sweep or across AMR iterations) mean the result is still moving, not
+  that it has plateaued.
+- AMR's time in `palace.json` / `palace_summary.py` is already cumulative
+  over iterations; use the final value, don't sum. Compare AMR on the
+  figure of merit, not only on `Max|ΔS|`: in the balun2x1 study it matched
+  the S-parameters but was less accurate on Q than a cheaper uniform mesh.
+- Derived coil quantities (L, k, Q) lose their meaning near and above
+  self-resonance; restrict their plots to below it.
 
 Two placement details that keep the study easy to navigate: put
-`mesh_convergence_report.md` at the **study's root** (not inside
+`README.md` at the **study's root** (not inside
 `results/`, where it's easy to miss) with image links written as
 `results/plots/...` to match; and keep generated meshes/raw solver output
 (`palace_model/`) out of version control via this folder's `.gitignore`
