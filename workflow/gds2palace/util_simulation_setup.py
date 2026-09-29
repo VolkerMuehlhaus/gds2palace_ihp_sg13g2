@@ -2198,8 +2198,12 @@ def create_model (excite_ports, settings):
                 else:    
                     Palace_material['Conductivity']=material.sigma
             else:
-                # not a metal, but we also have conductivity in stackup substrate
-                Palace_material['Conductivity']=material.sigma
+                if material.tand > 0:
+                    # regular dielectric: loss tangent only (was lost in the mesh redesign, 94985ac)
+                    Palace_material['LossTan']=material.tand
+                else:
+                    # not a metal, but we also have conductivity in stackup substrate
+                    Palace_material['Conductivity']=material.sigma
 
             Palace_materials.append(Palace_material)
         else:    
