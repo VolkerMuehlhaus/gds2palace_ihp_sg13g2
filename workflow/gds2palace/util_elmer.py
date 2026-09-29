@@ -498,8 +498,8 @@ End
         for n,material in enumerate(Elmer_materials):
             item = f'Material {n+1}\n   Name = string "{material["name"]}"\n'
             # thermal conductivity can be single value or table passed as string here
-            item = item + f"   Density = Real {material["density"]}\n"
-            item = item + f"   Heat Conductivity = {material["thermalcond"]}\n"
+            item = item + f'   Density = Real {material["density"]}\n'
+            item = item + f'   Heat Conductivity = {material["thermalcond"]}\n'
             item = item + "End\n"
             f.write(item + "\n")
 
@@ -507,7 +507,7 @@ End
         for n,body in enumerate(Elmer_bodies):
             item = f'Body {n+1}\n   Equation = Integer 1\n'
             item = item + f'   Name = "{body["name"]}"\n'
-            item = item + f"   Material = {body["material"]}\n"
+            item = item + f'   Material = {body["material"]}\n'
 
             if "bodyforce_number" in body.keys():
                 item = item + f'   Body Force = {body["bodyforce_number"]}\n'
@@ -525,8 +525,8 @@ End
         # write thermal boundary conditions
         for n,thermal_bc in enumerate(Elmer_thermal_boundaryconditions):
             item = f'Boundary Condition {n+1}\n'
-            item = item + f'   Name = "{thermal_bc['name']}"\n'
-            item = item + f'   Temperature = Real {thermal_bc['temp']:2f}\n'
+            item = item + f'   Name = "{thermal_bc["name"]}"\n'
+            item = item + f'   Temperature = Real {thermal_bc["temp"]:2f}\n'
             item = item + "End\n"
             f.write(item + '\n')
 
