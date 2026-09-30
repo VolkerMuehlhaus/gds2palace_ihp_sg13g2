@@ -15,6 +15,9 @@ Models that already converged without it give identical results with it, in abou
 **Bugfixes**  
 The dielectric loss tangent (`DielectricLossTangent` in the XML stackup) was no longer written to the Palace model since the mesh redesign in v0.4.1, so all dielectrics were simulated as lossless. This is fixed: dielectrics with a non-zero loss tangent get Palace's `LossTan` again. The IHP SG13G2 stackups use lossless dielectrics and are not affected; lossy PCB substrates (e.g. RO4003, RO4350B) are.
 
+**Examples and documentation**  
+The [L6n2 inductor study](../more_examples/measured_vs_simulated/more_accurate_models_L6n2_v2/README.md) was rerun with `complex_coarse_solve` on the same meshes: identical results, and all 8 frequency sweeps took 1h 59m instead of 3h 43m, with the 1 µm reference model at 35 minutes instead of 74. The [original study](../more_examples/measured_vs_simulated/more_accurate_models_L6n2/README.md) stays available for comparison.
+
 ## 25-26 September-2026
 **XML stackup files moved to separate folder**  
 The stackup files are moved from the workflow folder to a separate XML_stackup folder, with a clear separation between legacy stackups (for compatibility) and latest stackups (recommended for new models).

@@ -19,6 +19,7 @@ These are extra, more advanced gds2palace examples. Each one shows a specific fe
 | Example | What it shows |
 |---|---|
 | [`measured_vs_simulated/more_accurate_models_L6n2`](measured_vs_simulated/more_accurate_models_L6n2) | A 4-turn inductor, simulated L, Q and R compared to measurement. Steps through three model improvements: via array merging with `fill_factor_correction`, `filled_metals` (solid metal volumes) instead of surface impedance, and a conformal passivation stackup. Together they bring self-resonance and peak Q close to the measured values. Also tests a "passicut" stackup variant |
+| [`measured_vs_simulated/more_accurate_models_L6n2_v2`](measured_vs_simulated/more_accurate_models_L6n2_v2) | The same study, rerun with gds2palace 0.8.0 and its new default `complex_coarse_solve`: identical results, about 2x faster in total. Compares solve time, iterations and memory for every model |
 
 ## Mesh convergence
 

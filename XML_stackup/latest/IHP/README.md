@@ -37,7 +37,7 @@ Using parameters for final chip height and air height replaces several legacy fi
 - `SiO2_above_TM2` (layer 900): 1.9 µm of SiO2 on top of TopMetal2 (1.5 µm SiO2 + 0.4 µm passivation, both modelled as SiO2).
 - `SiO2_sides_TM2` (layer 901): SiO2 on the TopMetal2 side walls, 0.6 µm wide.
 - Both are derived from TopMetal2 automatically (`TM2_oversize` / `TM2_SiO2_sides` derived layers).
-- See the [L6n2 inductor study](../../../more_examples/measured_vs_simulated/more_accurate_models_L6n2/README.md) for results and simulation cost compared to the planar stackup.
+- See the [L6n2 inductor study](../../../more_examples/measured_vs_simulated/more_accurate_models_L6n2_v2/README.md) for results and simulation cost compared to the planar stackup.
 
 ## Legacy files and their replacement
 
