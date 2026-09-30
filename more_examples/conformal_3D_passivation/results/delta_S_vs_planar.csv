@@ -1,10 +1,10 @@
 Param,Comparison,Max|dS| (linear) (conformal vs. planar),|dS_dB| at 100 GHz,|dS_dB| at 140 GHz (design freq.),|dS_dB| at 200 GHz
-S11,4 um (planar) -> 4 um (conformal),0.1398,2.8032,10.0460,0.8045
-S11,2 um (planar) -> 2 um (conformal),0.1271,2.2606,0.2239,0.7544
-S11,1 um (planar) -> 1 um (conformal),0.1229,1.9712,7.5535,0.5664
-S21,4 um (planar) -> 4 um (conformal),0.1534,0.6060,0.1025,0.5391
-S21,2 um (planar) -> 2 um (conformal),0.1511,0.5702,0.0333,0.4543
-S21,1 um (planar) -> 1 um (conformal),0.1487,0.5799,0.0234,0.4085
-S31,4 um (planar) -> 4 um (conformal),0.1961,0.4074,0.0704,0.0310
-S31,2 um (planar) -> 2 um (conformal),0.1944,0.3936,0.0035,0.0448
-S31,1 um (planar) -> 1 um (conformal),0.1906,0.3761,0.0371,0.0757
+S11,4 um (planar) -> 4 um (conformal),0.1349,2.6975,11.4005,0.7418
+S11,2 um (planar) -> 2 um (conformal),0.1208,2.1714,0.5687,0.7168
+S11,1 um (planar) -> 1 um (conformal),0.1142,1.8687,6.8121,0.5659
+S21,4 um (planar) -> 4 um (conformal),0.1457,0.5673,0.1083,0.5158
+S21,2 um (planar) -> 2 um (conformal),0.1437,0.5366,0.0379,0.4328
+S21,1 um (planar) -> 1 um (conformal),0.1404,0.5353,0.0123,0.3895
+S31,4 um (planar) -> 4 um (conformal),0.1867,0.3887,0.0699,0.0272
+S31,2 um (planar) -> 2 um (conformal),0.1849,0.3769,0.0015,0.0404
+S31,1 um (planar) -> 1 um (conformal),0.1797,0.3563,0.0334,0.0663
