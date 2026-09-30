@@ -4,11 +4,14 @@ This is an (incomplete) list of changes and new features.
 
 ## 30 September-2026
 **New features**  
-`settings['complex_coarse_solve']` is a new gds2palace option, **enabled by default for every model**: Palace's sparse direct coarse solver now factorizes the full complex system instead of only its real part. With Palace's own default (real part only), absorbing boundaries, port resistances and losses are missing from the preconditioner. Some models then don't converge at some frequencies, and get wrong S-parameters there:
+`settings['complex_coarse_solve']` is a new gds2palace option, **enabled by default now**: Palace's sparse direct coarse solver now factorizes the full complex system instead of only its real part. **In many cases, this new setting will result in faster simulation.**  
+
+Models that already converged without this new option give identical results with it, in about the same or less time (up to 2.7x faster for an inductor at 5 GHz). The cost is peak RAM, which depends on the model: 1.0-1.6x at order 2 and 1.5-1.9x at order 1 in these test cases. The setting doesn't depend on `filled_metals`: both failures above used surface impedance metals. Set it to `False` only if a model doesn't fit into memory, and then check the Palace output for `did NOT converge`.
+
+Before, the Palace's own default (real part only) was used, so that absorbing boundaries, port resistances and losses were missing from the preconditioner. Some models did not converge at some frequencies, and got wrong S-parameters there:
 - a D-band grounded CPW line (110-170 GHz, order 1) needed 176-437 iterations and failed at 170 GHz. With the new default it converges in 1 iteration per frequency (14-31 at order 2), 3.5-6x faster, with identical S-parameters.
 - an inductor failed at 2.4 GHz, while the same model converged at 0.1 and 10 GHz. Its inductance came out as 1.1 nH instead of 2.5 nH. With the new default it converges in 1 iteration and runs 3.6x faster.
 
-Models that already converged without it give identical results with it, in about the same or less time (up to 2.7x faster for an inductor at 5 GHz). The cost is peak RAM, which depends on the model: 1.0-1.6x at order 2 and 1.5-1.9x at order 1 in these test cases. The setting doesn't depend on `filled_metals`: both failures above used surface impedance metals. Set it to `False` only if a model doesn't fit into memory, and then check the Palace output for `did NOT converge`.
 
 `settings['solver_maxits']` (default 400) and `settings['solver_tol']` (default 1e-6) make the Palace linear solver's iteration limit and tolerance configurable; both were hardcoded before.
 
