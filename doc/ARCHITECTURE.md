@@ -621,7 +621,7 @@ against the source, e.g. `get_optional_setting` defaults in `util_simulation_set
 | `adaptive_mesh_iterations` | 0 | AMR iterations — often unnecessary with a fine initial mesh |
 | `adaptive_mesh_conformal` | `False` | Use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement |
 | `save_adaptive_mesh` | `False` | Save the AMR-iteration mesh for reuse |
-| `complex_coarse_solve` | `True` | Palace: the sparse direct coarse solver factorizes the full complex system, not only its real part (Palace's own default, which leaves absorbing boundaries, port resistances and losses out of the preconditioner). Much faster convergence where radiation/loss matter - e.g. 1 instead of 176-437 GMRES iterations at order 1 on a D-band GCPW line - at about 1.9x (order 1) / 1.2x (order 2) peak RAM |
+| `complex_coarse_solve` | `True` | Palace: the sparse direct coarse solver factorizes the full complex system, not only its real part (Palace's own default, which leaves absorbing boundaries, port resistances and losses out of the preconditioner). On for every model (surface impedance or filled metals): without it, some models don't converge at some frequencies and get wrong S-parameters there - e.g. a D-band GCPW line at 170 GHz, an inductor at 2.4 GHz. Same results and same or shorter run time where both converge; costs 1.0-1.6x (order 2) / 1.5-1.9x (order 1) peak RAM, model dependent |
 | `solver_maxits` | 400 | Palace linear solver (GMRES) iteration limit per frequency. Reaching it only logs "solver did NOT converge" - that frequency's result is unreliable |
 | `solver_tol` | 1e-6 | Palace linear solver relative residual tolerance |
 | `save_gmsh_unrolled` | `False` | Also save the unmeshed gmsh geometry, for inspection |

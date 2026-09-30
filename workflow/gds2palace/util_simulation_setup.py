@@ -1264,7 +1264,9 @@ def create_model (excite_ports, settings):
     # for the coarse (sparse direct) solve instead of only its real part: the real-part-only
     # preconditioner ignores absorbing boundaries, port resistances and losses, and GMRES then
     # needs more and more iterations as radiation/leakage grows with frequency (see
-    # test_data/maxits_repro/analysis). Costs roughly 2x solver RAM at order 1.
+    # test_data/maxits_repro/analysis). It can also fail at a single low frequency (GF180
+    # inductor at 2.4 GHz, test_data/complex_coarse_solve), so it's on for every model.
+    # Costs 1.0-1.6x peak RAM at order 2 and 1.5-1.9x at order 1, model dependent.
     complex_coarse_solve = bool(get_optional_setting (settings, "complex_coarse_solve", True))
     solver_maxits = get_optional_setting (settings, "solver_maxits", 400)  # GMRES iteration limit
     if not isinstance(solver_maxits, int) or isinstance(solver_maxits, bool) or solver_maxits < 1:
