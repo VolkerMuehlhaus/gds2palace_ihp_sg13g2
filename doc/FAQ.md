@@ -348,6 +348,27 @@ actually blocked in a GUI event loop with no visible window — see
 [Automation and AI-agent-driven workflows](#automation-and-ai-agent-driven-workflows)
 for how to spot this.
 
+### Palace's log says "GMRES solver did NOT converge". What does that mean?
+
+The linear solver hit its iteration limit (`settings['solver_maxits']`,
+default 400) at that frequency. Palace does not stop: it carries on and
+still writes S-parameters for that frequency, but they are unreliable.
+setupEM flags these frequencies in its log; from a script, search the
+Palace output for `did NOT converge`.
+
+The usual cause is Palace's default preconditioner, which factorizes only
+the real part of the system and leaves absorbing boundaries, port
+resistances and losses out. It can fail at high frequency, where the model
+radiates, but also at a single low frequency: an inductor failed at 2.4 GHz
+and gave 1.1 nH instead of 2.5 nH, while it converged at 0.1 and 10 GHz.
+gds2palace therefore sets `settings['complex_coarse_solve'] = True` by
+default, for every model, which factorizes the full complex system. In the
+failing test cases this cut the iterations from 400 to 1-31 per frequency
+and the run time by 3.5-6x. It costs peak RAM, depending on the model
+1.0-1.6x at order 2 and 1.5-1.9x at order 1. If a model still doesn't
+converge with it, raise `settings['solver_maxits']`, and check the model
+and mesh. If you turned it off to save memory, turn it back on first.
+
 ## Output and results
 
 ### Palace writes CSV. Where does the Touchstone file come from?

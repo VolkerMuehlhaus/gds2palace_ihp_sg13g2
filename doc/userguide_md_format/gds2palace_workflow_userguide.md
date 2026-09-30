@@ -377,6 +377,12 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 **settings['amr_max_dof']:** Maximum number of unknowns for adaptive mesh refinement: refinement stops once the model reaches this size. Only used with adaptive_mesh_iterations > 0, default is 2e6  
 **settings['save_adaptive_mesh']:** Save mesh file from adaptive iteration for possible re-use, default is False  
 
+#### Linear solver (Palace)
+
+**settings['complex_coarse_solve']:** Let Palace's sparse direct coarse solver factorize the full complex system, instead of only its real part (Palace's own default). **Default is True, for every model**, whether metals are meshed as surface impedance or filled. The real-part-only preconditioner ignores absorbing boundaries, port resistances and losses. Some models then need far more iterations or don't converge at all, and a frequency that doesn't converge gets **wrong S-parameters**, not just slightly inaccurate ones. Which models are affected can't be predicted from the settings: it happened at high frequency (a D-band grounded CPW line failed at 170 GHz) and at a single low frequency (an inductor failed at 2.4 GHz and gave 1.1 nH instead of 2.5 nH, while the same model converged at 0.1 and 10 GHz). With True, both converged in 1-31 iterations and ran 3.5-6x faster. Models that already converge without it get identical results, in about the same or less time. The cost is peak RAM, which depends on the model: 1.0-1.6x at order 2 and 1.5-1.9x at order 1 in our test cases. Set it to False only if a model doesn't fit into memory, and then check the Palace output for `did NOT converge`  
+**settings['solver_maxits']:** Iteration limit of Palace's linear solver (GMRES) per frequency. If it is reached, Palace only logs "solver did NOT converge" and carries on, and the S-parameters at that frequency are unreliable. Default is 400  
+**settings['solver_tol']:** Relative residual tolerance of Palace's linear solver. Default is 1e-6  
+
 #### Simulation boundary
 
 **settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  

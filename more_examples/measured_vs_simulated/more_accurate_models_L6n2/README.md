@@ -18,6 +18,8 @@ The stackup used so far covers TopMetal2 with another thick **flat** layer of Si
 
 ## The details of this study:
 
+> **Newer version available:** this study was rerun with gds2palace 0.8.0, where `complex_coarse_solve` is on by default. Same results, about 2x faster simulation. See [the updated study](../more_accurate_models_L6n2_v2/README.md).
+
 - **Model:** `L6n2_with_ports.gds` (cell `L_6n2`), 2 via ports from a common PEC ground plane to TopMetal1, Z0 = 50 Ω
 - **gds2palace:** version 0.7.0
 - **EM stackups:** SG13G2_200um plus individual modifications (reported below)

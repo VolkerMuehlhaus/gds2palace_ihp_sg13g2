@@ -18,10 +18,13 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.9.0"
+__version__ = "1.10.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
+
+# Palace linear solver settings this version understands (checked by setupEM)
+PALACE_LINEAR_SOLVER_SETTINGS = ("complex_coarse_solve", "solver_maxits", "solver_tol")
 
 import os
 import sys
@@ -1256,6 +1259,23 @@ def create_model (excite_ports, settings):
 
     # optional iterative solver setting for Elmer
     iterative = get_optional_setting (settings, "iterative", False)
+
+    # Palace linear solver. ComplexCoarseSolve=True factorizes the full complex system
+    # for the coarse (sparse direct) solve instead of only its real part: the real-part-only
+    # preconditioner ignores absorbing boundaries, port resistances and losses, and GMRES then
+    # needs more and more iterations as radiation/leakage grows with frequency (see
+    # test_data/maxits_repro/analysis). It can also fail at a single low frequency (GF180
+    # inductor at 2.4 GHz, test_data/complex_coarse_solve), so it's on for every model.
+    # Costs 1.0-1.6x peak RAM at order 2 and 1.5-1.9x at order 1, model dependent.
+    complex_coarse_solve = bool(get_optional_setting (settings, "complex_coarse_solve", True))
+    solver_maxits = get_optional_setting (settings, "solver_maxits", 400)  # GMRES iteration limit
+    if not isinstance(solver_maxits, int) or isinstance(solver_maxits, bool) or solver_maxits < 1:
+        print('WARNING: solver_maxits must be an integer >= 1\nValue changed to default value solver_maxits=400.')
+        solver_maxits = 400
+    solver_tol = get_optional_setting (settings, "solver_tol", 1e-6)  # GMRES relative residual tolerance
+    if not isinstance(solver_tol, (int, float)) or isinstance(solver_tol, bool) or not (0 < solver_tol < 1):
+        print('WARNING: solver_tol must be a number between 0 and 1\nValue changed to default value solver_tol=1e-6.')
+        solver_tol = 1e-6
    
     simulation_ports = get_optional_setting(settings, "simulation_ports",[]) # not required for thermal simulation 
 
@@ -2130,14 +2150,16 @@ def create_model (excite_ports, settings):
             "Linear": {
                 "Type": "Default",
                 "KSPType": "GMRES",
-                "Tol": 1e-06,
-                "MaxIts": 400
+                "Tol": solver_tol,
+                "MaxIts": solver_maxits,
+                "ComplexCoarseSolve": complex_coarse_solve
             },
             "Order": order,
             "Device": "CPU"
             }
 
     solver['Driven'] = allsamples
+    print(f"Palace linear solver: ComplexCoarseSolve={complex_coarse_solve}, MaxIts={solver_maxits}, Tol={solver_tol:g}")
 
 
     config_data['Solver'] = solver
@@ -2198,8 +2220,12 @@ def create_model (excite_ports, settings):
                 else:    
                     Palace_material['Conductivity']=material.sigma
             else:
-                # not a metal, but we also have conductivity in stackup substrate
-                Palace_material['Conductivity']=material.sigma
+                if material.tand > 0:
+                    # regular dielectric: loss tangent only (was lost in the mesh redesign, 94985ac)
+                    Palace_material['LossTan']=material.tand
+                else:
+                    # not a metal, but we also have conductivity in stackup substrate
+                    Palace_material['Conductivity']=material.sigma
 
             Palace_materials.append(Palace_material)
         else:    
