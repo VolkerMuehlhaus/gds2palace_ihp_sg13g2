@@ -377,6 +377,12 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 **settings['amr_max_dof']:** Maximum number of unknowns for adaptive mesh refinement: refinement stops once the model reaches this size. Only used with adaptive_mesh_iterations > 0, default is 2e6  
 **settings['save_adaptive_mesh']:** Save mesh file from adaptive iteration for possible re-use, default is False  
 
+#### Linear solver (Palace)
+
+**settings['complex_coarse_solve']:** Let Palace's sparse direct coarse solver factorize the full complex system, instead of only its real part (Palace's own default). The real-part-only preconditioner ignores absorbing boundaries, port resistances and losses, so the iterative solver needs more and more iterations as frequency and radiation grow, and can fail to converge. In a D-band test case (5 mm grounded CPW, 110-170 GHz), True converged in 1 iteration per frequency at order 1 (14-31 at order 2) instead of 176-437, ran 3.5-6x faster and gave identical results, at about 1.9x (order 1) or 1.2x (order 2) peak RAM. Default is True  
+**settings['solver_maxits']:** Iteration limit of Palace's linear solver (GMRES) per frequency. If it is reached, Palace only logs "solver did NOT converge" and carries on, and the S-parameters at that frequency are unreliable. Default is 400  
+**settings['solver_tol']:** Relative residual tolerance of Palace's linear solver. Default is 1e-6  
+
 #### Simulation boundary
 
 **settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  

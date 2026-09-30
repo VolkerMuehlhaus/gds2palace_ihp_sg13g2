@@ -2,6 +2,15 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 30 September-2026
+**New features**  
+`settings['complex_coarse_solve']` is a new Palace option, **enabled by default**: Palace's sparse direct coarse solver now factorizes the full complex system instead of only its real part. With Palace's own default (real part only), absorbing boundaries, port resistances and losses are missing from the preconditioner, so the number of GMRES iterations grows with frequency until it hits the iteration limit. In a D-band test case (5 mm grounded CPW, 110-170 GHz) this took 176-437 iterations at order 1 and failed at 170 GHz; with the new default it converges in 1 iteration per frequency (14-31 at order 2), 3.5-6x faster, with identical S-parameters. It needs more RAM: about 1.9x at order 1 and 1.2x at order 2. Set it to `False` to get the previous behaviour.
+
+`settings['solver_maxits']` (default 400) and `settings['solver_tol']` (default 1e-6) make the Palace linear solver's iteration limit and tolerance configurable; both were hardcoded before.
+
+**Bugfixes**  
+The dielectric loss tangent (`DielectricLossTangent` in the XML stackup) was no longer written to the Palace model since the mesh redesign in v0.4.1, so all dielectrics were simulated as lossless. This is fixed: dielectrics with a non-zero loss tangent get Palace's `LossTan` again. The IHP SG13G2 stackups use lossless dielectrics and are not affected; lossy PCB substrates (e.g. RO4003, RO4350B) are.
+
 ## 25-26 September-2026
 **XML stackup files moved to separate folder**  
 The stackup files are moved from the workflow folder to a separate XML_stackup folder, with a clear separation between legacy stackups (for compatibility) and latest stackups (recommended for new models).
