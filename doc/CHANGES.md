@@ -8,6 +8,10 @@ Elmer thermal models failed with the [latest IHP stackups](../XML_stackup/latest
 
 A heat source whose target layer has zero thickness (a sheet layer, `PEC` or resistor) now stops with a clear error message. Before, it failed with a gmsh "Degenerate box" exception.
 
+Elmer thermal models failed with `SG13G2_FEM_200um_passi3D.xml` when TopMetal2 encloses an area, e.g. a ring or a heat spreader with openings: thermal models build all metals as volumes, and TopMetal2 then cuts the thin `Passive` layer into separate pieces, which stopped the model with an `AssertionError` ([issue #68](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/issues/68)). Now all pieces of a dielectric keep its name and material.
+
+A heat source can now have several polygons on its GDS source layer. Before, a second polygon stopped the model with `KeyError`. Overlapping or touching polygons of a source are merged into one volume. All volumes of a source share its power: the given power is the total for that source, not the power per polygon.
+
 ## 30 September-2026
 **New features**  
 `settings['complex_coarse_solve']` is a new gds2palace option, **enabled by default now**: Palace's sparse direct coarse solver now factorizes the full complex system instead of only its real part. **In many cases, this new setting will result in faster simulation.**  

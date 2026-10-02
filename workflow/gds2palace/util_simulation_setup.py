@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.10.2"
+__version__ = "1.10.3"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -1011,7 +1011,7 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
         thermal_objects 
 
     Returns:
-       list of thermal source dimtags
+       dict of thermal source volume tags, key = source name, value = list of tags (one box per polygon)
     """
 
     tags_created_3D = {}
@@ -1056,9 +1056,20 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
 
                         box_tag = gmsh.model.occ.addBox(xmin,ymin,zmin,xmax-xmin,ymax-ymin,zmax-zmin)
                         gmsh.model.setEntityName(dim=3,tag=box_tag, name=f'source_{object.source_layernum}')
-                        tags_created_3D['source_'+str(object.source_layernum)]=box_tag
+                        tags_created_3D.setdefault('source_'+str(object.source_layernum), []).append(box_tag)
+
+    # fuse overlapping or touching boxes of the same source, otherwise they would be reported
+    # as different conductors touching each other; separate boxes stay separate volumes
+    for key, tags in tags_created_3D.items():
+        if len(tags) > 1:
+            fused, _ = gmsh.model.occ.fuse([(3, tags[0])], [(3, tag) for tag in tags[1:]])
+            tags_created_3D[key] = [tag for _, tag in fused]
 
     gmsh.model.occ.synchronize()
+
+    for key, tags in tags_created_3D.items():
+        for tag in tags:
+            gmsh.model.setEntityName(dim=3, tag=tag, name=key)
 
     return tags_created_3D
 
@@ -1564,12 +1575,25 @@ def create_model (excite_ports, settings):
             os.remove(missing_debug_log)        
     '''        
 
-    # cut metal volumes from dielectric volumes
+    # cut metal volumes from dielectric volumes. A metal that reaches through a thin dielectric
+    # can split it into several pieces, e.g. a TopMetal2 ring through Passive in the conformal
+    # passivation stackup in a thermal model (all metals are volumes there): every piece keeps the
+    # name of its dielectric, so all pieces end up in the same physical group and material
+    dielectric_names = {tag: gmsh.model.getEntityName(dim=3, tag=tag) for _, tag in dielectric_volume_dimtags}
     outDimTags, outDimTagsMap = gmsh.model.occ.cut(dielectric_volume_dimtags, metal_volume_dimtags, -1, removeTool=False)
-    dielectric_tags_unchanged = (outDimTags==dielectric_volume_dimtags)
-    assert dielectric_tags_unchanged
 
     gmsh.model.occ.synchronize()
+
+    dielectric_pieces = []
+    for n, (_, original_tag) in enumerate(dielectric_volume_dimtags):
+        # outDimTagsMap lists the objects first, in input order
+        pieces = outDimTagsMap[n]
+        if len(pieces) > 1:
+            print(f'Dielectric "{dielectric_names[original_tag]}" is split into {len(pieces)} volumes by metals')
+        for _, piece_tag in pieces:
+            gmsh.model.setEntityName(dim=3, tag=piece_tag, name=dielectric_names[original_tag])
+        dielectric_pieces.extend(pieces)
+    dielectric_volume_dimtags = dielectric_pieces
     
     # Now embed/fragment metal and dielectric volumes, return value geom_map keeps mapping between original tags and new tags after fragmenting
 
@@ -1618,7 +1642,7 @@ def create_model (excite_ports, settings):
 
     gmsh.model.occ.synchronize()
 
-    # dielectric volume dim tags have not changed, so all other volumes after fragmenting must be metal
+    # dielectric volumes are not changed by fragmenting, so all other volumes after fragmenting must be metal
     metal_volume_dimtags = []
     all_volume_dimtags = gmsh.model.getEntities(3)
     for volume_dimtag in all_volume_dimtags:
@@ -1657,8 +1681,8 @@ def create_model (excite_ports, settings):
         # add thermal volume dimtags (i.e. thermal sources)
         thermal_volume_dimtags = []
         for key in thermalsource_dimtags_created_3D:
-            tag = thermalsource_dimtags_created_3D[key]
-            thermal_volume_dimtags.append((3,tag))
+            for tag in thermalsource_dimtags_created_3D[key]:
+                thermal_volume_dimtags.append((3,tag))
 
     # sheet and volume names must be captured before fragment(), since fragment() can split
     # a sheet or a 3D volume into multiple new entities (e.g. where a sheet touches another
@@ -1752,8 +1776,11 @@ def create_model (excite_ports, settings):
             # we get a list with one or more new dimtags for each the original dimtag
             original_tag = geom_dimtags[n]
             if original_tag in thermal_volume_dimtags:
-                #  sheetlayer_dimtags is flat list, this is all we have for now, information on layer/material is only in sheet itself (getEntityName)
-                restored_thermalvolume_dimtags.append(new_dimtag_list[0])
+                # keep all pieces, a source volume can be split by fragment(), e.g. where two
+                # polygons on the same source layer overlap
+                for dimtag in new_dimtag_list:
+                    if dimtag not in restored_thermalvolume_dimtags:
+                        restored_thermalvolume_dimtags.append(dimtag)
         thermal_volume_dimtags = restored_thermalvolume_dimtags        
 
 
@@ -1776,7 +1803,15 @@ def create_model (excite_ports, settings):
     geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]
     for dim, tag in geom_dimtags:
         name = gmsh.model.getEntityName(dim=3,tag=tag)
-        if name in metal_surface_dict.keys():
+        if elmer_thermal and name in thermal_volume_dict.keys():
+            # heat source, one source can have several volumes (one per polygon), all in the
+            # same physical group, so they share one Body Force and its total power
+            thermal_volume_dict[name].append(tag)
+
+            # register all surfaces of 3d body also, so that they appear in mesh view in Paraview
+            _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+            metal_surface_dict.setdefault(name, []).append(surfaceloops)
+        elif name in metal_surface_dict.keys():
             # get all surfaces of 3d body
             _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
             metal_surface_dict[name].append(surfaceloops)   
@@ -1824,13 +1859,6 @@ def create_model (excite_ports, settings):
             _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
             for surfaceloop in surfaceloops:
                 airbox_surface_taglist.append(surfaceloop) 
-        elif name in thermal_volume_dict.keys():
-            # this is what the thermal solver uses
-            thermal_volume_dict[name].append(tag)
-
-            # register all surfaces of 3d body also, so that they appear in mesh view in Paraview
-            _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
-            metal_surface_dict[name]= [surfaceloops]
         else:
             # this should not happen
             print(f"Found volume tag {tag} with name '{name}' which can't be assigned, abort")
