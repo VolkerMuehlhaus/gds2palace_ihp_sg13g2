@@ -107,4 +107,4 @@ The `PEC` sheets `SUBGND`, `BACKSIDEGND` and `REF_FOR_TRANSISTOR` have no therma
 thermal_objects.add_consttemp(simulation_setup.constanttemp(temp=298, source_layernum=202, target_layername='BACKSIDEGND'))
 ```
 
-A heat source needs a target layer with a real material and thickness, so a `PEC` layer can't be its target.
+`PEC` vias and conductor volumes (none in these stackups) use the thermal properties of copper in thermal models: 401 W/m·K at 300 K (CRC Handbook). This also applies to a heat source whose target layer is a `PEC` volume. A heat source needs a target layer with a thickness, so a `PEC` sheet can't be its target.

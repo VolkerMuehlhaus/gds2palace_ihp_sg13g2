@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.10.1"
+__version__ = "1.10.2"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -32,6 +32,7 @@ import gmsh
 import math
 import numpy as np
 import json
+import types
 
 from . import util_elmer
 from .util_stackup_reader import PEC_MATERIAL_NAME
@@ -42,6 +43,13 @@ from .util_stackup_reader import PEC_MATERIAL_NAME
 # test_data/zeromargin/SG13G2_PEC_at_M1.xml. (openEMS, being FDTD, has no such limitation and
 # uses a literal ideal-conductor volume for a PEC via instead - see gds2openEMS.)
 PEC_VIA_EQUIVALENT_CONDUCTIVITY = 1e10
+
+# PEC has no thermal properties - in an Elmer thermal model, PEC via/conductor volumes (and heat
+# sources with a PEC target layer) use the values of pure copper at 300 K instead:
+# thermal conductivity 401 W/m/K, density 8960 kg/m^3 (CRC Handbook of Chemistry and Physics)
+PEC_THERMAL_EQUIVALENT = types.SimpleNamespace(
+    name=f'{PEC_MATERIAL_NAME}_copper', eps=1.0, sigma=PEC_VIA_EQUIVALENT_CONDUCTIVITY,
+    thermalcond=401.0, density=8960.0, thermaltablename="", thermaltable=None)
 
 
 def _is_pec_material (materialname):
@@ -974,46 +982,24 @@ def _thermal_setup_error (message):
     return ValueError(f"\n{banner}\nTHERMAL MODEL ERROR: {message}\n{banner}")
 
 
-def _skip_pec_layer_in_thermal_model (metal, groupname, metals_list, reported_layers):
-    """Thermal model: decide what to do with a physical group that maps to a layer using the
-    reserved PEC material (EM-only, no thermal properties).
-
-    - constant temperature boundary targeting the PEC layer: kept, the target layer only
-      gives the z position of the boundary, its material is not used
-    - PEC sheet itself (e.g. SUBGND, BACKSIDEGND): skipped, the same as any other zero-thickness
-      sheet in a thermal model, reported once per layer (in reported_layers)
-    - heat source targeting the PEC layer, or a PEC via/conductor volume: error, these need a
-      real thermal conductivity
-
-    Returns:
-        bool: True if the group must be skipped
+def _report_pec_layer_in_thermal_model (metal, reported_layers):
+    """Thermal model: print once per layer (tracked in reported_layers) how a layer using the
+    reserved PEC material (EM-only, no thermal properties) is modelled:
+    - PEC sheet (e.g. SUBGND, BACKSIDEGND): ignored, the same as any other zero-thickness sheet
+      in a thermal model. It can still be the target layer of a constant temperature boundary,
+      which uses only its z position.
+    - PEC via/conductor volume, and heat sources targeting it: thermal properties of copper,
+      see PEC_THERMAL_EQUIVALENT
     """
-    if groupname.startswith('constanttemp_'):
-        return False
-
-    xml_filename = getattr(metals_list, 'xml_filename', None)
-    in_file = f' in stackup file "{xml_filename}"' if xml_filename else ''
-
-    if groupname.startswith('source_'):
-        raise _thermal_setup_error(
-            f'Heat source "{groupname}" targets layer "{metal.name}", which uses the reserved "PEC" '
-            f'material{in_file}. A heat source gets the material of its target layer, and PEC has no '
-            'thermal conductivity -- choose a target layer with a real Conductor material.'
-        )
-
+    if metal.name in reported_layers:
+        return
+    reported_layers.add(metal.name)
     if metal.is_sheet:
-        if metal.name not in reported_layers:
-            reported_layers.add(metal.name)
-            print(f'Layer "{metal.name}" uses the reserved "PEC" material - zero-thickness sheet, '
-                  'ignored in thermal model.')
-        return True
-
-    raise _thermal_setup_error(
-        f'Layer "{metal.name}" uses the reserved "PEC" material{in_file}. PEC is an '
-        'electromagnetic-only construct and has no thermal conductivity, so it is valid in a '
-        'thermal model only for sheet layers (ignored there) -- assign a real Conductor material '
-        'with ThermalConductivity to this layer instead.'
-    )
+        print(f'Layer "{metal.name}" uses the reserved "PEC" material - zero-thickness sheet, '
+              'ignored in thermal model.')
+    else:
+        print(f'Layer "{metal.name}" uses the reserved "PEC" material - modelled with the thermal '
+              f'properties of copper ({PEC_THERMAL_EQUIVALENT.thermalcond:g} W/mK) in thermal model.')
 
 
 def add_thermal_sources (allpolygons, metals_list, thermal_objects):
@@ -1884,7 +1870,9 @@ def create_model (excite_ports, settings):
                     phys_group = gmsh.model.addPhysicalGroup(3, bucket["tags"], tag=-1)
                     gmsh.model.setPhysicalName(3, phys_group, groupname)
                     physical_groups_3D.append({"layername":key, "groupname":groupname, "grouptag":phys_group, "fill_factor":bucket["mean_fill_factor"]})
-                    if _is_pec_material(via_metal.material):
+                    if _is_pec_material(via_metal.material) and elmer_thermal:
+                        sigma_info = f'PEC material, copper heat conductivity = {PEC_THERMAL_EQUIVALENT.thermalcond*bucket["mean_fill_factor"]:.4g} W/mK'
+                    elif _is_pec_material(via_metal.material):
                         sigma_info = 'PEC material, conductivity not scaled'
                     elif via_material is not None and elmer_thermal:
                         if via_material.thermaltablename == "":
@@ -2221,8 +2209,8 @@ def create_model (excite_ports, settings):
 
     Palace_materials = []
 
-    # thermal model: PEC sheet layers already reported as ignored
-    thermal_pec_sheets_reported = set()
+    # thermal model: PEC layers already reported (see _report_pec_layer_in_thermal_model)
+    thermal_pec_layers_reported = set()
 
     for item in physical_groups_3D:
         # items can be from via layer, filled/solid metal volume, or dielectric stackup
@@ -2235,8 +2223,7 @@ def create_model (excite_ports, settings):
 
         if metal is not None and _is_pec_material(metal.material):
             if elmer_thermal:
-                # raises for PEC volumes and heat sources on a PEC layer
-                _skip_pec_layer_in_thermal_model(metal, groupname, metals_list, thermal_pec_sheets_reported)
+                # no Palace output for a thermal model
                 continue
             # PEC via or filled/solid metal: Palace has no ideal-conductor volume, approximate
             # with a fixed very high but finite conductivity domain instead
@@ -2324,8 +2311,7 @@ def create_model (excite_ports, settings):
 
         if metal is not None and _is_pec_material(metal.material):
             if elmer_thermal:
-                # no Palace output for a thermal model, only check (raises for PEC volumes)
-                _skip_pec_layer_in_thermal_model(metal, groupname, metals_list, thermal_pec_sheets_reported)
+                # no Palace output for a thermal model
                 continue
             if metal.is_metal or metal.is_sheet:
                 # ideal conductor: goes into the Boundaries.PEC group instead of
@@ -2571,11 +2557,9 @@ def create_model (excite_ports, settings):
             # fill factor of merged via arrays, 1.0 unless fill_factor_correction split this via layer
             via_fill_factor = item.get("fill_factor", 1.0) if (metal is not None and metal.is_via) else 1.0
 
-            if metal is not None and _is_pec_material(metal.material):
-                if elmer_thermal:
-                    # raises for PEC volumes and heat sources on a PEC layer
-                    _skip_pec_layer_in_thermal_model(metal, groupname, metals_list, thermal_pec_sheets_reported)
-                    continue
+            pec_layer = metal is not None and _is_pec_material(metal.material)
+
+            if pec_layer and not elmer_thermal:
                 # PEC via or filled/solid metal: Elmer has no ideal-conductor volume either,
                 # approximate with the same fixed very high conductivity domain as Palace output
                 print(f'Layer "{metal.name}" uses the reserved "PEC" material - approximated as a '
@@ -2590,7 +2574,12 @@ def create_model (excite_ports, settings):
                 Elmer_bodies.append({'name': groupname, 'material': material_index+1})
                 continue
 
-            material = get_material_from_layer_or_dielectric_name(layername)
+            if pec_layer:
+                # thermal model: PEC volume, or heat source with a PEC target layer
+                _report_pec_layer_in_thermal_model(metal, thermal_pec_layers_reported)
+                material = PEC_THERMAL_EQUIVALENT
+            else:
+                material = get_material_from_layer_or_dielectric_name(layername)
 
             if (material is not None) or (layername == 'airbox'):
                 Elmer_material = {}
@@ -2679,7 +2668,9 @@ def create_model (excite_ports, settings):
 
             if metal is not None and _is_pec_material(metal.material):
                 if elmer_thermal:
-                    if _skip_pec_layer_in_thermal_model(metal, groupname, metals_list, thermal_pec_sheets_reported):
+                    if not groupname.startswith('constanttemp_'):
+                        # PEC sheet ignored; surfaces of a PEC volume need no thermal boundary
+                        _report_pec_layer_in_thermal_model(metal, thermal_pec_layers_reported)
                         continue
                     # constant temperature boundary at the PEC layer's z position: handled below
                 else:
