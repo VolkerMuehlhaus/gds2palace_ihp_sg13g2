@@ -6,6 +6,8 @@ This is an (incomplete) list of changes and new features.
 **Bugfixes**  
 Elmer thermal models failed with the [latest IHP stackups](../XML_stackup/latest/IHP/README.md) when the layout had shapes on `SUBGND` (250), `BACKSIDEGND` (251) or `REF_FOR_TRANSISTOR` (300), or when a constant temperature boundary used `BACKSIDEGND` as its target layer: these layers use the `PEC` material, which was rejected for thermal models ([issue #67](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/issues/67)). Now thermal models ignore `PEC` sheet layers, in the same way as the resistor sheets, and a `PEC` layer can be the target of a constant temperature boundary. The same stackup file now works for EM and thermal models. `PEC` vias and conductor volumes, and heat sources with a `PEC` target layer, are still rejected for thermal models, because `PEC` has no thermal conductivity. That error message now also names the stackup file.
 
+A heat source whose target layer has zero thickness (a sheet layer, `PEC` or resistor) now stops with a clear error message. Before, it failed with a gmsh "Degenerate box" exception.
+
 ## 30 September-2026
 **New features**  
 `settings['complex_coarse_solve']` is a new gds2palace option, **enabled by default now**: Palace's sparse direct coarse solver now factorizes the full complex system instead of only its real part. **In many cases, this new setting will result in faster simulation.**  

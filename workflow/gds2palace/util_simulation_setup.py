@@ -1058,6 +1058,15 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
                             )
                         zmin = target_metal.zmin
                         zmax = target_metal.zmax
+                        if zmax <= zmin:
+                            xml_filename = getattr(metals_list, 'xml_filename', None)
+                            in_file = f' in stackup file "{xml_filename}"' if xml_filename else ''
+                            raise _thermal_setup_error(
+                                f"Thermal source on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' has zero thickness{in_file} "
+                                f"(sheet layer, Zmin = Zmax = {zmin:g}). A heat source is a volume and takes "
+                                "the thickness of its target layer -- choose a conductor or via target layer."
+                            )
 
                         box_tag = gmsh.model.occ.addBox(xmin,ymin,zmin,xmax-xmin,ymax-ymin,zmax-zmin)
                         gmsh.model.setEntityName(dim=3,tag=box_tag, name=f'source_{object.source_layernum}')
