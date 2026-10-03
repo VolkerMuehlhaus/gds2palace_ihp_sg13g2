@@ -326,7 +326,7 @@ Two settings are available to control processing of the GDSII geometries:
 ![](./images/gds2palace_workflow_userguide.pdf-0013-05.png)
 
 
-**pre_process_gds** must be enabled if the layout includes any cutouts (holes) or other selfintersecting polygon boundaries. This will split such polygons into smaller entities, which can be processed properly. Without that preprocessing, mesh generation of layout with holes would fail with error messages like “Exception: Curve loop is not closed” 
+**preprocess_gds** is no longer needed: layouts with cutouts (holes) or other self-intersecting polygon boundaries are now handled automatically. If an older model script still sets it to True, the GDSII reader ignores it and prints a note. Earlier versions needed it, otherwise meshing of layouts with holes failed with errors like “Exception: Curve loop is not closed”. 
 
 **merge_polygon_size** applies to layers which are declared as _Type=”via”_ in the XML stackup file. 
 
