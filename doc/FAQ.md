@@ -204,8 +204,9 @@ solved data nearby.
 
 `settings['fpoint']` adds discrete frequencies on top of the `fstart`/
 `fstop`/`fstep` sweep; `settings['fdump']` additionally writes a field dump
-at each listed frequency, for viewing in ParaView (there's no built-in field
-plotter). See ["Adaptive mesh refinement at selected frequencies
+at each listed frequency, for viewing in ParaView or in setupEM's built-in
+3D field viewer (also available as the `fieldViewer` command, which can
+render a screenshot without a window). See ["Adaptive mesh refinement at selected frequencies
 only"](userguide_md_format/gds2palace_workflow_userguide.md#adaptive-mesh-refinement-at-selected-frequencies-only)
 for how these interact.
 
@@ -227,8 +228,10 @@ directly for a key you're unsure about (search for `get_optional_setting`
 calls, which show the default). The most commonly used keys: `fstart`/
 `fstop`/`fstep`/`fpoint`/`fdump`, `refined_cellsize`/`refined_cellsize_override`,
 `meshsize_max`, `cells_per_wavelength`, `adaptive_mesh_iterations`/`amr_tol`/
-`amr_max_dof`, `order`, `margin`/`air_around`, `boundary`, `preprocess_gds`,
-`merge_polygon_size`, `preview_only`/`no_preview`/`no_gui`. The [user's
+`amr_max_dof`, `order`, `margin`/`air_around`, `boundary`,
+`merge_polygon_size`, `preview_only`/`no_preview`/`no_gui`. The table in
+[`AGENTS.md`](../AGENTS.md#settings) lists all optional keys with their
+defaults. The [user's
 guide's `settings` chapter](userguide_md_format/gds2palace_workflow_userguide.md#settings)
 covers the everyday ones with examples.
 
