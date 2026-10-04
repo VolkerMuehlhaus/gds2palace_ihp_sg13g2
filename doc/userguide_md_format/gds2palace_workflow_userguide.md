@@ -200,14 +200,36 @@ In addition, we need the simulation model code in Python, which brings the workf
 
 In this section, the user specifies the GDSII data source and the technology stackup file.  
 
-![Model script: input files](./images/gds2palace_workflow_userguide.pdf-0006-09.png)
+```python
+# ===================== input files and path settings =======================
+
+gds_filename = "line_simple_viaport.gds"   # geometries
+XML_filename = "SG13G2_nosub.xml"          # stackup
+
+# preprocess GDSII for safe handling of cutouts/holes?
+preprocess_gds = False
+```
 
 
 ### Simulation model: Simulation control 
 
 In this section, the user needs to specify frequency range and mesh settings.  There are additional optional settings that can be applied, as discussed later in this document.  
 
-![Model script: frequency range and mesh settings](./images/gds2palace_workflow_userguide.pdf-0006-12.png)
+```python
+settings['unit']   = 1e-6  # geometry is in microns
+settings['margin'] = 50    # distance in microns from GDSII geometry boundary to simulation boundary
+
+settings['fstart']  = 0e9
+settings['fstop']   = 100e9
+settings['fstep']   = 2.5e9
+
+settings['refined_cellsize'] = 2  # mesh cell size in conductor region
+settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, must be 10 or more
+
+settings['meshsize_max'] = 70  # microns, override cells_per_wavelength
+settings['adaptive_mesh_iterations'] = 0
+settings['z_thickness_factor'] = 0.33
+```
 
 Users who are familiar with the IHP openEMS workflow will notice many similarities, although some implementation details are different.  
 
@@ -224,7 +246,17 @@ Similar to the IHP openEMS workflow, **ports are created based on polygons from 
 The port mapping defines the port number and port impedance, and then maps the port geometry from the special GDSII input layer (usually 201 and above) to actual IHP technology layers. For the vertical ports shown here, we have from_layername and to_layername. For in-plane ports, we would have target_layername instead. Finally, the port direction is required to specify vertical ports or in-plane ports and their direction/polarity.  
 
 
-![Model script: port definitions](./images/gds2palace_workflow_userguide.pdf-0007-04.png)
+```python
+simulation_ports = simulation_setup.all_simulation_ports()
+# instead of in-plane port specified with target_layername,
+# we here use via port specified with from_layername and to_layername
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=1, voltage=1, port_Z0=50, source_layernum=201,
+    from_layername='Metal1', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=2, voltage=1, port_Z0=50, source_layernum=202,
+    from_layername='Metal1', to_layername='TopMetal2', direction='z'))
+```
 
 
 For this Palace workflow, the voltage parameter is not supported yet by the Palace solver. Palace only supports opposite polarity by reversing the port direction. **But here in our workflow, we use this voltage parameter to specify if a port is active: ports with voltage=0 will not be excited.**  
@@ -277,7 +309,33 @@ This shows the mesh at the conductor surfaces of Metal1, TopMetal1 and the verti
 When you are done with inspection of the model (which is optional, no user action is required!), the gmsh viewer window can be closed to finish model generation. The workflow code has now created the required file to start Palace: the simulation control file config.json and the mesh file.  
 
 
-![Palace configuration file config.json created by the model script](./images/gds2palace_workflow_userguide.pdf-0010-04.png)
+```json
+{
+    "Problem": {
+        "Type": "Driven",
+        "Verbose": 3,
+        "Output": "output/palace_line_viaport"
+    },
+    "Model": {
+        "Mesh": "palace_line_viaport.msh",
+        "L0": 1e-06,
+        "Refinement": {}
+    },
+    "Solver": {
+        "Driven": {
+            "MinFreq": 0.1,
+            "MaxFreq": 100.0,
+            "FreqStep": 2.5,
+            "SaveStep": 0,
+            "AdaptiveTol": 0.01
+        },
+        "Linear": {
+            "Type": "Default",
+            "KSPType": "GMRES",
+            "Tol": 1e-06,
+            "MaxIts": 400,
+            ...
+```
 
 
 ### Running Palace FEM simulation from our input files 
@@ -285,7 +343,11 @@ When you are done with inspection of the model (which is optional, no user actio
 To simplify running the solver, in addition to mesh file and config file, a script file was also created named *run_sim*.  
 
 
-![Script run_sim created by the model script](./images/gds2palace_workflow_userguide.pdf-0011-02.png)
+```bash
+#!/bin/bash
+run_palace config.json
+combine_snp
+```
 
 
 This starts a script *run_palace* where you can define in detail how to run Palace. It is recommended that you place this run_palace script in your PATH, configured for the actual machine where you want to run Palace.  
@@ -295,7 +357,10 @@ For workflow development and test, Palace was installed into an apptainer contai
 The script *run_palace* was then configured to start Palace inside the palace_014.sif container, which is located in the user’s home directory, and passes one command line argument (the config.json file). The additional parameter _-np 16_ tells palace to run using 16 threads. This will partition the simulation domain into 8 pieces, each running in a separate process, and the combine results into one output directory.  
 
 
-![Script run_palace, configured to run Palace from an Apptainer container](./images/gds2palace_workflow_userguide.pdf-0011-06.png)
+```bash
+#!/bin/bash
+apptainer exec ~/palace_014.sif palace -np 16 $1
+```
 
 
 Running Palace is not very spectacular, the simulation progress is shown in the terminal window.  
@@ -333,13 +398,24 @@ This ends our quick tour of using the gds2palace workflow. There are many additi
 Typical simulation models require two input files: GDSII geometries and XML stackup. 
 
 
-![Model script: GDSII and XML stackup input files](./images/gds2palace_workflow_userguide.pdf-0013-03.png)
+```python
+# ===================== input files and path settings =======================
+
+gds_filename = "BM_Ardavan_Rahimian_with_ports.gds"   # geometries
+XML_filename = "SG13G2_nosub.xml"          # stackup
+```
 
 
 Two settings are available to control processing of the GDSII geometries: 
 
 
-![Model script: GDSII preprocessing and via merging](./images/gds2palace_workflow_userguide.pdf-0013-05.png)
+```python
+# preprocess GDSII for safe handling of cutouts/holes?
+preprocess_gds = False
+
+# merge via polygons with distance less than .. microns, set to 0 to disable via merging.
+merge_polygon_size = 0
+```
 
 
 **preprocess_gds** is no longer needed: layouts with cutouts (holes) or other self-intersecting polygon boundaries are now handled automatically. If an older model script still sets it to True, the GDSII reader ignores it and prints a note. Earlier versions needed it, otherwise meshing of layouts with holes failed with errors like “Exception: Curve loop is not closed”. 
@@ -437,7 +513,17 @@ Similar to the IHP openEMS workflow, **ports are created based on polygons from 
 The port mapping defines the port number and port impedance, and then maps the port geometry from the special GDSII input layer (usually 201 and above) to actual IHP technology layers. For the vertical ports shown here, we have from_layername and to_layername. For in-plane ports, we would have target_layername instead. Finally, the port direction is required to specify vertical ports or in-plane ports and their direction/polarity.  
 
 
-![Port definitions with via ports between Metal1 and TopMetal2](./images/gds2palace_workflow_userguide.pdf-0016-03.png)
+```python
+simulation_ports = simulation_setup.all_simulation_ports()
+# instead of in-plane port specified with target_layername,
+# we here use via port specified with from_layername and to_layername
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=1, voltage=1, port_Z0=50, source_layernum=201,
+    from_layername='Metal1', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=2, voltage=1, port_Z0=50, source_layernum=202,
+    from_layername='Metal1', to_layername='TopMetal2', direction='z'))
+```
 
 
 For this Palace workflow, the voltage parameter is not supported yet by the Palace solver. Palace only supports opposite polarity by reversing the port direction. **But here in our workflow, we use this voltage parameter to specify if a port is active: ports with voltage=0 will not be excited.**  
@@ -459,13 +545,71 @@ To get the full S-parameter file, all ports must be defined with non-zero voltag
 If you want to have additional control over the names of files and directories that are created by the workflow, have a look at this section at the beginning of the simulation model file: 
 
 
-![Model script: file names and output directory](./images/gds2palace_workflow_userguide.pdf-0017-02.png)
+```python
+# get path for this simulation file
+script_path = utilities.get_script_path(__file__)
+
+# use script filename as model basename
+model_basename = utilities.get_basename(__file__)
+
+# set and create directory for simulation output
+sim_path = utilities.create_sim_path (script_path,model_basename)
+print('Simulation data directory: ', sim_path)
+
+# change path to models script path
+modelDir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(modelDir)
+```
 
 
 For example, if you want the customize the model name, to reflect settings used for meshing, you can define these values as variables and append that to the model_basename variable. 
 
 
-![Model script: model name built from mesh settings](./images/gds2palace_workflow_userguide.pdf-0017-04.png)
+```python
+mesh  = 5  # define here, so that we can add this information to output filenames
+order = 3  # define here, so that we can add this information to output filenames
+
+XML_filename = "SG13G2_nosub.xml"          # stackup
+
+# preprocess GDSII for safe handling of cutouts/holes?
+preprocess_gds = False
+
+# merge via polygons with distance less than .. microns, set to 0 to disable via merging.
+merge_polygon_size = 0
+
+# get path for this simulation file
+script_path = utilities.get_script_path(__file__)
+
+# use script filename as model basename, with parameters for suffix
+model_basename = utilities.get_basename(__file__) + '_mesh' + str(mesh) + '_order' + str(order)
+
+# set and create directory for simulation output
+sim_path = utilities.create_sim_path (script_path,model_basename)
+print('Simulation data directory: ', sim_path)
+
+# change path to models script path
+modelDir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(modelDir)
+
+# ======================== simulation settings ================================
+
+settings = {}
+
+settings['unit']   = 1e-6  # geometry is in microns
+settings['margin'] = 50    # distance in microns from GDSII geometry boundary to simulation boundary
+
+settings['fstart']  = 0e9
+settings['fstop']   = 100e9
+settings['fstep']   = 2.5e9
+
+settings['refined_cellsize'] = mesh  # mesh cell size in conductor region
+settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, must be 10 or more
+
+settings['meshsize_max'] = 70  # microns, override cells_per_wavelength
+settings['adaptive_mesh_iterations'] = 0
+settings['z_thickness_factor'] = 0.33
+settings['order'] = order
+```
 
 
 If you want the script to create the Palace files without showing the mesh in gmsh 3D viewer, this is also possible. 
@@ -597,10 +741,32 @@ We will first look at results from refined_cellsize=5 and refined_cellsize=2, bo
 
 There is quite a difference in S11 and S21,S31 results, and we can assume that the finer mesh gives more accurate results … but how far are we off from convergence? We could now simulate with an ever smaller refined_meshsize = 1, or we can use adaptive mesh refinement now. This will run the simulation starting with an initial mesh size, and then refine the mesh in the most relevant regions.  
 
-By default, adaptive mesh refinement in Palace uses data from all simulation frequencies and all port excitations, which means a significant increase in overall simulation time because a full simulation is used during mesh refinement. The screenshot below shows settings from the Palace configuration file for an adaptive sweep with maximum of 2 adaptive mesh refinements, with up to 2 million degrees of freedom.  
+By default, adaptive mesh refinement in Palace uses data from all simulation frequencies and all port excitations, which means a significant increase in overall simulation time because a full simulation is used during mesh refinement. The excerpt below shows settings from the Palace configuration file for an adaptive sweep with maximum of 2 adaptive mesh refinements, with up to 2 million degrees of freedom.  
 
 
-![Palace configuration for adaptive mesh refinement with 2 iterations](./images/gds2palace_workflow_userguide.pdf-0026-01.png)
+```json
+"Model": {
+    "Mesh": "palace_balun_mesh5_AMR.msh",
+    "L0": 1e-06,
+    "Refinement": {
+        "UniformLevels": 0,
+        "Tol": 0.01,
+        "MaxIts": 2,
+        "MaxSize": 2000000.0,
+        "Nonconformal": true,
+        "UpdateFraction": 0.7,
+        "SaveAdaptMesh": false
+    }
+},
+"Solver": {
+    "Driven": {
+        "MinFreq": 100.0,
+        "MaxFreq": 200.0,
+        "FreqStep": 1.0,
+        "SaveStep": 0,
+        "AdaptiveTol": 0.01
+    },
+```
 
 
 Note for experts: We could decide to create an adaptive mesh refinement at one target frequency, or a few selected target frequencies, and then store that refined mesh for the final full frequency sweep. This is the approach chosen by many commercial FEM solvers, where the user needs to decide what frequencies are used for AMR.  
@@ -673,7 +839,11 @@ The approach taken by the gds2palace workflow script is to have a **scaling fact
 In the model code, you can set this value by parameter 'z_thickness_factor': 
 
 
-![Setting z_thickness_factor in the model script](./images/gds2palace_workflow_userguide.pdf-0031-02.png)
+```python
+settings['meshsize_max'] = 30  # microns, override cells_per_wavelength
+settings['adaptive_mesh_iterations'] = 0
+settings['z_thickness_factor'] = 0.33
+```
 
 
 If you do not specify this option, the default value for that scaling factor is 1.0 
@@ -877,7 +1047,21 @@ The existing data is not complete enough to create an “official” technology 
 By default, adaptive mesh refinement in Palace uses data from all simulation frequencies and all port excitations, which means a significant increase in overall simulation time because a full simulation is used during mesh refinement. To do a two-step approach where the adaptive mesh refinement used only a limited set of frequencies, you could run the gds2palace workflow with those frequencies only, and change the config.json file to **store the resulting mesh data to disk** , by setting SaveAdaptMesh to true.  
 
 
-![Palace configuration for adaptive mesh refinement](./images/gds2palace_workflow_userguide.pdf-0040-04.png)
+```json
+"Model": {
+    "Mesh": "palace_balun_mesh2_AMR.msh",
+    "L0": 1e-06,
+    "Refinement": {
+        "UniformLevels": 0,
+        "Tol": 0.01,
+        "MaxIts": 2,
+        "MaxSize": 2000000.0,
+        "Nonconformal": true,
+        "UpdateFraction": 0.7,
+        "SaveAdaptMesh": false
+    }
+},
+```
 
 
 Adaptive frequency sweep would be **disabled** by removing the "AdaptiveTol" line in the frequency block. 
@@ -1120,7 +1304,34 @@ The workflow creates different types of geometry: volumes and surfaces. This dep
 Extract from an XML stackup file, showing layer mappings with conductor, via and sheet types: 
 
 
-![XML stackup: layer mappings with conductor, via and sheet types](./images/gds2palace_workflow_userguide.pdf-0042-09.png)
+```xml
+  </Dielectrics>
+  <Layers>
+    <Substrate Offset="183.75"/>
+    <Layer Name="Activ" Type="conductor" Zmin="0.0000" Zmax="0.4000" Material="Activ" Layer="1"/>
+    <Layer Name="Metal1" Type="conductor" Zmin="1.0400" Zmax="1.4600" Material="Metal1" Layer="8"/>
+    <Layer Name="Metal2" Type="conductor" Zmin="2.0000" Zmax="2.4900" Material="Metal2" Layer="10"/>
+    <Layer Name="Metal3" Type="conductor" Zmin="3.0300" Zmax="3.5200" Material="Metal3" Layer="30"/>
+    <Layer Name="Metal4" Type="conductor" Zmin="4.0600" Zmax="4.5500" Material="Metal4" Layer="50"/>
+    <Layer Name="Metal5" Type="conductor" Zmin="5.0900" Zmax="5.5800" Material="Metal5" Layer="67"/>
+    <Layer Name="TopMetal1" Type="conductor" Zmin="6.4303" Zmax="8.4303" Material="TopMetal1" Layer="126"/>
+    <Layer Name="TopMetal2" Type="conductor" Zmin="11.2303" Zmax="14.2303" Material="TopMetal2" Layer="134"/>
+    <Layer Name="TopVia2" Type="via" Zmin="8.4303" Zmax="11.2303" Material="TopVia2" Layer="133"/>
+    <Layer Name="TopVia1" Type="via" Zmin="5.5800" Zmax="6.4303" Material="TopVia1" Layer="125"/>
+    <Layer Name="Via4" Type="via" Zmin="4.5500" Zmax="5.0900" Material="Via4" Layer="66"/>
+    <Layer Name="Via3" Type="via" Zmin="3.5200" Zmax="4.0600" Material="Via3" Layer="49"/>
+    <Layer Name="Via2" Type="via" Zmin="2.4900" Zmax="3.0300" Material="Via2" Layer="29"/>
+    <Layer Name="Via1" Type="via" Zmin="1.4600" Zmax="2.0000" Material="Via1" Layer="19"/>
+    <Layer Name="Cont" Type="via" Zmin="0.4000" Zmax="1.0400" Material="Cont" Layer="6"/>
+    <Layer Name="SUBGND" Type="conductor" Zmin="-3.75" Zmax="0" Material="LOWLOSS" Layer="210"/>
+    <Layer Name="BACKSIDEGND" Type="sheet" Zmin="-180" Zmax="-180" Material="LOWLOSS" Layer="211"/>
+    <Layer Name="MIM" Type="conductor" Zmin="5.6043" Zmax="5.7540" Material="MIM" Layer="36"/>
+    <Layer Name="Vmim" Type="via" Zmin="5.7540" Zmax="6.4303" Material="Vmim" Layer="129"/>
+    <Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="Air" Layer="157"/>
+  </Layers>
+</ELayers>
+</Stackup>
+```
 
 
 Resulting mesh with surface and volume objects: 
@@ -1133,23 +1344,70 @@ Resulting mesh with surface and volume objects:
 Dielectrics are defined in the <Dielectrics> section of the XML file, and usually cover the entire drawing area (bounding box of GDSII drawing) plus an additional “margin” that is defined in the simulation model code.  
 
 
-![XML stackup: dielectrics covering the whole drawing area](./images/gds2palace_workflow_userguide.pdf-0043-03.png)
+```xml
+</Materials>
+<ELayers LengthUnit="um">
+  <Dielectrics>
+    <Dielectric Name="AIR" Material="AIR" Thickness="200.0000"/>
+    <Dielectric Name="Passive" Material="Passive" Thickness="0.4000"/>
+    <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303"/>
+    <Dielectric Name="EPI" Material="EPI" Thickness="3.7500"/>
+    <Dielectric Name="Substrate" Material="Substrate" Thickness="180.0000"/>
+  </Dielectrics>
+  <Layers>
+    <Substrate Offset="183.75"/>
+    <Layer Name="Activ" Type="conductor" Zmin="0.0000" Zmax="0.4000" Material="Activ" Layer="1"/>
+    ...
+```
 
 
 As an option, the size of these dielectric layers can be defined by an optional parameter **Boundary** which sets the size of the dielectric from the bounding box of that layer in the GDSII file.  
 
 
-![XML stackup: dielectrics with the optional Boundary parameter](./images/gds2palace_workflow_userguide.pdf-0044-00.png)
+```xml
+</Materials>
+<ELayers LengthUnit="um">
+  <Dielectrics>
+    <Dielectric Name="iAIR" Material="AIR" Thickness="50.0000" Boundary="1039"/>
+    <Dielectric Name="iSubstrate" Material="Substrate" Thickness="80.0000" Boundary="1039"/>
+    <Dielectric Name="iSiO2" Material="SiO2" Thickness="12.27" Boundary="1039"/>
+    <Dielectric Name="iPassive" Material="Passive" Thickness="0.4000" Boundary="1039"/>
+    <Dielectric Name="Underfill" Material="Underfill" Thickness="46.2" Boundary="1039"/>
+    <Dielectric Name="Passive" Material="Passive" Thickness="0.4000" Boundary="39"/>
+    <Dielectric Name="SiO2" Material="SiO2" Thickness="15.7303" Boundary="39"/>
+    <Dielectric Name="EPI" Material="EPI" Thickness="3.7500" Boundary="39"/>
+    <Dielectric Name="Substrate" Material="Substrate" Thickness="180.0000" Boundary="39"/>
+    <Dielectric Name="AIR" Material="AIR" Thickness="50.0000" Boundary="39"/>
+  </Dielectrics>
+  <Layers>
+    <Substrate Offset="233.75"/>
+    <Layer Name="Activ" Type="conductor" Zmin="0.0000" Zmax="0.4000" Material="Activ" Layer="1"/>
+    ...
+```
 
 
 ### Mapping of Volumes and Surfaces to Palace materials 
 
 Palace offers a wide range of options to assign material properties to volumes and surfaces. Our workflow creates that mapping in the Palace control file (config.json), as described below:  
 
-**Via layers** (Type=”via”) are created as volumes, and the conductivity defined in the XML stackup is assigned to these volumes.  
+**Via layers** (Type=”via”) are created as volumes, and the conductivity defined in the XML stackup is assigned to these volumes. In the Palace configuration file excerpts below, "Attributes" is the number of the physical volume or surface in the mesh.  
 
 
-![Palace config.json: conductivity assigned to a via volume](./images/gds2palace_workflow_userguide.pdf-0045-03.png)
+```json
+"Domains": {
+    "Materials": [
+        {
+            "Attributes": [
+                9
+            ],
+            "Permittivity": 1.0,
+            "Conductivity": [
+                314300.0,
+                314300.0,
+                3143000.0
+            ]
+        },
+```
 
 
 To account for the z-directed nature of via arrays, which allows current flow predominantly in z direction, the conductivity from XML is only assigned to z-direction, and the value in xydirection is reduced by a factor of 10. This avoids issues with “unreal” currents flowing on the side walls of merged via polygons after via array merging.  
@@ -1159,7 +1417,17 @@ With settings['fill_factor_correction'] = True, the conductivity of merged via p
 **Metal layers** (Type=”conductor”) are created as hollow elements surrounded by surfaces, with surface impedance to define metal loss. The conductivity and thickness are obtained from the XML file.  
 
 
-![Palace config.json: conductivity and thickness assigned to conductor surfaces](./images/gds2palace_workflow_userguide.pdf-0045-06.png)
+```json
+"Boundaries": {
+    "Conductivity": [
+        {
+            "Attributes": [
+                27
+            ],
+            "Conductivity": 21640000.0,
+            "Thickness": 0.41999999999999993
+        },
+```
 
 
 This is straightforward for top and bottom of the conductors, with the total conductor cross section being calculated properly even at low frequency where skin depth is larger than the physical conductor height.  
@@ -1169,19 +1437,47 @@ However, using that same surface impedance also for the side walls, we would ove
 **Metall sheet layers** (Type=”sheet”) are created as a single, flat surface. Their position in the stackup should be defined with Zmin=Zmax for better readability, but actually the Zmax value is ignored here.  
  
 
-![XML stackup: sheet layers](./images/gds2palace_workflow_userguide.pdf-0046-01.png)
+```xml
+<Layer Name="MIM" Type="conductor" Zmin="5.6043" Zmax="5.7540" Material="MIM" Layer="36"/>
+<Layer Name="Vmim" Type="via" Zmin="5.7540" Zmax="6.4303" Material="Vmim" Layer="129"/>
+<Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="Brick" Layer="157"/>
+<Layer Name="ResistorA" Type="sheet" Zmin="22.0" Zmax="22.0" Material="ResA" Layer="220"/>
+<Layer Name="ResistorB" Type="sheet" Zmin="15.0" Zmax="15.0" Material="ResB" Layer="221"/>
+```
 
 
 These sheets are typically used with a Type=”Resistor” material definition in the XML file, with fixed sheet resistance in Ohm/square. 
 
 
-![XML stackup: resistor materials with sheet resistance](./images/gds2palace_workflow_userguide.pdf-0046-03.png)
+```xml
+<Material Name="Vmim" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="2191000.0" Color="ffe6bf"/>
+<Material Name="MIM" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="500000.0" Color="e6ffbf"/>
+<Material Name="LBE" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" Conductivity="0" Color="d0d0d0"/>
+<Material Name="ResA" Type="Resistor" Rs="3.5e-1" Color="d0d0d0"/>
+<Material Name="ResB" Type="Resistor" Rs="1.1" Color="d0d0d0"/>
+```
 
 
 In the Palace config file, this results in an Impedance boundary with Rs value mapped to the surface.  
 
 
-![Palace config.json: impedance boundary with sheet resistance Rs](./images/gds2palace_workflow_userguide.pdf-0046-05.png)
+```json
+"Impedance": [
+    {
+        "Attributes": [
+            37,
+            38
+        ],
+        "Rs": 0.35
+    },
+    {
+        "Attributes": [
+            39
+        ],
+        "Rs": 1.1
+    }
+],
+```
 
 
 ### Extended XML stackup format
@@ -1259,7 +1555,35 @@ https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/workflow/pala
 Geometry is from GDSII, the model uses a total of 8 via ports between Metal3 and TopMetal2. However, to speed up simulation, only one port excitation is active in this model, and we only get S11,S21,S31,S41,S51,S61,S71 and S81 from this simulation run. 
 
 
-![Example palace_butlermatrix.py: only port 1 is excited](./images/gds2palace_workflow_userguide.pdf-0050-04.png)
+```python
+simulation_ports = simulation_setup.all_simulation_ports()
+# instead of in-plane port specified with target_layername,
+# we here use via port specified with from_layername and to_layername
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=1, voltage=1, port_Z0=50, source_layernum=201,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=2, voltage=0, port_Z0=50, source_layernum=202,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=3, voltage=0, port_Z0=50, source_layernum=203,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=4, voltage=0, port_Z0=50, source_layernum=204,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=5, voltage=0, port_Z0=50, source_layernum=205,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=6, voltage=0, port_Z0=50, source_layernum=206,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=7, voltage=0, port_Z0=50, source_layernum=207,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=8, voltage=0, port_Z0=50, source_layernum=208,
+    from_layername='Metal3', to_layername='TopMetal2', direction='z'))
+```
 
 
 All other port excitations are set to voltage=0 in the model. To get full 8-port S-parameters, we would need to change all port voltages to 1 and re-run the model, so that all excitations are simulated, one after another. 
@@ -1269,7 +1593,15 @@ All other port excitations are set to voltage=0 in the model. To get full 8-port
 Same as before, but a field dump setting is added in this model at 93 GHz. 
 
 
-![Example palace_butlermatrix_dump93.py: field dump at 93 GHz](./images/gds2palace_workflow_userguide.pdf-0050-08.png)
+```python
+settings['fstart']  = 90e9
+settings['fstop']   = 95e9
+settings['fstep']   = 0.1e9
+
+# settings["fpoint"] = [93e9]  # list of discrete frequencies to be simulated
+
+settings["fdump"] = [93e9]  # save field dump at these frequency points
+```
 
 https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/workflow/palace_butlermatrix_dump93.py  
 
@@ -1301,11 +1633,33 @@ This shows a use case of gds2palace outside the RFIC domain: the layout of a PCB
 
 An XML stackup file was created for this substrate, with layout layers matching the layer numbers used in klayout. 
 
-![Example palace_pcb_lowpass.py: XML stackup for the RO4003 substrate](./images/gds2palace_workflow_userguide.pdf-0052-04.png)
+```xml
+<Stackup schemaVersion="2.0">
+  <Materials>
+    <Material Name="Copper" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="3.3e7" Color="00ff00"/>
+    <Material Name="RO4003" Type="Dielectric" Permittivity="3.38" DielectricLossTangent="0.0022" Conductivity="0" Color="01e0ff"/>
+    <Material Name="AIR" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" Conductivity="0" Color="d0d0d0"/>
+  </Materials>
+  <ELayers LengthUnit="um">
+    <Dielectrics>
+      <Dielectric Name="RO4003" Material="RO4003" Thickness="510"/>
+    </Dielectrics>
+    <Layers>
+      <Substrate Offset="0"/>
+      <Layer Name="Bottom" Type="Conductor" Zmin="-17" Zmax="0" Material="Copper" Layer="1"/>
+      <Layer Name="Top" Type="Conductor" Zmin="510" Zmax="527" Material="Copper" Layer="10"/>
+    </Layers>
+  </ELayers>
+</Stackup>
+```
 
 Here, setting “margins” only controls the (small) oversize of the dielectrics from the drawing layers. The optional “air_around” setting was used in the simulation model to define the air margins independently, without adding these air layers in the XML stackup.  
 
-![Example palace_pcb_lowpass.py: margin and air_around settings](./images/gds2palace_workflow_userguide.pdf-0052-06.png)
+```python
+settings['unit']   = 1e-6  # geometry is in MILLIMETER for PCB example
+settings['margin'] = 2000    # distance in microns from GDSII geometry boundary to simulation boundary
+settings['air_around'] = [1000,1000,1000,1000,2000, 10000] # airbox size to simulation boundary
+```
 
 https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/workflow/palace_pcb_lowpass.py  
 
