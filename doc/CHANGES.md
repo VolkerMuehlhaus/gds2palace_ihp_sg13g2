@@ -2,6 +2,12 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 4 October-2026
+**Documentation**  
+The PDF user's guide is now generated from the Markdown user's guide [`userguide_md_format/gds2palace_workflow_userguide.md`](userguide_md_format/gds2palace_workflow_userguide.md), which is the only source from now on: `python doc/pdf_build/build_userguide_pdf.py`, see [`pdf_build/README.md`](pdf_build/README.md). A GitHub workflow builds the PDF when the guide changes and attaches it to each release.
+
+The Markdown user's guide now includes the content that was only in the PDF so far: the surface impedance calculation in chapter "Limits of conductor loss calculation", the all-in-one installation script for Linux, and `filled_metals` in "What's New". Screenshots of code, XML stackup and Palace configuration excerpts are replaced by text (code blocks), so they can be searched and copied. All other figures have captions, broken links are fixed, and the `no_gui` example shows the current setting name.
+
 ## 2 October-2026
 **Bugfixes**  
 Via array merging (`merge_polygon_size > 0`) could short different metal shapes: closely spaced via arrays that connect different metal shapes above or below merged into one via. Now a merged via region that touches more than one metal shape above or below is built again: its vias are grouped by the metal shapes they connect, each group is merged on its own and clipped to the overlap of its metal shapes. The metal layers above and below each via layer come from the XML stackup. Vias without metal above or below stay unmerged. Merged vias that do not connect different metal shapes are not changed, so models without this problem give the same results as before.
