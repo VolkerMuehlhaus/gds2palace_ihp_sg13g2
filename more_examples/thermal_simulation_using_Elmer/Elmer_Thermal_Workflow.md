@@ -84,7 +84,10 @@ thermal_objects.add_consttemp(simulation_setup.constanttemp(
   The marker polygon just needs to overlap that layer's footprint in xy.
 - `heatsource(power, ...)` — dissipates `power` Watts, distributed as a
   volumetric heat source over that volume. In the example, 0.65 W is applied
-  to the `TFR` resistor layer via marker layer 201.
+  to the `TFR` resistor layer via marker layer 201. If the marker layer has
+  several polygons, `power` is the total for all of them together, not the
+  power per polygon. Overlapping or touching polygons are merged into one
+  volume.
 - `constanttemp(temp, ...)` — fixes that volume's temperature (Kelvin),
   acting as a heat sink/reference boundary. In the example, layer 202 pins
   the `BACKSIDEGND` layer to 298 K (25 °C) — a typical backside heatsink
