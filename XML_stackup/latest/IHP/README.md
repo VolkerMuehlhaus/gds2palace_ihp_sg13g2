@@ -100,3 +100,11 @@ Every material now has a thermal conductivity; the legacy files had none.
 | Passive | 0.5 |
 | AIR | 0.026 |
 | Substrate, EPI | temperature table `Si_vs_T_IHP` (IHP-measured, DOI: 10.1109/EuroSimE.2018.8369872) |
+
+The `PEC` sheets `SUBGND`, `BACKSIDEGND` and `REF_FOR_TRANSISTOR` have no thermal properties. Thermal models ignore them, like the resistor sheets: they have zero thickness and add no thermal volume. A `PEC` sheet can be the target layer of a constant temperature boundary, because the boundary uses only the target layer's z position. For example, this models a heat sink at the chip backside, at the area drawn on layer 202:
+
+```python
+thermal_objects.add_consttemp(simulation_setup.constanttemp(temp=298, source_layernum=202, target_layername='BACKSIDEGND'))
+```
+
+`PEC` vias and conductor volumes (none in these stackups) use the thermal properties of copper in thermal models: 401 W/m·K at 300 K (CRC Handbook). This also applies to a heat source whose target layer is a `PEC` volume. A heat source needs a target layer with a thickness, so a `PEC` sheet can't be its target.

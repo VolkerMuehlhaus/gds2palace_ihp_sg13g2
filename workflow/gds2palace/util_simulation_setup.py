@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.10.0"
+__version__ = "1.10.3"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -32,6 +32,7 @@ import gmsh
 import math
 import numpy as np
 import json
+import types
 
 from . import util_elmer
 from .util_stackup_reader import PEC_MATERIAL_NAME
@@ -42,6 +43,13 @@ from .util_stackup_reader import PEC_MATERIAL_NAME
 # test_data/zeromargin/SG13G2_PEC_at_M1.xml. (openEMS, being FDTD, has no such limitation and
 # uses a literal ideal-conductor volume for a PEC via instead - see gds2openEMS.)
 PEC_VIA_EQUIVALENT_CONDUCTIVITY = 1e10
+
+# PEC has no thermal properties - in an Elmer thermal model, PEC via/conductor volumes (and heat
+# sources with a PEC target layer) use the values of pure copper at 300 K instead:
+# thermal conductivity 401 W/m/K, density 8960 kg/m^3 (CRC Handbook of Chemistry and Physics)
+PEC_THERMAL_EQUIVALENT = types.SimpleNamespace(
+    name=f'{PEC_MATERIAL_NAME}_copper', eps=1.0, sigma=PEC_VIA_EQUIVALENT_CONDUCTIVITY,
+    thermalcond=401.0, density=8960.0, thermaltablename="", thermaltable=None)
 
 
 def _is_pec_material (materialname):
@@ -974,6 +982,26 @@ def _thermal_setup_error (message):
     return ValueError(f"\n{banner}\nTHERMAL MODEL ERROR: {message}\n{banner}")
 
 
+def _report_pec_layer_in_thermal_model (metal, reported_layers):
+    """Thermal model: print once per layer (tracked in reported_layers) how a layer using the
+    reserved PEC material (EM-only, no thermal properties) is modelled:
+    - PEC sheet (e.g. SUBGND, BACKSIDEGND): ignored, the same as any other zero-thickness sheet
+      in a thermal model. It can still be the target layer of a constant temperature boundary,
+      which uses only its z position.
+    - PEC via/conductor volume, and heat sources targeting it: thermal properties of copper,
+      see PEC_THERMAL_EQUIVALENT
+    """
+    if metal.name in reported_layers:
+        return
+    reported_layers.add(metal.name)
+    if metal.is_sheet:
+        print(f'Layer "{metal.name}" uses the reserved "PEC" material - zero-thickness sheet, '
+              'ignored in thermal model.')
+    else:
+        print(f'Layer "{metal.name}" uses the reserved "PEC" material - modelled with the thermal '
+              f'properties of copper ({PEC_THERMAL_EQUIVALENT.thermalcond:g} W/mK) in thermal model.')
+
+
 def add_thermal_sources (allpolygons, metals_list, thermal_objects):
     """Add thermal_objects from special port layers to gmsh
 
@@ -983,7 +1011,7 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
         thermal_objects 
 
     Returns:
-       list of thermal source dimtags
+       dict of thermal source volume tags, key = source name, value = list of tags (one box per polygon)
     """
 
     tags_created_3D = {}
@@ -1016,12 +1044,32 @@ def add_thermal_sources (allpolygons, metals_list, thermal_objects):
                             )
                         zmin = target_metal.zmin
                         zmax = target_metal.zmax
+                        if zmax <= zmin:
+                            xml_filename = getattr(metals_list, 'xml_filename', None)
+                            in_file = f' in stackup file "{xml_filename}"' if xml_filename else ''
+                            raise _thermal_setup_error(
+                                f"Thermal source on GDS layer {object.source_layernum}: "
+                                f"target layer '{object.target_layername}' has zero thickness{in_file} "
+                                f"(sheet layer, Zmin = Zmax = {zmin:g}). A heat source is a volume and takes "
+                                "the thickness of its target layer -- choose a conductor or via target layer."
+                            )
 
                         box_tag = gmsh.model.occ.addBox(xmin,ymin,zmin,xmax-xmin,ymax-ymin,zmax-zmin)
                         gmsh.model.setEntityName(dim=3,tag=box_tag, name=f'source_{object.source_layernum}')
-                        tags_created_3D['source_'+str(object.source_layernum)]=box_tag
+                        tags_created_3D.setdefault('source_'+str(object.source_layernum), []).append(box_tag)
+
+    # fuse overlapping or touching boxes of the same source, otherwise they would be reported
+    # as different conductors touching each other; separate boxes stay separate volumes
+    for key, tags in tags_created_3D.items():
+        if len(tags) > 1:
+            fused, _ = gmsh.model.occ.fuse([(3, tags[0])], [(3, tag) for tag in tags[1:]])
+            tags_created_3D[key] = [tag for _, tag in fused]
 
     gmsh.model.occ.synchronize()
+
+    for key, tags in tags_created_3D.items():
+        for tag in tags:
+            gmsh.model.setEntityName(dim=3, tag=tag, name=key)
 
     return tags_created_3D
 
@@ -1527,12 +1575,25 @@ def create_model (excite_ports, settings):
             os.remove(missing_debug_log)        
     '''        
 
-    # cut metal volumes from dielectric volumes
+    # cut metal volumes from dielectric volumes. A metal that reaches through a thin dielectric
+    # can split it into several pieces, e.g. a TopMetal2 ring through Passive in the conformal
+    # passivation stackup in a thermal model (all metals are volumes there): every piece keeps the
+    # name of its dielectric, so all pieces end up in the same physical group and material
+    dielectric_names = {tag: gmsh.model.getEntityName(dim=3, tag=tag) for _, tag in dielectric_volume_dimtags}
     outDimTags, outDimTagsMap = gmsh.model.occ.cut(dielectric_volume_dimtags, metal_volume_dimtags, -1, removeTool=False)
-    dielectric_tags_unchanged = (outDimTags==dielectric_volume_dimtags)
-    assert dielectric_tags_unchanged
 
     gmsh.model.occ.synchronize()
+
+    dielectric_pieces = []
+    for n, (_, original_tag) in enumerate(dielectric_volume_dimtags):
+        # outDimTagsMap lists the objects first, in input order
+        pieces = outDimTagsMap[n]
+        if len(pieces) > 1:
+            print(f'Dielectric "{dielectric_names[original_tag]}" is split into {len(pieces)} volumes by metals')
+        for _, piece_tag in pieces:
+            gmsh.model.setEntityName(dim=3, tag=piece_tag, name=dielectric_names[original_tag])
+        dielectric_pieces.extend(pieces)
+    dielectric_volume_dimtags = dielectric_pieces
     
     # Now embed/fragment metal and dielectric volumes, return value geom_map keeps mapping between original tags and new tags after fragmenting
 
@@ -1581,7 +1642,7 @@ def create_model (excite_ports, settings):
 
     gmsh.model.occ.synchronize()
 
-    # dielectric volume dim tags have not changed, so all other volumes after fragmenting must be metal
+    # dielectric volumes are not changed by fragmenting, so all other volumes after fragmenting must be metal
     metal_volume_dimtags = []
     all_volume_dimtags = gmsh.model.getEntities(3)
     for volume_dimtag in all_volume_dimtags:
@@ -1620,8 +1681,8 @@ def create_model (excite_ports, settings):
         # add thermal volume dimtags (i.e. thermal sources)
         thermal_volume_dimtags = []
         for key in thermalsource_dimtags_created_3D:
-            tag = thermalsource_dimtags_created_3D[key]
-            thermal_volume_dimtags.append((3,tag))
+            for tag in thermalsource_dimtags_created_3D[key]:
+                thermal_volume_dimtags.append((3,tag))
 
     # sheet and volume names must be captured before fragment(), since fragment() can split
     # a sheet or a 3D volume into multiple new entities (e.g. where a sheet touches another
@@ -1715,8 +1776,11 @@ def create_model (excite_ports, settings):
             # we get a list with one or more new dimtags for each the original dimtag
             original_tag = geom_dimtags[n]
             if original_tag in thermal_volume_dimtags:
-                #  sheetlayer_dimtags is flat list, this is all we have for now, information on layer/material is only in sheet itself (getEntityName)
-                restored_thermalvolume_dimtags.append(new_dimtag_list[0])
+                # keep all pieces, a source volume can be split by fragment(), e.g. where two
+                # polygons on the same source layer overlap
+                for dimtag in new_dimtag_list:
+                    if dimtag not in restored_thermalvolume_dimtags:
+                        restored_thermalvolume_dimtags.append(dimtag)
         thermal_volume_dimtags = restored_thermalvolume_dimtags        
 
 
@@ -1739,7 +1803,15 @@ def create_model (excite_ports, settings):
     geom_dimtags = [x for x in gmsh.model.occ.getEntities(dim=3)]
     for dim, tag in geom_dimtags:
         name = gmsh.model.getEntityName(dim=3,tag=tag)
-        if name in metal_surface_dict.keys():
+        if elmer_thermal and name in thermal_volume_dict.keys():
+            # heat source, one source can have several volumes (one per polygon), all in the
+            # same physical group, so they share one Body Force and its total power
+            thermal_volume_dict[name].append(tag)
+
+            # register all surfaces of 3d body also, so that they appear in mesh view in Paraview
+            _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
+            metal_surface_dict.setdefault(name, []).append(surfaceloops)
+        elif name in metal_surface_dict.keys():
             # get all surfaces of 3d body
             _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
             metal_surface_dict[name].append(surfaceloops)   
@@ -1787,13 +1859,6 @@ def create_model (excite_ports, settings):
             _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
             for surfaceloop in surfaceloops:
                 airbox_surface_taglist.append(surfaceloop) 
-        elif name in thermal_volume_dict.keys():
-            # this is what the thermal solver uses
-            thermal_volume_dict[name].append(tag)
-
-            # register all surfaces of 3d body also, so that they appear in mesh view in Paraview
-            _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
-            metal_surface_dict[name]= [surfaceloops]
         else:
             # this should not happen
             print(f"Found volume tag {tag} with name '{name}' which can't be assigned, abort")
@@ -1833,7 +1898,9 @@ def create_model (excite_ports, settings):
                     phys_group = gmsh.model.addPhysicalGroup(3, bucket["tags"], tag=-1)
                     gmsh.model.setPhysicalName(3, phys_group, groupname)
                     physical_groups_3D.append({"layername":key, "groupname":groupname, "grouptag":phys_group, "fill_factor":bucket["mean_fill_factor"]})
-                    if _is_pec_material(via_metal.material):
+                    if _is_pec_material(via_metal.material) and elmer_thermal:
+                        sigma_info = f'PEC material, copper heat conductivity = {PEC_THERMAL_EQUIVALENT.thermalcond*bucket["mean_fill_factor"]:.4g} W/mK'
+                    elif _is_pec_material(via_metal.material):
                         sigma_info = 'PEC material, conductivity not scaled'
                     elif via_material is not None and elmer_thermal:
                         if via_material.thermaltablename == "":
@@ -2170,6 +2237,9 @@ def create_model (excite_ports, settings):
 
     Palace_materials = []
 
+    # thermal model: PEC layers already reported (see _report_pec_layer_in_thermal_model)
+    thermal_pec_layers_reported = set()
+
     for item in physical_groups_3D:
         # items can be from via layer, filled/solid metal volume, or dielectric stackup
 
@@ -2181,11 +2251,8 @@ def create_model (excite_ports, settings):
 
         if metal is not None and _is_pec_material(metal.material):
             if elmer_thermal:
-                raise _thermal_setup_error(
-                    f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
-                    'electromagnetic-only construct, not valid for thermal simulation -- assign '
-                    'a real Conductor material with ThermalConductivity for this layer instead.'
-                )
+                # no Palace output for a thermal model
+                continue
             # PEC via or filled/solid metal: Palace has no ideal-conductor volume, approximate
             # with a fixed very high but finite conductivity domain instead
             print(f'Layer "{metal.name}" uses the reserved "PEC" material - approximated as a '
@@ -2272,11 +2339,8 @@ def create_model (excite_ports, settings):
 
         if metal is not None and _is_pec_material(metal.material):
             if elmer_thermal:
-                raise _thermal_setup_error(
-                    f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
-                    'electromagnetic-only construct, not valid for thermal simulation -- assign '
-                    'a real Conductor material with ThermalConductivity for this layer instead.'
-                )
+                # no Palace output for a thermal model
+                continue
             if metal.is_metal or metal.is_sheet:
                 # ideal conductor: goes into the Boundaries.PEC group instead of
                 # Conductivity/Impedance - merged in below with the airbox PEC faces
@@ -2521,13 +2585,9 @@ def create_model (excite_ports, settings):
             # fill factor of merged via arrays, 1.0 unless fill_factor_correction split this via layer
             via_fill_factor = item.get("fill_factor", 1.0) if (metal is not None and metal.is_via) else 1.0
 
-            if metal is not None and _is_pec_material(metal.material):
-                if elmer_thermal:
-                    raise _thermal_setup_error(
-                        f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
-                        'electromagnetic-only construct, not valid for thermal simulation -- assign '
-                        'a real Conductor material with ThermalConductivity for this layer instead.'
-                    )
+            pec_layer = metal is not None and _is_pec_material(metal.material)
+
+            if pec_layer and not elmer_thermal:
                 # PEC via or filled/solid metal: Elmer has no ideal-conductor volume either,
                 # approximate with the same fixed very high conductivity domain as Palace output
                 print(f'Layer "{metal.name}" uses the reserved "PEC" material - approximated as a '
@@ -2542,7 +2602,12 @@ def create_model (excite_ports, settings):
                 Elmer_bodies.append({'name': groupname, 'material': material_index+1})
                 continue
 
-            material = get_material_from_layer_or_dielectric_name(layername)
+            if pec_layer:
+                # thermal model: PEC volume, or heat source with a PEC target layer
+                _report_pec_layer_in_thermal_model(metal, thermal_pec_layers_reported)
+                material = PEC_THERMAL_EQUIVALENT
+            else:
+                material = get_material_from_layer_or_dielectric_name(layername)
 
             if (material is not None) or (layername == 'airbox'):
                 Elmer_material = {}
@@ -2631,17 +2696,18 @@ def create_model (excite_ports, settings):
 
             if metal is not None and _is_pec_material(metal.material):
                 if elmer_thermal:
-                    raise _thermal_setup_error(
-                        f'Layer "{metal.name}" uses the reserved "PEC" material, which is an '
-                        'electromagnetic-only construct, not valid for thermal simulation -- assign '
-                        'a real Conductor material with ThermalConductivity for this layer instead.'
-                    )
-                if metal.is_metal or metal.is_sheet:
-                    # ideal conductor: literal PEC boundary, same "E re/im {e} = Real 0"
-                    # construct already used for the outer airbox faces
-                    Elmer_boundaries_PEC.append(gmsh.model.getPhysicalName(2, grouptag))
-                # metal.is_via: no boundary needed, same as a regular via lateral surface below
-                continue
+                    if not groupname.startswith('constanttemp_'):
+                        # PEC sheet ignored; surfaces of a PEC volume need no thermal boundary
+                        _report_pec_layer_in_thermal_model(metal, thermal_pec_layers_reported)
+                        continue
+                    # constant temperature boundary at the PEC layer's z position: handled below
+                else:
+                    if metal.is_metal or metal.is_sheet:
+                        # ideal conductor: literal PEC boundary, same "E re/im {e} = Real 0"
+                        # construct already used for the outer airbox faces
+                        Elmer_boundaries_PEC.append(gmsh.model.getPhysicalName(2, grouptag))
+                    # metal.is_via: no boundary needed, same as a regular via lateral surface below
+                    continue
 
             material = get_material_from_layer_or_dielectric_name(layername)
 

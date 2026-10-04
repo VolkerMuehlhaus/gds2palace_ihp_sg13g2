@@ -62,8 +62,10 @@
 #              branch point and each chiplet's own root Dielectric - unlike a single-chiplet
 #              stackup, there's no longer a single "whole GDS extent" fallback that means
 #              anything for either side of the branch
+# 02 Oct 2026: read_substrate() stores the file name as metals_list.xml_filename (None if the
+#              list was built some other way), so solver setup errors can name the stackup file
 
-__version__ = "1.9.4"
+__version__ = "1.9.5"
 
 import os
 import math
@@ -1358,6 +1360,7 @@ class metal_layers_list:
     self.highest = None   # metal with largest zmax value
     self.orphan_layers = []  # list with layers that have no direct neighbor above or below
     self.derived_layers = derived_layers_list()  # empty by default, populated by read_substrate() if XML has a DerivedLayers section
+    self.xml_filename = None  # stackup file name, set by read_substrate()
 
   def append (self, metal):
     """Append one metal layer (drawn layer)
@@ -1800,7 +1803,9 @@ def read_substrate (XML_filename, variable_overrides=None):
     # editor on every edit) - that would otherwise reprint the same warning constantly
     check_schema_version(substrate_root)
 
-    return parse_substrate(substrate_root, variable_overrides)
+    materials_list, dielectrics_list, metals_list = parse_substrate(substrate_root, variable_overrides)
+    metals_list.xml_filename = XML_filename
+    return materials_list, dielectrics_list, metals_list
 
   else:
     print('XML stackup file not found: ', XML_filename)
