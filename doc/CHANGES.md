@@ -2,6 +2,10 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 15 October-2026
+**Bugfix**  
+Reading a GDSII file printed "WARNING: could not auto-repair 2 invalid polygon(s)" for via ports drawn as a zero-width line (e.g. layers 201/202 in `workflow/line_simple_viaport.gds`), although the port works and nothing was changed. The check for self-intersecting polygons now only looks at layers that are meshed as solids (stackup metals and vias, dielectric boundary layers, derived layers), not at port and marker layers. Polygons that need repair are repaired as before.
+
 ## 12 October-2026
 **Bugfixes**  
 Port de-embedding in `combine_extend_snp.py` (the `_deembedded.sNp` and `_dc_deembedded.sNp` files) put the negative inductance of all ports in series at port 1, and nothing at the other ports. For a 2-port with 2.2 pH per port, port 1 was reduced by 4.4 pH and port 2 was not de-embedded at all; for a 3-port, port 1 got the sum of all three values. Now each port gets its own value, in port number order. The raw `.sNp` and the `_dc.sNp` files were not affected. De-embedded files created with earlier versions should be created again by running `combine_extend_snp.py` again. Thanks to Gianluca Simone and David Lurz (FAU) for finding and reporting this bug.

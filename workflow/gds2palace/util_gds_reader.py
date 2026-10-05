@@ -18,7 +18,7 @@
 
 # Extract objects from layers in GDSII file
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 import gdspy
 import numpy as np
@@ -768,7 +768,7 @@ def _fracture_valid_pieces (points, max_points_candidates=(8, 6, 5)):
   return None
 
 
-def _repair_malformed_polygons (all_polygons):
+def _repair_malformed_polygons (all_polygons, solid_layers=None):
   """Silently repair any polygon that's geometrically invalid (self-intersecting)
   beyond the benign single-hole "keyhole" case gmsh/OpenCASCADE already tolerates
   fine (see _is_benign_single_keyhole()) - what actually breaks meshing (confirmed
@@ -788,6 +788,12 @@ def _repair_malformed_polygons (all_polygons):
   This runs transparently every time a GDSII file is read - a file that
   needed no repair looks the same as before, and a file that did gets fixed
   automatically instead of failing (or silently meshing wrong).
+
+  solid_layers (set of int, optional): only polygons on these layers are
+  checked - the layers meshed as solids. Port and marker layers only give the
+  position / extent of a port, and a via port is often drawn on purpose as a
+  zero-width line, which is "invalid" geometry that must not be warned about.
+  None checks every layer.
   """
   repaired_layers = set()
   unresolved = []
@@ -795,6 +801,9 @@ def _repair_malformed_polygons (all_polygons):
 
   for poly in all_polygons.polygons:
     if len(poly.pts_x) < 3:
+      new_polygons.append(poly)
+      continue
+    if solid_layers is not None and int(poly.layernum) not in solid_layers:
       new_polygons.append(poly)
       continue
 
@@ -1016,8 +1025,16 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
 
     # silently repair a malformed (self-intersecting) polygon here, right after
     # reading, instead of letting it surface as an opaque meshing failure much
-    # later (or, for the benign single-keyhole case, doing nothing at all)
-    _repair_malformed_polygons(all_polygons)
+    # later (or, for the benign single-keyhole case, doing nothing at all).
+    # Only on layers meshed as solids: stackup metals / vias, dielectric
+    # boundary layers and derived layers - not port / marker layers
+    solid_layers = None
+    if metals_list is not None:
+      solid_layers = set(metals_list.getlayernumbers())
+      solid_layers.update(int(layer) for layer in gds_boundary_layers)
+      if derived_layers is not None:
+        solid_layers.update(derived_layers.getlayernumbers())
+    _repair_malformed_polygons(all_polygons, solid_layers)
 
     # done!
     return all_polygons
