@@ -77,4 +77,6 @@ settings['adaptive_mesh_iterations'] = 0  # Palace adative mesh iterations
 
 14-September-2026: Fixed bug where spiral polygon vertices were not exactly on the 0.01um grid. FlexPath miter joins at the 45-degree spiral bends introduce sqrt(2)-based offsets that were not caught by snapping only the path centerline points, so polygon vertices are now snapped again after path-to-polygon conversion.
 
+10-October-2026: Fixed bug where the EM model for each candidate was drawn with line width equal to the spacing (w=s) instead of the actual line width w, so the simulated geometry did not match the final GDS layout (issue #73).
+
 

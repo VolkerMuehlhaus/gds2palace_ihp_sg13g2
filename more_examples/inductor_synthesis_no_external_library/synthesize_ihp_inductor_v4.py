@@ -26,6 +26,8 @@
 #                     FlexPath miter joins at 45-degree bends introduce sqrt(2)-based offsets that
 #                     gridsnap() on the centerline points alone did not catch, so vertices are now
 #                     snapped again after path-to-polygon conversion (see snap_geometry_to_grid())
+# 10-October-2026: Fixed bug where EM candidates were drawn with line width = spacing (w=s) instead of
+#                   the actual line width w, so simulated geometry did not match the final GDS (issue #73)
 
 # Specify the target frequency, target value and geometry limits in the parameters below.
 # Settings for gds2palace FEM simulation are defined in the script below.
