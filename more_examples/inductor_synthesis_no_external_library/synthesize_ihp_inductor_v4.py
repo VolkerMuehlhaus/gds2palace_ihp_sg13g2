@@ -888,7 +888,7 @@ def create_gds_and_model (nturns, w, s, d_outer, layout_with_centertap, force2po
     gds_filename = geometry_name + '.gds'
 
     includeCenterTap = layout_with_centertap
-    symmetric_octa_IHP(N=nturns, D=d_outer, w=s, s=s, includeCenterTap=includeCenterTap, LBE=False, forEM=True, filename=gds_filename)
+    symmetric_octa_IHP(N=nturns, D=d_outer, w=w, s=s, includeCenterTap=includeCenterTap, LBE=False, forEM=True, filename=gds_filename)
     print(f"Created output file {gds_filename}")
 
     # create Palace model and add to list of models, but don't start simulation immediately
