@@ -29,6 +29,9 @@
 #   "NULL" placeholder for an unsolved excitation, no longer crashes with an IndexError
 #   or gets silently written into the Touchstone file; affected S-parameters are set to
 #   0.0 dB / 0 deg and flagged both on stdout and in a comment line in the output file
+# updated 12-Oct-2026 Mue: port de-embedding cascaded all negative port inductances at port 1
+#   (none at the other ports); each port now gets its own value, in port number order
+#   (bug found by Gianluca Simone and David Lurz, FAU)
 
 import os,re, json, math
 import skrf as rf
@@ -306,7 +309,7 @@ def port_deembedding (snp_filename, port_info_available, port_info_data):
 
         # convert the dict with port L into a list, to have the final values in correct order
         L_values = []
-        for key in Lport.keys():
+        for key in sorted(Lport.keys(), key=int):
             L_values.append(-Lport[key])
 
         # load SnP data and apply negative series L at each port        
@@ -316,14 +319,17 @@ def port_deembedding (snp_filename, port_info_available, port_info_data):
         # Create a Media object (needed for Media.inductor)
         media = rf.media.DefinedGammaZ0(frequency=freq, z0=50)
 
+        N = ntwk.nports
         for n,L in enumerate(L_values):
             print(f'Cascading L= {L*1e12:.2f} pH at port {n+1}')
             # series inductor
             inductor = media.inductor(L=L)
-            # cascade with the main network 
-            # due to internal renumbering the new port always appears at the end
-            # after iterating over all ports we have the correct order again
-            ntwk = connect(inductor, 0, ntwk, 0)
+            # cascade with the main network at port n
+            # skrf connect() puts the remaining inductor port at index 0,
+            # so move it back to index n to keep the original port order
+            ntwk = connect(inductor, 1, ntwk, n)
+            perm = list(range(1, n+1)) + [0] + list(range(n+1, N))
+            ntwk.s = ntwk.s[:, perm][:, :, perm]
 
 
         filename, file_extension = os.path.splitext(snp_filename)
