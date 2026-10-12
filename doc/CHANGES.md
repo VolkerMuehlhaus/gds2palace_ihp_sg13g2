@@ -6,6 +6,8 @@ This is an (incomplete) list of changes and new features.
 **Bugfixes**  
 Port de-embedding in `combine_extend_snp.py` (the `_deembedded.sNp` and `_dc_deembedded.sNp` files) put the negative inductance of all ports in series at port 1, and nothing at the other ports. For a 2-port with 2.2 pH per port, port 1 was reduced by 4.4 pH and port 2 was not de-embedded at all; for a 3-port, port 1 got the sum of all three values. Now each port gets its own value, in port number order. The raw `.sNp` and the `_dc.sNp` files were not affected. De-embedded files created with earlier versions should be created again by running `combine_extend_snp.py` again. Thanks to Gianluca Simone and David Lurz (FAU) for finding and reporting this bug.
 
+A second fix to the same port de-embedding: when `port_information.json` had no geometry data for a port, the values of the following ports moved up by one port (for a 3-port without data for port 2, port 2 got the value of port 3 and port 3 was not de-embedded). Each port now gets the value for its own port number, and a port without geometry data is not de-embedded. The de-embedding circuit is now built with scikit-rf's `Circuit` (named, explicit connections), as recommended by the scikit-rf maintainers, instead of chaining `connect()`.
+
 ## 4 October-2026
 **Documentation**  
 The PDF user's guide is now generated from the Markdown user's guide [`userguide_md_format/gds2palace_workflow_userguide.md`](userguide_md_format/gds2palace_workflow_userguide.md), which is the only source from now on: `python doc/pdf_build/build_userguide_pdf.py`, see [`pdf_build/README.md`](pdf_build/README.md). A GitHub workflow builds the PDF when the guide changes and attaches it to each release.
