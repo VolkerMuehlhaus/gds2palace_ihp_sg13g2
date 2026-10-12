@@ -6,6 +6,8 @@ This is an (incomplete) list of changes and new features.
 **Bugfixes**  
 Port de-embedding in `combine_extend_snp.py` (the `_deembedded.sNp` and `_dc_deembedded.sNp` files) put the negative inductance of all ports in series at port 1, and nothing at the other ports. For a 2-port with 2.2 pH per port, port 1 was reduced by 4.4 pH and port 2 was not de-embedded at all; for a 3-port, port 1 got the sum of all three values. Now each port gets its own value, in port number order. The raw `.sNp` and the `_dc.sNp` files were not affected. De-embedded files created with earlier versions should be created again by running `combine_extend_snp.py` again. Thanks to Gianluca Simone and David Lurz (FAU) for finding and reporting this bug.
 
+A second fix to the same port de-embedding: when `port_information.json` had no geometry data for a port, the values of the following ports moved up by one port (for a 3-port without data for port 2, port 2 got the value of port 3 and port 3 was not de-embedded). Each port now gets the value for its own port number, and a port without geometry data is not de-embedded. The de-embedding circuit is now built with scikit-rf's `Circuit` (named, explicit connections), as recommended by the scikit-rf maintainers, instead of chaining `connect()`.
+
 ## 7 October-2026
 **Bugfix**  
 gmsh's 3D Delaunay meshing can fail with "Could not recover boundary mesh: error 2", for example for a large `LBE` cavity or a `BACKSIDEGND` sheet that covers only part of the substrate bottom. Mesh generation now retries with gmsh's HXT algorithm in that case and prints a note. Models that mesh with Delaunay are not changed. If HXT also fails, model creation stops with an error instead of writing an incomplete mesh.
