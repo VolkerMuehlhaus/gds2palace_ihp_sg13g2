@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.10.4"
+__version__ = "1.10.5"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -1207,6 +1207,21 @@ def create_model (excite_ports, settings):
 
     def get_surface_orientation (s):
         # get the normal of a surface, we use that to get surface orientation (x, y or z)
+
+        # Exact normal of the CAD face at the centre of its parameter range. All conductor faces
+        # are planar here, so one evaluation gives the orientation of the whole face. The vertex
+        # based estimate below is only a fallback: it collects the boundary points curve by curve,
+        # which does not give them in loop order when curves run against the loop direction (e.g.
+        # faces split by a port box), and then returns a wrong or zero normal - this put vertical
+        # end faces into the horizontal (_xy) group and horizontal slivers into the vertical (_z) one.
+        try:
+            umin, umax = gmsh.model.getParametrizationBounds(2, s)
+            exact = np.array(gmsh.model.getNormal(s, [(umin[0] + umax[0]) / 2, (umin[1] + umax[1]) / 2]))
+            norm = np.linalg.norm(exact)
+            if norm > 0:
+                return exact / norm
+        except Exception:
+            pass
 
         # Get the boundary of the surface
         boundary_lines  = gmsh.model.getBoundary([(2, s)], oriented=True)
