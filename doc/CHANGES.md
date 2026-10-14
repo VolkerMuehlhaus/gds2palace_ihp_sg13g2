@@ -8,6 +8,10 @@ Port de-embedding in `combine_extend_snp.py` (the `_deembedded.sNp` and `_dc_dee
 
 A second fix to the same port de-embedding: when `port_information.json` had no geometry data for a port, the values of the following ports moved up by one port (for a 3-port without data for port 2, port 2 got the value of port 3 and port 3 was not de-embedded). Each port now gets the value for its own port number, and a port without geometry data is not de-embedded. The de-embedding circuit is now built with scikit-rf's `Circuit` (named, explicit connections), as recommended by the scikit-rf maintainers, instead of chaining `connect()`.
 
+## 7 October-2026
+**Bugfix**  
+gmsh's 3D Delaunay meshing can fail with "Could not recover boundary mesh: error 2", for example for a large `LBE` cavity or a `BACKSIDEGND` sheet that covers only part of the substrate bottom. Mesh generation now retries with gmsh's HXT algorithm in that case and prints a note. Models that mesh with Delaunay are not changed. If HXT also fails, model creation stops with an error instead of writing an incomplete mesh.
+
 ## 4 October-2026
 **Documentation**  
 The PDF user's guide is now generated from the Markdown user's guide [`userguide_md_format/gds2palace_workflow_userguide.md`](userguide_md_format/gds2palace_workflow_userguide.md), which is the only source from now on: `python doc/pdf_build/build_userguide_pdf.py`, see [`pdf_build/README.md`](pdf_build/README.md). A GitHub workflow builds the PDF when the guide changes and attaches it to each release.
