@@ -289,8 +289,9 @@ a 0.15 µm layer at every face, plus a core. The rules, in this order:
 2. With `True` or a list, two kinds of layers are skipped; a layer named in
    the dict is split anyway: conductivity above 1e8 S/m (a stand-in for a
    perfect conductor, e.g. SUBGND in older stackups), and layers thinner than
-   2 skin depths at the highest frequency (the current fills them anyway; in
-   SG13G2 Metal1-Metal5).
+   4 skin depths at the highest frequency (they gain little, but their very
+   thin skin layers cost much solver effort; in SG13G2 Metal1-Metal5 up to
+   about 1 THz).
 3. `True` uses 0.4 and 1 skin depth at the highest simulation frequency (the
    largest of `fstop`, `fpoint`, `fdump`), from each layer's conductivity, e.g.
    0.094 and 0.236 µm for TopMetal2 at 150 GHz.
