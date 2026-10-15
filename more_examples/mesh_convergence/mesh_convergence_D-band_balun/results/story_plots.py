@@ -6,7 +6,7 @@ to results/plots/ (new files only, the plots of analyze_convergence.py are not
 touched):
 
   story_uniform_inband.png   - balun figures of merit vs. frequency, uniform
-                               mesh 5 -> 1 um, target band 120-160 GHz shaded
+                               mesh 5 -> 1 um, target band 140-170 GHz shaded
   story_best_answers.png     - 2 um working point vs. 1 um, 2 um/order 3, AMR
   story_accuracy_vs_cost.png - Max|dS| vs. the 1 um result, over solve time,
                                for all variants
@@ -29,7 +29,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SNP_DIR = os.path.join(HERE, "snp")
 PLOT_DIR = os.path.join(HERE, "plots")
 
-BAND = (120e9, 160e9)
+BAND = (140e9, 170e9)
 
 # uniform sweep, coarse -> fine; ordinal blue ramp, light -> dark
 UNIFORM = [
@@ -108,7 +108,7 @@ def plot_uniform_inband():
         ax.set_title(title, loc="left", fontsize=11, color=INK)
     for ax in axes[1]:
         ax.set_xlabel("Frequency (GHz)", color=INK2)
-    axes[0, 0].text(140, 0.97, "target band", transform=axes[0, 0].get_xaxis_transform(),
+    axes[0, 0].text(155, 0.97, "target band", transform=axes[0, 0].get_xaxis_transform(),
                     ha="center", va="top", fontsize=8, color=INK2)
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=5, frameon=False, fontsize=9,
@@ -194,7 +194,7 @@ def print_numbers():
     ref = load(REFERENCE)
     rows = [(l, f) for l, f, _ in UNIFORM] + [ORDER3, AMR]
     print()
-    print("In-band (120-160 GHz) figures of merit; worst case over the band")
+    print("In-band (140-170 GHz) figures of merit; worst case over the band")
     print(f"{'variant':15s} {'IL min..max':>14s} {'S11 max':>8s} {'|amp| max':>9s} {'phase max':>9s} {'MaxdS vs 1um':>12s}")
     for label, fname in rows:
         ntw = load(fname)

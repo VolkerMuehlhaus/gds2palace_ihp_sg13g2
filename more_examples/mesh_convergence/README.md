@@ -10,7 +10,7 @@ These are six structures at six frequency ranges. Their numbers won't transfer d
 |---|---|---|---|
 | [Spiral inductor](mesh_convergence_inductor/README.md) | 4-turn spiral, 0–50 GHz | 5 µm trace / gap | 2 µm (Q within 2%); 5 µm is enough for L alone |
 | [Transformer](mesh_convergence_transformer/README.md) | 1:1 coil pair, 30 GHz | 2 µm traces | 2 µm for L and k; Q not converged even with AMR |
-| [D-band balun](mesh_convergence_D-band_balun/README.md) | edge-coupled lines, 120–160 GHz | 2 µm gap | 2 µm for design, 1 µm for final numbers |
+| [D-band balun](mesh_convergence_D-band_balun/README.md) | edge-coupled lines, 140–170 GHz | 2 µm gap | 2 µm for design, 1 µm for final numbers |
 | [2:1 edge-coupled balun](mesh_convergence_balun2x1/README.md) | 4 coupled lines, 1–50 GHz | 2 µm gap | 2 µm; 5 µm is too coarse |
 | [MIM-loaded balun](mesh_convergence_balun_mim/README.md) | complete balun with MIM caps, 17–22 GHz | via / MIM detail | 2 µm for loss and balance, 1 µm for the match |
 | [MOM capacitor](mesh_convergence_mom_cmos5l/README.md) | interdigitated fingers, SG13CMOS5L, 1 GHz | 0.16 µm fingers | 0.1 µm at order 3 |
