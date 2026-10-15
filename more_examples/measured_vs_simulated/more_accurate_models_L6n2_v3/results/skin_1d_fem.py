@@ -96,8 +96,6 @@ def figure(method, solve, meshes, filename, fr, ref):
     ax2.set_ylabel('resistance per square of TopMetal2 (mOhm)')
     ax2.set_title(f'{method}: RF sheet resistance of TopMetal2 (3 um), current on both faces', fontsize=10)
     ax2.legend(fontsize=8, loc='upper left')
-    fig.suptitle('1D model of the FEM order 2 scheme (not a Palace run); the metal faces are mesh lines',
-                 fontsize=9, color='#555555')
     fig.tight_layout()
     fig.savefig(os.path.join(HERE, 'plots', filename), dpi=150)
     plt.close(fig)
