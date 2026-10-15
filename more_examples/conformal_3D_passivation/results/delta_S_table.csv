@@ -1,7 +1,7 @@
-Param,Comparison,Max|dS| (linear),|dS_dB| at 100 GHz,|dS_dB| at 140 GHz (design freq.),|dS_dB| at 200 GHz
-S11,4 um (conformal) -> 2 um (conformal),0.0322,0.3825,6.3618,0.2696
-S11,2 um (conformal) -> 1 um (conformal),0.0281,0.2756,3.1251,0.2124
-S21,4 um (conformal) -> 2 um (conformal),0.0165,0.0988,0.0034,0.0334
-S21,2 um (conformal) -> 1 um (conformal),0.0119,0.0707,0.0039,0.0429
-S31,4 um (conformal) -> 2 um (conformal),0.0212,0.0725,0.0100,0.0131
-S31,2 um (conformal) -> 1 um (conformal),0.0151,0.0519,0.0015,0.0041
+Param,Comparison,Max|dS| (linear),|dS_dB| at 100 GHz,|dS_dB| at 155 GHz (design freq.),|dS_dB| at 200 GHz
+S11,4 um (conformal) -> 2 um (conformal),0.0311,0.3534,11.9768,0.3214
+S11,2 um (conformal) -> 1 um (conformal),0.0275,0.2563,4.3645,0.2932
+S21,4 um (conformal) -> 2 um (conformal),0.0162,0.0977,0.0188,0.0403
+S21,2 um (conformal) -> 1 um (conformal),0.0117,0.0701,0.0175,0.0471
+S31,4 um (conformal) -> 2 um (conformal),0.0214,0.0708,0.0240,0.0253
+S31,2 um (conformal) -> 1 um (conformal),0.0153,0.0507,0.0104,0.0116

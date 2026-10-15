@@ -1,6 +1,6 @@
 # How fine a mesh does this D-band balun need? (IHP SG13G2)
 
-This study asks a practical question for one specific layout: a compact edge-coupled balun for 120–160 GHz. How fine must the Palace mesh be before the results stop changing in ways a designer would care about? And are the "more accurate" options (finer mesh, higher FEM order, adaptive mesh refinement) worth their cost here?
+This study asks a practical question for one specific layout: a compact edge-coupled balun for 140–170 GHz. How fine must the Palace mesh be before the results stop changing in ways a designer would care about? And are the "more accurate" options (finer mesh, higher FEM order, adaptive mesh refinement) worth their cost here?
 
 We answer this in three steps:
 
@@ -12,8 +12,8 @@ The findings apply to this balun, with this stackup, in this frequency range. Ot
 
 ## The details of this study
 
-- **Model:** `Balun_140-170G_RupokDas_with_ports.gds`, stackup `SG13G2_nosub.xml` (planar dielectrics above TopMetal2). Despite the file name, the target band is 120–160 GHz.
-- **Ports:** 3 via ports (Metal3 → TopMetal2), Z0 = 50 Ω. Port 1 is the input, ports 2 and 3 are the balanced outputs. Port parasitic inductance is de-embedded in all results shown.
+- **Model:** `Balun_140-170G_RupokDas_with_ports.gds`, stackup `SG13G2_nosub.xml` (planar dielectrics above TopMetal2). The target band is 140–170 GHz, as in the file name.
+- **Ports:** 3 via ports (Metal3 → TopMetal2), Z0 = 50 Ω. Port 1 is the input, ports 2 and 3 are the balanced outputs. Port parasitic inductance is de-embedded in all results shown (redone in October 2026 with the corrected `combine_extend_snp.py`, which before had put the inductance of all ports at port 1; see `doc/CHANGES.md`, 12 October 2026).
 - **Solver:** AWS Palace (FEM), ABC boundaries, 50 µm air margin, order 2 unless noted
 - **Sweep:** 100–200 GHz in 1 GHz steps (adaptive frequency sweep)
 - **Mesh:** `refined_cellsize` varied as described below. Metal3 is a wide ground plane and is always kept at 5 µm (`refined_cellsize_override`).
@@ -42,7 +42,7 @@ The four panels respond very differently:
 
 - **Amplitude balance is insensitive to the mesh.** In the target band, all five curves stay within about 0.1 dB of each other. Even the 5 µm mesh would give a usable amplitude-balance prediction.
 - **Phase balance shifts only slightly.** The 1 µm mesh predicts about 1.5° less phase imbalance than the 5 µm mesh. Most of that change happens below 3 µm.
-- **Input match and insertion loss move the most**, because the whole response **shifts up in frequency** as the mesh is refined. The S11 null, and with it the best-matched point, moves from 125 GHz (5 µm) to 135 GHz (1 µm), so it wanders across a quarter of the target band. The insertion-loss minimum moves with it. At the upper band edge (160 GHz), this improves the match from −14.2 to −16.6 dB and lowers the insertion loss from 1.28 to 1.08 dB.
+- **Input match and insertion loss move the most**, because the whole response **shifts up in frequency** as the mesh is refined. The S11 null, and with it the best-matched point, moves from 132 GHz (5 µm, below the target band) to 146 GHz (1 µm, inside it). The insertion-loss minimum moves with it. At the upper band edge (170 GHz), this improves the match from −16.1 to −19.4 dB and lowers the insertion loss from 1.29 to 1.08 dB.
 
 Every refinement step moves the curves the same way, and the steps get smaller. So the mesh is converging, but at 1 µm we can't yet tell whether it has stopped. That is the question for step 2.
 
@@ -67,9 +67,9 @@ If all three routes land on the same answer, we can trust that answer. The plot 
 
 The three runs agree closely with each other, and all of them differ from the 2 µm order-2 run in the same way:
 
-- The **S11 null sits at 135–137 GHz** in all three runs, compared with 131 GHz at 2 µm order 2. Its *depth* varies (−33 to −43 dB), but a null that sharp and deep is very sensitive to small changes and doesn't matter for the design. What matters is its frequency position.
+- The **S11 null sits at 146–148 GHz** in all three runs, compared with 141 GHz at 2 µm order 2. Its *depth* varies (−40 to −52 dB), but a null that sharp and deep is very sensitive to small changes and doesn't matter for the design. What matters is its frequency position.
 - **Insertion loss** agrees within about 0.05 dB across the target band.
-- Measured over all S-parameters and frequencies, the three runs differ from each other by Max|ΔS| = 0.010 to 0.024 (linear). That is the remaining uncertainty of the "converged" answer for this model.
+- Measured over all S-parameters and frequencies, the three runs differ from each other by Max|ΔS| = 0.010 to 0.023 (linear). That is the remaining uncertainty of the "converged" answer for this model.
 
 AMR ends up at slightly lower loss than the other two runs, so the true answer may lie a little beyond the 1 µm result. The difference is small compared with everything we saw in step 1.
 
@@ -81,10 +81,10 @@ Now we can put every run on one chart. The vertical axis shows how far each run 
 
 | Variant | DOF | Solve time | Peak RAM | Max\|ΔS\| vs. 1 µm |
 |---|---:|---:|---:|---:|
-| 2 µm, order 2 | 340,226 | 3m 14s | 4.17 GB | 0.036 |
+| 2 µm, order 2 | 340,226 | 3m 14s | 4.17 GB | 0.035 |
 | 1 µm, order 2 | 665,874 | 7m 11s | 7.22 GB | (reference) |
 | 2 µm, order 3 | 969,582 | 12m 10s | 7.23 GB | 0.010 |
-| AMR, 5 iterations | 4,654,886 (final) | 2h 23m (all iterations) | 51 GB | 0.024 |
+| AMR, 5 iterations | 4,654,886 (final) | 2h 23m (all iterations) | 51 GB | 0.023 |
 
 For this balun:
 
@@ -93,7 +93,7 @@ For this balun:
 
 ## Summary for this balun
 
-- **2 µm uniform mesh, order 2, is a good working point for design iterations.** It gets amplitude and phase balance right and finishes in about 3 minutes. Its main error is a frequency shift of the response of about 4 GHz (S11 null at 131 GHz instead of 135 GHz), which makes insertion loss look up to about 0.07 dB worse in the target band.
+- **2 µm uniform mesh, order 2, is a good working point for design iterations.** It gets amplitude and phase balance right and finishes in about 3 minutes. Its main error is a frequency shift of the response of about 5 GHz (S11 null at 141 GHz instead of 146 GHz), which makes insertion loss look up to about 0.07 dB worse in the target band.
 - **For final numbers, run 1 µm once** (about 7 minutes here). This moves the result into the range where three independent methods agree.
 - **Mesh size mostly shifts this balun's response in frequency rather than changing its balance.** That is plausibly because the 2 µm coupling gap is under-resolved at coarse settings, but this study doesn't prove the cause.
 

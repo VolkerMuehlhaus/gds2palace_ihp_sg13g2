@@ -13,7 +13,7 @@ The findings apply to this inductor, with this stackup, in this frequency range.
 ## The details of this study
 
 - **Model:** `ind_frame_with_ports.gds`, stackup `SG13G2_200um.xml`
-- **Ports:** 2 via ports (Metal1 → TopMetal2), Z0 = 50 Ω, de-embedded (port parasitic inductance removed) in all results shown, evaluated as one differential pair
+- **Ports:** 2 via ports (Metal1 → TopMetal2), Z0 = 50 Ω, de-embedded (port parasitic inductance removed) in all results shown, evaluated as one differential pair. The de-embedding was redone in October 2026 with the corrected `combine_extend_snp.py`, which before had put the inductance of all ports at port 1 (see `doc/CHANGES.md`, 12 October 2026); L, Q and R of the differential pair don't change, because they only see the sum of both port inductances
 - **Solver:** AWS Palace (FEM), ABC boundaries, 20 µm margin, order 2 unless noted
 - **Sweep:** 0–50 GHz in 0.5 GHz steps (adaptive frequency sweep)
 - **Execution:** `hpz2`, 16 of 32 cores

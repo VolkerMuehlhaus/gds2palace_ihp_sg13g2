@@ -29,7 +29,7 @@ SNP_DIR = os.path.join(HERE, "snp")
 PLANAR_DIR = os.path.join(HERE, "..", "..", "mesh_convergence", "mesh_convergence_D-band_balun", "results", "snp")
 PLOT_DIR = os.path.join(HERE, "plots")
 
-BAND = (120e9, 160e9)
+BAND = (140e9, 170e9)
 
 PLANAR = {m: os.path.join(PLANAR_DIR, f"balun_mesh{m}um.s3p") for m in (5, 4, 3, 2, 1)}
 CONFORMAL = {m: os.path.join(SNP_DIR, f"balun_conformal_mesh{m}um.s3p") for m in (4, 2, 1)}
@@ -81,7 +81,7 @@ def plot_planar_vs_conformal():
     for ax, (_, title) in zip(axes.flat, panels):
         style(ax)
         ax.set_title(title, loc="left", fontsize=11, color=INK)
-    axes[0, 0].text(140, 0.97, "target band", transform=axes[0, 0].get_xaxis_transform(),
+    axes[0, 0].text(155, 0.97, "target band", transform=axes[0, 0].get_xaxis_transform(),
                     ha="center", va="top", fontsize=8, color=INK2)
     for ax in axes[1]:
         ax.set_xlabel("Frequency (GHz)", color=INK2)
@@ -138,8 +138,8 @@ def plot_mesh_vs_stackup():
 def print_numbers():
     print()
     print(f"In-band ({BAND[0] / 1e9:.0f}-{BAND[1] / 1e9:.0f} GHz), worst case over the band")
-    print(f"{'run':14s} {'IL min..max':>13s} {'IL@120':>7s} {'IL@160':>7s} {'S11 max':>8s} {'S11@120':>8s} "
-          f"{'S11@160':>8s} {'null GHz':>8s} {'|amp| max':>9s} {'phase':>11s} {'dS own1':>8s}")
+    print(f"{'run':14s} {'IL min..max':>13s} {'IL@140':>7s} {'IL@170':>7s} {'S11 max':>8s} {'S11@140':>8s} "
+          f"{'S11@170':>8s} {'null GHz':>8s} {'|amp| max':>9s} {'phase':>11s} {'dS own1':>8s}")
     for name, runs in (("planar", PLANAR), ("conformal", CONFORMAL)):
         for mesh in sorted(runs, reverse=True):
             ntw = rf.Network(runs[mesh])
@@ -147,8 +147,8 @@ def print_numbers():
             b = (ntw.f >= BAND[0]) & (ntw.f <= BAND[1])
             at = lambda k, f: np.interp(f, ntw.f, m[k])
             print(f"{name + f' {mesh} µm':14s} {m['IL'][b].min():5.2f}..{m['IL'][b].max():5.2f} "
-                  f"{at('IL', 120e9):7.2f} {at('IL', 160e9):7.2f} {m['S11'][b].max():8.1f} "
-                  f"{at('S11', 120e9):8.1f} {at('S11', 160e9):8.1f} {null_freq_ghz(runs[mesh]):8.0f} "
+                  f"{at('IL', 140e9):7.2f} {at('IL', 170e9):7.2f} {m['S11'][b].max():8.1f} "
+                  f"{at('S11', 140e9):8.1f} {at('S11', 170e9):8.1f} {null_freq_ghz(runs[mesh]):8.0f} "
                   f"{np.abs(m['amp'][b]).max():9.2f} {m['phase'][b].min():5.1f}..{m['phase'][b].max():4.1f} "
                   f"{own_delta(runs, mesh):8.4f}")
     for mesh in (4, 2, 1):
