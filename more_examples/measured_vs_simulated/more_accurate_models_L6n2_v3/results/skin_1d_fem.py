@@ -7,8 +7,7 @@ Exact: Zs = (gamma/sigma) coth(gamma t/2).
 
 FEM order 2 (as Palace order 2: the tangential field varies quadratically in the normal direction within a cell),
 Galerkin with quadratic elements, on mesh lines through the thickness (the metal faces are always mesh lines):
-2 um (2 cells of 1.5 um through the 3 um metal, as in the gds2palace mesh), 1 um (3 cells), 0.5 um (6 cells), and
-skin layers 0.1 + 0.15 um at both faces (settings['skin_layers']) with the 2.5 um core in 2 cells.
+2 um (2 cells of 1.5 um through the 3 um metal, as in the gds2palace mesh), 1 um (3 cells) and 0.5 um (6 cells).
 This is the numerical scheme on a 1D slab, not a Palace run.
 Writes plots/skin_1d_fem.png.  Run with Python (numpy, matplotlib):  python skin_1d_fem.py
 """
@@ -59,9 +58,8 @@ def fem_p2(f, nodes):
     return np.array(zs), np.array(Es), E[0]
 
 
-MESHES = {'2 um': np.linspace(0, T, 3), '1 um': np.linspace(0, T, 4), '0.5 um': np.linspace(0, T, 7),
-          'skin layers': np.array([0, 0.1e-6, 0.25e-6, T / 2, T - 0.25e-6, T - 0.1e-6, T])}
-COLORS = {'2 um': '#2a78d6', '1 um': '#1baf7a', '0.5 um': '#7a3db8', 'skin layers': '#111111'}
+MESHES = {'2 um': np.linspace(0, T, 3), '1 um': np.linspace(0, T, 4), '0.5 um': np.linspace(0, T, 7)}
+COLORS = {'2 um': '#2a78d6', '1 um': '#1baf7a', '0.5 um': '#7a3db8'}
 
 def figure(method, solve, meshes, filename, fr, ref):
     """current density at 75 GHz (left) and conductor loss over frequency (right) for one method"""
@@ -98,20 +96,17 @@ def figure(method, solve, meshes, filename, fr, ref):
     ax2.set_ylabel('resistance per square of TopMetal2 (mOhm)')
     ax2.set_title(f'{method}: RF sheet resistance of TopMetal2 (3 um), current on both faces', fontsize=10)
     ax2.legend(fontsize=8, loc='upper left')
-    fig.suptitle('1D model of the FEM order 2 scheme (not a Palace run); the metal faces are mesh lines',
-                 fontsize=9, color='#555555')
     fig.tight_layout()
     fig.savefig(os.path.join(HERE, 'plots', filename), dpi=150)
     plt.close(fig)
 
 
-LABELS = {'2 um': '2 um mesh', '1 um': '1 um mesh', '0.5 um': '0.5 um mesh',
-          'skin layers': 'skin layers 0.1 + 0.15 um, 2 um mesh'}
+LABELS = {'2 um': '2 um mesh', '1 um': '1 um mesh', '0.5 um': '0.5 um mesh'}
 
 if __name__ == '__main__':
     fr = np.linspace(1e9, 150e9, 120)
     ref = np.array([exact(f, [0])[1].real for f in fr])
-    figure('FEM order 2', fem_p2, ('2 um', '1 um', '0.5 um', 'skin layers'), 'skin_1d_fem.png', fr, ref)
+    figure('FEM order 2', fem_p2, ('2 um', '1 um', '0.5 um'), 'skin_1d_fem.png', fr, ref)
     fs = (1e9, 10e9, 20e9, 50e9, 100e9, 150e9)
     print('FEM order 2, loss / exact at ' + ', '.join(f'{f / 1e9:g}' for f in fs) + ' GHz')
     for m in MESHES:

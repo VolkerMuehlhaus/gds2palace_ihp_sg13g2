@@ -148,22 +148,19 @@ Volume meshing of filled conductors means more mesh cells and more memory. The s
 
 What is not shown in this table: Palace also calculates internal "quality" metrics from the FEM solution. These error indicator values are approximately twice as much for the volume mesh model. This indicates that we might need a smaller refined_cellsize value for the volume mesh model. We will come back to that later, for the "ultimate" final model with best accuracy.
 
-**IMPORTANT NOTE:  For accurate loss calculation, volume mesh requires to mesh into skin effect! In this frequency range here, δ = 0.91µm @ 10 GHz, so we might be already on the edge: mesh refined along the edges is enforced by settings['refined_cellsize']=2 micron here. This gets even harder at higher frequencies where the skin depth becomes much smaller than 1 µm, e.g. 0.41µm @ 50 GHz and 0.2 µm @ 200 GHz.**
+**Note on skin effect:** with a volume mesh, the current distribution inside the conductor must be resolved, and the skin depth of TopMetal2 is smaller than the 2 µm mesh above a few GHz (δ = 0.91 µm @ 10 GHz, 0.41 µm @ 50 GHz). This turned out to be much less critical than expected: the second order finite elements used by Palace follow the current decay into the metal even when a mesh cell is several skin depths thick. The plot below compares them with the exact solution for the 3 µm thick TopMetal2, where a 2 µm mesh means two cells of 1.5 µm through the metal. Left: current density from the surface to the centre of the metal at 75 GHz. Right: RF resistance per square of TopMetal2, which starts at the DC value of 11 mΩ and rises as the current moves to the surfaces.
 
-How far off is a filled metal when the cells are larger than the skin depth? The plot below answers this for the 3 µm thick TopMetal2 with a simple 1D model: the field across the metal, computed with the same order 2 finite elements that Palace uses, compared with the exact solution ([results/skin_1d_fem.py](results/skin_1d_fem.py)). A 2 µm mesh means two cells of 1.5 µm through the metal. Left: current density from the surface to the centre of the metal at 75 GHz. Right: the RF resistance per square of TopMetal2, which starts at the DC value of 11 mΩ and rises as the current moves to the surfaces.
+![Order 2 FEM vs. exact solution: current density inside TopMetal2 and RF sheet resistance for different mesh sizes](results/plots/skin_1d_fem.png)
 
-![FEM order 2: current density inside TopMetal2 and RF sheet resistance for different mesh sizes](results/plots/skin_1d_fem.png)
-
-Inside each cell, the order 2 elements let the field bend, so even a 1.5 µm cell follows the decay near the surface quite well. But it leaves some current too deep in the metal, so the resistance comes out too high once the skin depth is a fraction of the cell size:
+Only when the skin depth is a fraction of the cell size, some current is left too deep in the metal, and the resistance comes out too high:
 
 | mesh | 10 GHz | 20 GHz | 50 GHz | 100 GHz |
 |---|---:|---:|---:|---:|
 | 2 µm | +2.4 % | +10 % | +18 % | +17 % |
 | 1 µm | +0.5 % | +2.3 % | +9 % | +19 % |
 | 0.5 µm | 0 % | 0 % | +0.7 % | +3 % |
-| 2 µm + thin skin layers 0.1 and 0.15 µm | +0.7 % | +2.3 % | -0.7 % | -5 % |
 
-For this inductor, with SRF at 11 GHz, the 2 µm mesh is good enough: the 1D model predicts an error of about 2 % in conductor loss at 10 GHz, and the 1 µm "ultimate" model in section 7 indeed changes peak Q by only 1.4 %. For inductors and lines at mm-wave frequencies, the error of the 2 µm mesh grows to 10-20 %. There, the thin layers along the conductor faces (`settings['skin_layers']`, gds2palace 0.9.0, see the User's Guide chapter "Conductor loss modelling") give the accuracy of a finely meshed conductor without refining the whole conductor. This is a 1D model of the numerical method, not a Palace run: in a real layout, edges and corners add their own mesh error, and the field at the faces is not symmetric.
+For this inductor, with SRF at 11 GHz, the 2 µm mesh is good enough: about 2 % in conductor loss at 10 GHz, and the 1 µm "ultimate" model in section 7 indeed changes peak Q by only 1.4 %. For inductors and lines at mm-wave frequencies, the error of the 2 µm mesh grows to 10-20 %, and a finer mesh is needed in the conductors.
 
 
 ## 4. Conformal passivation over TopMetal2
