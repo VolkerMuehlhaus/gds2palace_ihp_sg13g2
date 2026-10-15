@@ -2,6 +2,13 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 15 October-2026
+**New features**  
+`settings['skin_layers']` is a new option for filled metals: each conductor is split into thin layers along all its faces plus a core, so that the mesh has thin cells next to the conductor surface (where the skin effect puts the current) while the cell size along the surface stays at `refined_cellsize`. For a single-turn TopMetal2 inductor with peak Q at 77 GHz, filled metals with `refined_cellsize` 2 and skin layers are within 1.3 % of a converged filled model (`refined_cellsize` 0.125) from 10 to 100 GHz, at a ninth of the run time; without skin layers, `refined_cellsize` 2 overestimates the resistance by up to 9 % and underestimates peak Q by 8 %. Values: `True` (depths from the skin depth at the highest frequency), a list of depths, or a dictionary per layer. See "Accuracy at high frequency" in the user's guide, chapter "Conductor loss modelling".
+
+**Bugfix**  
+Conductor faces of surface impedance models were sorted into horizontal (`_xy`) and vertical (`_z`) groups by a normal computed from their boundary vertices, which gave a wrong or zero normal when a face was split, e.g. by a port: in a single-turn inductor, 68 % of the side wall area ended up in the horizontal group. Now the normal of the planar CAD face is used. This only matters for `z_thickness_factor` other than 1 (the default 1 gives both groups the same thickness): before, only part of the side walls got the reduced thickness.
+
 ## 12 October-2026
 **Bugfixes**  
 Port de-embedding in `combine_extend_snp.py` (the `_deembedded.sNp` and `_dc_deembedded.sNp` files) put the negative inductance of all ports in series at port 1, and nothing at the other ports. For a 2-port with 2.2 pH per port, port 1 was reduced by 4.4 pH and port 2 was not de-embedded at all; for a 3-port, port 1 got the sum of all three values. Now each port gets its own value, in port number order. The raw `.sNp` and the `_dc.sNp` files were not affected. De-embedded files created with earlier versions should be created again by running `combine_extend_snp.py` again. Thanks to Gianluca Simone and David Lurz (FAU) for finding and reporting this bug.

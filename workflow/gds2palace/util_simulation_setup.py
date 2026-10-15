@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.10.5"
+__version__ = "1.11.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -621,6 +621,116 @@ def add_metal_volumes (allpolygons, metals_list, meshseed=0):
     
     return metal_dimtags_created_3D, metal_dimtags_created_sheetlayer, via_fill_factor_by_tag
     
+
+
+def skin_layer_depths (skin_layers, metals_list, materials_list, fmax, unit):
+    """Depths of the skin layers per conductor layer, from settings['skin_layers'].
+
+    Args:
+        skin_layers: True (all conductor layers, depths from the skin depth at fmax), a list of depths
+            (all conductor layers), or a dict {layername: True or list of depths} (only these layers).
+            Depths are measured from the conductor surface inward, in drawing units.
+        metals_list, materials_list: from stackup reader
+        fmax (float): highest simulation frequency in Hz
+        unit (float): drawing unit in m
+
+    Returns:
+        dict {layername: sorted list of depths}, only layers that get at least one skin layer, and
+        dict {layername: list of requested depths that are too deep for the layer thickness}
+    """
+    if isinstance(skin_layers, dict):
+        requested = dict(skin_layers)
+        for layername in requested:
+            if metals_list.getbylayername(layername) is None:
+                print(f'WARNING: skin_layers: layer "{layername}" is not in the stackup, ignored')
+    else:
+        requested = {metal.name: skin_layers for metal in metals_list.metals}
+
+    depths_by_layer, dropped_by_layer = {}, {}
+    for metal in metals_list.metals:
+        if metal.name not in requested or not metal.is_metal or metal.thickness <= 0:
+            continue
+        if _is_pec_material(metal.material):
+            continue
+        value = requested[metal.name]
+        if value is True:
+            # auto: about 0.4 and 1 skin depth at the highest frequency (tested: TopMetal2, 0.1 / 0.25 um up to 150 GHz)
+            material = materials_list.get_by_name(metal.material)
+            if material is None or material.sigma <= 0 or fmax <= 0:
+                continue
+            delta = 1 / math.sqrt(math.pi * fmax * 4e-7 * math.pi * material.sigma) / unit
+            depths = [round(0.4 * delta, 3), round(delta, 3)]
+        elif value is False or value is None:
+            continue
+        else:
+            depths = [float(d) for d in value]
+        # a core of at least a third of the thickness must remain; skip depths below the geometry tolerance
+        usable = sorted({d for d in depths if 0.005 <= d <= metal.thickness / 3})
+        if usable:
+            depths_by_layer[metal.name] = usable
+            dropped_by_layer[metal.name] = sorted(set(depths) - set(usable))
+    return depths_by_layer, dropped_by_layer
+
+
+def add_conductor_skin_cores (allpolygons, metals_list, depths_by_layer, dropped_by_layer=None, meshseed=0):
+    """Add nested core volumes inside filled conductors, so that fragmenting splits each conductor into thin skin
+    layers along all its faces plus a core. The mesh then has thin cells next to the conductor surface (where the
+    skin effect needs them) without a fine mesh along the surface. All pieces keep the conductor layer name, so
+    they end up in the same physical group and material.
+
+    Core k is the layer's polygon outline offset inward by depth k (sharp corners kept), extruded from zmin + depth k
+    to zmax - depth k. Call after add_metal_volumes(), not before: that function fuses all volumes of a layer.
+
+    Args:
+        allpolygons: from gds reader
+        metals_list: from stackup reader
+        depths_by_layer (dict): {layername: sorted list of depths}, see skin_layer_depths()
+        dropped_by_layer (dict, optional): {layername: depths not used}, only for the report
+
+    Returns:
+        list of created 3D dimtags
+    """
+    from shapely.geometry import Polygon as ShapelyPolygon
+    from shapely.validation import make_valid
+    from shapely import unary_union
+
+    created = []
+    for metal in metals_list.metals:
+        depths = depths_by_layer.get(metal.name)
+        if not depths:
+            continue
+        shapes = []
+        for poly in allpolygons.polygons:
+            if int(poly.layernum) == int(metal.layernum) and len(poly.pts_x) >= 3:
+                shapes.append(make_valid(ShapelyPolygon(list(zip(poly.pts_x, poly.pts_y)))))
+        if not shapes:
+            continue
+        outline = unary_union(shapes)
+        count = 0
+        for depth in depths:
+            core = outline.buffer(-depth, join_style='mitre').simplify(1e-4)
+            parts = [core] if core.geom_type == 'Polygon' else [g for g in getattr(core, 'geoms', []) if g.geom_type == 'Polygon']
+            for part in parts:
+                if part.is_empty or part.area < depth * depth:
+                    continue                     # tiny remainder of a narrow feature, not worth a separate core
+                z = metal.zmin + depth
+                outer = _build_plane_surface(list(part.exterior.coords)[:-1], z, meshseed)
+                holes = [_build_plane_surface(list(ring.coords)[:-1], z, meshseed) for ring in part.interiors]
+                surfaces = [outer]
+                if holes:
+                    surfaces, _ = gmsh.model.occ.cut([outer], holes)
+                for surface in surfaces:
+                    out = gmsh.model.occ.extrude([surface], 0, 0, metal.thickness - 2 * depth)
+                    for dimtag in out:
+                        if dimtag[0] == 3:
+                            gmsh.model.setEntityName(dim=3, tag=dimtag[1], name=metal.name)
+                            created.append(dimtag)
+                            count += 1
+        gmsh.model.occ.synchronize()
+        dropped = (dropped_by_layer or {}).get(metal.name)
+        note = f', not used: {dropped} (a core of at least 1/3 of the thickness {metal.thickness:g} must remain)' if dropped else ''
+        print(f'Skin layers for {metal.name}: depths {depths} (drawing units), {count} core volume(s){note}')
+    return created
 
 
 def create_box_with_meshseed (xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
@@ -1400,6 +1510,12 @@ def create_model (excite_ports, settings):
     # redundant surface-impedance BC on the same faces as the bulk-conductivity domain).
     filled_metals_em = filled_metals and not elmer_thermal
 
+    # thin conductor layers along all faces of filled conductors (skin effect), see add_conductor_skin_cores()
+    skin_layers = get_optional_setting(settings, 'skin_layers', False)
+    if skin_layers and not filled_metals_em:
+        print("Note: settings['skin_layers'] only applies to filled metals (filled_metals = True), ignored.")
+        skin_layers = False
+
     # scale via conductivity (thermal: heat conductivity) by the fill factor of merged via arrays
     fill_factor_correction = get_optional_setting(settings, 'fill_factor_correction', False)
     if fill_factor_correction:
@@ -1543,6 +1659,11 @@ def create_model (excite_ports, settings):
     print('Adding metal tags ...')
     # add as volume
     metal_dimtags_created_3D, sheetlayer_dimtags, via_fill_factor_by_tag = add_metal_volumes (allpolygons, metals_list)
+
+    if skin_layers:
+        # thin layers along all conductor faces: nested core volumes, split from the conductors by fragment() below
+        depths_by_layer, dropped_by_layer = skin_layer_depths(skin_layers, metals_list, materials_list, fmax, unit)
+        metal_dimtags_created_3D.extend(add_conductor_skin_cores(allpolygons, metals_list, depths_by_layer, dropped_by_layer))
 
 
     if elmer_thermal:

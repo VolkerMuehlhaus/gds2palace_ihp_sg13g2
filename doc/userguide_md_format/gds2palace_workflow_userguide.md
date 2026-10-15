@@ -63,6 +63,7 @@ Document version: 2026-10-04
 This chapter gives a brief overview of major features added since the previous edition of this guide. For the complete, dated change log, see [`CHANGES.md`](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/doc/CHANGES.md) in the repository.
 
 - **settings['filled_metals']** is a new option for Palace, used for volume meshing of conductors instead of placing a surface impedance onto the side walls. This gives more accurate conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section.
+- **settings['skin_layers']** adds thin layers along all faces of filled conductors, so that the mesh resolves the skin effect without a fine mesh along the surface. For an inductor with peak Q at 77 GHz, `refined_cellsize` 2 µm with skin layers is as accurate as filled metals with `refined_cellsize` 0.125 µm (within 1.3 % from 10 to 100 GHz), at about a ninth of the run time. See "Accuracy at high frequency" in chapter "Conductor loss modelling".
 - **Elmer FEM as an additional solver.** gds2palace can now generate simulation input not only for AWS Palace, but also for [Elmer FEM](https://www.elmerfem.org/), an open-source multiphysics solver. This adds two new workflows, both built from the same GDSII layout + XML stackup + Python model script approach already used for Palace:
   - **Elmer EM simulation** — S-parameter simulation, see chapter "Using gds2palace with Elmer FEM for EM simulation".
   - **Elmer thermal simulation** — steady-state heat conduction (temperature) simulation from user-defined heat sources and constant-temperature boundaries, see chapter "Using gds2palace with Elmer FEM for thermal simulation".
@@ -484,6 +485,14 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 
 **settings['filled_metals']:** Model conductors as solid volumes with bulk conductivity (volume mesh) instead of the default surface impedance on the conductor surfaces. This gives more accurate conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section. Not recommended as a default: it needs more RAM and simulation time, and becomes inaccurate at higher frequencies unless the mesh resolves the skin depth. Tested with Palace, Elmer thermal models always use solid conductor volumes. Default is False  
 **settings['fill_factor_correction']:** Only has an effect with merge_polygon_size > 0. Via array merging fills the gaps between vias with via material, so each merged via polygon is scaled down to its real via conductivity: its conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials, starting a new group when the fill factor is more than 20% below the group's highest value, and each group uses its mean fill factor. Vias with the reserved PEC material are grouped but not scaled. Applies to Palace and Elmer EM (electrical conductivity) and to Elmer thermal (heat conductivity, including temperature table values). Default is False  
+**settings['skin_layers']:** Only with `filled_metals`. Splits each conductor into thin layers along all its faces (top, bottom and side walls) plus a core, so that the mesh has thin cells next to the conductor surface, where the skin effect puts the current, while the cell size along the surface stays at `refined_cellsize`. Without it, filled metals need a small `refined_cellsize` everywhere to be accurate at high frequency. Values:
+
+- `True`: all conductor layers, depths of about 0.4 and 1 skin depth at the highest simulation frequency, from the layer's conductivity
+- a list of depths in drawing units, e.g. `[0.1, 0.25]`: these depths for all conductor layers
+- a dictionary for selected layers, e.g. `{'TopMetal2': True, 'TopMetal1': [0.1, 0.25]}`: recommended, because the skin layers are only needed where the conductor loss matters, and each layer adds mesh cells
+
+A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. PEC layers and vias are not split. Tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Default is False  
+
 **settings['z_thickness_factor']:** This optional setting can tweak the conductor loss modelling when using the default "hollow body with skin-effect-aware surface impedance" approach, also known as "do not solve inside". This factor will be applied for metal thickness value on conductor side walls[^z-thickness], default is 1.  
 
 [^z-thickness]: See chapter on metal loss at low frequency, where skin depth is larger than metal thickness.  
@@ -1009,6 +1018,37 @@ If you prefer to use another value for loss tangent, that is fully supported by 
 Reduced thickness for the side walls looked like a simple, effective correction to prevent an over-estimate of low frequency conductor cross section, but this effect spreads out into the microwave frequency range.  
 
 If you have a need to model conductor loss accurately at low frequency, consider using the settings['filled_metals'] option. 
+
+Note: up to version 1.10.4 of `util_simulation_setup.py`, part of the side walls could end up in the group of horizontal faces (for faces split by a port or another shape), and then got the full thickness instead of the reduced one. The tests with z_thickness_factor 0.33 and 0.5 above were made with that version. The default z_thickness_factor = 1 is not affected, because both groups get the same thickness.
+
+### Accuracy at high frequency
+
+The two conductor models have opposite errors at high frequency:
+
+- **Surface impedance** (default): the conductor loss is too low, also well above the frequency range of the side wall effect described above. Each face gets an impedance that is exact for a wide sheet, but near the edges and corners of a conductor the current crowds into a region where the skin layers of two faces overlap, and a surface impedance per face cannot describe that. For TopMetal2 lines of 2-20 µm width, the resistance is still 7-22 % too low at 50-150 GHz.
+- **Filled metals** with `refined_cellsize` 2: the conductor loss is too high, because two cell layers through the 3 µm thick TopMetal2 cannot resolve a skin depth of 0.3-0.5 µm. What matters is the cell size normal to the conductor surface: the first cell layer needs to be about half the skin depth. A small `refined_cellsize` gives that, but also makes the mesh fine along the surface, which is expensive. `skin_layers` adds the thin layers only where they are needed.
+
+Single-turn inductor, w = 4.5 µm, TopMetal2, peak Q at 77 GHz, compared with filled metals at `refined_cellsize` 0.125 µm (converged: 0.25 µm changes R by less than 1.4 %):
+
+| conductor model | refined_cellsize | R at 30 / 75 / 100 GHz | peak Q | run time (8 cores) |
+|---|---:|---|---:|---:|
+| filled_metals (reference) | 0.125 | 1 / 1 / 1 | 22.2 | 89 min |
+| filled_metals | 0.25 | +0.4 / +0.8 / +0.9 % | 22.0 | 34 min |
+| filled_metals | 2 | +5.7 / +8.1 / +9.4 % | 20.4 | 8 min |
+| filled_metals + skin_layers `[0.1, 0.25]` | 2 | -0.6 / -0.7 / +1.3 % | 22.4 | 10 min |
+| surface impedance (default) | 2 | -24 / -18 / -14 % | 27.1 | 6 min |
+
+`skin_layers = True` (depths from the skin depth at the highest frequency, here 0.094 and 0.236 µm at 150 GHz) gives the same result. On straight TopMetal2 lines of 4.5 and 20 µm width, compared with an independent 2D calculation, the skin layer models are within -2 to +6 % from 1 to 150 GHz, as close as filled metals at `refined_cellsize` 0.25.
+
+![Single-turn inductor: differential resistance of the conductor models, relative to the converged filled model](./images/skin_layers_inductor_R.png)
+
+Practical guide:
+
+| purpose | conductor model |
+|---|---|
+| resonance frequencies, coupling, matching networks where conductor loss is a small part | surface impedance, the fastest |
+| Q or insertion loss below about 5 GHz | filled_metals |
+| Q or insertion loss at higher frequencies | filled_metals + skin_layers, for the layers that carry the current |
 
 ## Dielectric loss modelling 
 
