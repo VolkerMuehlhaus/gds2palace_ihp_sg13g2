@@ -244,14 +244,74 @@ quick sanity check of port setup or layout, not for a number you'd report;
 see the [mesh convergence studies](../more_examples/mesh_convergence/README.md)
 for real order-1-vs-2 error data on five actual structures.
 
+### Surface impedance or filled metals? And what do `filled_metals = 'auto'` and `skin_layers` do?
+
+By default every conductor is a hollow body with a surface impedance on its
+faces (like HFSS's "solve on surface" or Momentum's sheets), which is fast
+but has known limits: too low loss at low frequency for narrow traces and
+10-25 % too low at high frequency (edges and corners), and up to twice the
+loss for thin layers that carry current on one face only (Metal1-Metal5
+ground planes, MIM capacitor plates). `filled_metals` meshes conductors as
+volumes with bulk conductivity instead (like "solve inside"):
+
+```python
+settings['filled_metals'] = False    # default: surface impedance on all conductors
+settings['filled_metals'] = True     # all conductor layers as volumes
+settings['filled_metals'] = 'auto'   # only layers thinner than refined_cellsize as volumes
+```
+
+`'auto'` fills the layers that are meshed only about one cell thick anyway, so
+it costs little: with `refined_cellsize` 2 in SG13G2, Metal1-Metal5, MIM and
+Activ are filled and TopMetal1/TopMetal2 stay surface impedance. The choice
+does not depend on the frequency range. Example: the series resistance of the
+MIM capacitor `palace_rfcmim.py` is 0.85 Ω at low frequency (10 MHz) with
+`'auto'`, 0.87 Ω with all metals filled and 1.88 Ω with surface impedance, at about the
+run time of the surface model.
+
+Filled metals with a 2 µm mesh overestimate the loss of thick metals at high
+frequency (TopMetal2: +10 % at 20 GHz, up to +18 % above 50 GHz), because the
+current crowds into a skin depth of 0.2-0.5 µm. `skin_layers` adds thin
+layers along all faces of filled conductors, so that the mesh resolves the
+skin effect without a fine mesh along the surface:
+
+```python
+settings['skin_layers'] = True                         # automatic depths, eligible layers
+settings['skin_layers'] = [0.1, 0.25]                  # fixed depths (drawing units), eligible layers
+settings['skin_layers'] = {'TopMetal2': True,          # per layer: automatic ...
+                           'TopMetal1': [0.1, 0.25]}   # ... or fixed depths
+```
+
+Depths are measured from the surface inward; `[0.1, 0.25]` gives a 0.1 µm and
+a 0.15 µm layer at every face, plus a core. The rules, in this order:
+
+1. Only filled layers are split (`filled_metals` True or `'auto'`); vias,
+   sheet layers and PEC layers never.
+2. With `True` or a list, two kinds of layers are skipped; a layer named in
+   the dict is split anyway: conductivity above 1e8 S/m (a stand-in for a
+   perfect conductor, e.g. SUBGND in older stackups), and layers thinner than
+   2 skin depths at the highest frequency (the current fills them anyway; in
+   SG13G2 Metal1-Metal5).
+3. `True` uses 0.4 and 1 skin depth at the highest simulation frequency (the
+   largest of `fstop`, `fpoint`, `fdump`), from each layer's conductivity, e.g.
+   0.094 and 0.236 µm for TopMetal2 at 150 GHz.
+4. A depth is only used if a core of at least 1/3 of the layer thickness
+   remains. The model script prints the depths used per layer, or why a
+   layer got none.
+
+For a single-turn TopMetal2 inductor with peak Q at 77 GHz, filled metals with
+`refined_cellsize` 2 and `skin_layers = True` are within about 1 % of a
+converged filled model (`refined_cellsize` 0.125) up to 100 GHz, at a ninth
+of its run time. Validated so far on TopMetal2 inductors and lines up to
+150 GHz; see "Accuracy at high frequency" in the [user's
+guide](userguide_md_format/gds2palace_workflow_userguide.md#accuracy-at-high-frequency).
+
 ### What does `z_thickness_factor` do?
 
-It scales the effective thickness used for a conductor's side-wall surface
-impedance separately from its true top/bottom surfaces, to correct for
-over-estimating low-frequency conductor cross-section. See ["Conductor loss
-modelling"](userguide_md_format/gds2palace_workflow_userguide.md#conductor-loss-modelling)
-for the derivation and test cases — and note the related limitation
-described in the next question.
+It scales the thickness used for a conductor's side-wall surface impedance,
+an early workaround for the over-estimated low-frequency cross-section of
+the surface model. It is not recommended any more: it also changes the
+side-wall impedance well into the skin-effect regime. Use `filled_metals`
+(and `skin_layers`) instead, see the previous question.
 
 ### Why is my simulated DC/low-frequency resistance wrong for a narrow trace?
 
@@ -266,6 +326,8 @@ README](../more_examples/EM_temperature_coefficient/README.md) walks through
 hitting this with a 2 µm-wide test line and switching to the standard,
 much-wider `line_simple_viaport` structure instead. See also ["Limits of
 conductor loss calculation"](userguide_md_format/gds2palace_workflow_userguide.md#limits-of-conductor-loss-calculation).
+`settings['filled_metals'] = True` gives the correct DC/low-frequency
+resistance for any trace width.
 
 ### What boundary condition types are available?
 
@@ -277,10 +339,14 @@ Palace yet.
 
 ### Why is the mesh so much coarser here than in openEMS?
 
-This FEM workflow models conductors as hollow shells with a surface
-impedance boundary condition, so there's no need to mesh into skin depth the
-way a solid-conductor FDTD/FEM tool (like openEMS) does. 2-5 µm is a good
-`refined_cellsize` starting point for most IHP SG13G2 models.
+By default this FEM workflow models conductors as hollow shells with a
+surface impedance boundary condition, so there's no need to mesh into skin
+depth the way a solid-conductor FDTD tool (like openEMS) does. 2-5 µm is a
+good `refined_cellsize` starting point for most IHP SG13G2 models. With
+`filled_metals`, the second order elements still follow the skin effect
+reasonably with 2 µm cells (loss up to about 18 % too high above 50 GHz for
+TopMetal2), and `skin_layers` removes most of that error without a finer
+mesh.
 
 ### Can I refine one layer more finely than the global mesh setting?
 

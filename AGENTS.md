@@ -265,9 +265,10 @@ model data keys set at the end of the template. Optional keys and defaults
 | `solver_maxits` / `solver_tol` | `400` / `1e-6` | Palace linear solver limits |
 | `boundary` | 6 × `'ABC'` | xmin, xmax, ymin, ymax, zmin, zmax: `ABC`, `PEC` or `PMC` |
 | `air_around` | `margin` | Air around the dielectrics, one value or 6 values; 0 is allowed |
-| `filled_metals` | `False` | Solid metal volumes instead of surface impedance: better low-frequency R, more RAM and time |
+| `filled_metals` | `False` | Solid metal volumes instead of surface impedance: `True` all conductor layers, `'auto'` only layers thinner than `refined_cellsize` (thin metals, MIM) |
+| `skin_layers` | `False` | Thin layers along all faces of filled conductors: `True` (0.4 and 1 skin depth at the highest frequency), a list of depths, or a dict per layer; see the FAQ |
 | `fill_factor_correction` | `False` | Scale the conductivity of merged via arrays by their fill factor (needs `merge_polygon_size > 0`) |
-| `z_thickness_factor` | `1` | Side-wall thickness factor for conductor loss, see "Conductor loss modelling" in the user's guide |
+| `z_thickness_factor` | `1` | Side-wall thickness factor for conductor loss; not recommended, use `filled_metals` / `skin_layers` |
 | `no_gui` / `no_preview` / `preview_only` | `False` | gmsh windows: none at all / skip the unmeshed preview / preview and stop |
 | `save_gmsh_unrolled` | `False` | Also save the unmeshed gmsh geometry |
 | `config_suffix` | `''` | Suffix for `config.json`/`port_information.json`, e.g. `'_fine'` |
