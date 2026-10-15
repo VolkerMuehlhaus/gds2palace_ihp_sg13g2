@@ -63,6 +63,7 @@ Document version: 2026-10-04
 This chapter gives a brief overview of major features added since the previous edition of this guide. For the complete, dated change log, see [`CHANGES.md`](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/doc/CHANGES.md) in the repository.
 
 - **settings['filled_metals']** is a new option for Palace, used for volume meshing of conductors instead of placing a surface impedance onto the side walls. This gives more accurate conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section.
+- **settings['filled_metals'] = 'auto'** fills only the conductor layers thinner than `refined_cellsize` (in SG13G2: Metal1-Metal5, MIM) and keeps TopMetal1 and TopMetal2 as surface impedance. This removes an error of the surface model for thin layers with current on one face, e.g. ground planes and MIM capacitor plates, at little extra cost.
 - **settings['skin_layers']** adds thin layers along all faces of filled conductors, so that the mesh resolves the skin effect without a fine mesh along the surface. For an inductor with peak Q at 77 GHz, `refined_cellsize` 2 µm with skin layers is as accurate as filled metals with `refined_cellsize` 0.125 µm (within 1.3 % from 10 to 100 GHz), at about a ninth of the run time. See "Accuracy at high frequency" in chapter "Conductor loss modelling".
 - **Elmer FEM as an additional solver.** gds2palace can now generate simulation input not only for AWS Palace, but also for [Elmer FEM](https://www.elmerfem.org/), an open-source multiphysics solver. This adds two new workflows, both built from the same GDSII layout + XML stackup + Python model script approach already used for Palace:
   - **Elmer EM simulation** — S-parameter simulation, see chapter "Using gds2palace with Elmer FEM for EM simulation".
@@ -484,6 +485,8 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 #### Conductor modelling
 
 **settings['filled_metals']:** Model conductors as solid volumes with bulk conductivity (volume mesh) instead of the default surface impedance on the conductor surfaces. This gives more accurate conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section. Not recommended as a default: it needs more RAM and simulation time, and becomes inaccurate at higher frequencies unless the mesh resolves the skin depth. Tested with Palace, Elmer thermal models always use solid conductor volumes. Default is False  
+
+`settings['filled_metals'] = 'auto'` meshes only the conductor layers thinner than `refined_cellsize` as volumes and keeps the others as surface impedance. A thin layer is meshed only about one cell thick anyway, so a volume costs little, and the surface model overestimates the loss of thin layers that carry current on one face only, up to twice (see "Palace's External option"). With `refined_cellsize` 2 in SG13G2, Metal1-Metal5, MIM and Activ are filled, TopMetal1 and TopMetal2 stay surface impedance. The choice does not depend on the frequency range, so an over-specified highest frequency does not change it. MIM capacitor `palace_rfcmim.py`: series resistance 0.88 Ω at 1 GHz with 'auto', 0.90 Ω with all metals filled, 2.0 Ω with surface impedance, at about the run time of the surface model. `palace_line_viaport.py` (TopMetal2 line over a Metal1 ground plane): line resistance 3-11 % too low with 'auto' (the surface model error of TopMetal2), instead of 16-41 % too high with surface impedance.  
 **settings['fill_factor_correction']:** Only has an effect with merge_polygon_size > 0. Via array merging fills the gaps between vias with via material, so each merged via polygon is scaled down to its real via conductivity: its conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials, starting a new group when the fill factor is more than 20% below the group's highest value, and each group uses its mean fill factor. Vias with the reserved PEC material are grouped but not scaled. Applies to Palace and Elmer EM (electrical conductivity) and to Elmer thermal (heat conductivity, including temperature table values). Default is False  
 **settings['skin_layers']:** Only with `filled_metals`. Splits each conductor into thin layers along all its faces (top, bottom and side walls) plus a core, so that the mesh has thin cells next to the conductor surface, where the skin effect puts the current, while the cell size along the surface stays at `refined_cellsize`. Without it, filled metals need a small `refined_cellsize` everywhere to be accurate at high frequency. Values:
 
@@ -1054,7 +1057,7 @@ Practical guide:
 | resonance frequencies, coupling, matching networks where conductor loss is a small part | surface impedance, the fastest (loss of Metal1-Metal5 ground planes too high, see above) |
 | Q or insertion loss below about 5 GHz | filled_metals |
 | Q or insertion loss at higher frequencies | filled_metals + skin_layers, for the layers that carry the current |
-| loss with ground planes or shields on Metal1-Metal5 | filled_metals (also below 5 GHz, see "Palace's External option") |
+| loss with ground planes, shields or MIM capacitors on Metal1-Metal5 | filled_metals = 'auto' (thin layers filled, see "Palace's External option"), or True |
 
 #### Palace's External option
 
@@ -1066,7 +1069,7 @@ gds2palace models each conductor as a hollow body with all its faces in the mesh
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Re Zs with External / without | 0.50 | 0.54 | 0.67 | 0.87 | 1.03 | 1.09 | 1.05 |
 
-Setting `External` by hand on the faces of a wide ground plane removes the error above in `palace_line_viaport.py`, but it would halve the low frequency loss of conductors that carry current on both faces, e.g. Metal1 lines, and gds2palace groups the top and bottom faces of a conductor together. For thin layers that carry current mainly on one face, `filled_metals` is the better choice: a layer thinner than 2 skin depths is only one or two cells thick, so filling it costs little, and the current distribution in it is then right.
+Setting `External` by hand on the faces of a wide ground plane removes the error above in `palace_line_viaport.py`, but it would halve the low frequency loss of conductors that carry current on both faces, e.g. Metal1 lines, and gds2palace groups the top and bottom faces of a conductor together. For thin layers that carry current mainly on one face, `filled_metals` is the better choice: a layer thinner than 2 skin depths is only one or two cells thick, so filling it costs little, and the current distribution in it is then right. `filled_metals = 'auto'` does this for all layers thinner than `refined_cellsize` and keeps the thicker layers as surface impedance.
 
 ## Dielectric loss modelling 
 

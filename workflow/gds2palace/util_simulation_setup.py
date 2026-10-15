@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -1512,8 +1512,10 @@ def create_model (excite_ports, settings):
     # separate_z_group_for_metals setting 
     z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
 
-    # metal layers are modeled as surface for EM by default
-    filled_metals = get_optional_setting(settings, 'filled_metals', False)
+    # metal layers are modeled as surface for EM by default; True: all conductor layers as volumes;
+    # 'auto': only conductor layers thinner than their refined_cellsize as volumes (see filled_layers below)
+    filled_metals_setting = get_optional_setting(settings, 'filled_metals', False)
+    filled_metals = filled_metals_setting is True
 
     # solver choice
     elmer = get_optional_setting(settings, 'elmer', False)
@@ -1532,10 +1534,29 @@ def create_model (excite_ports, settings):
     # redundant surface-impedance BC on the same faces as the bulk-conductivity domain).
     filled_metals_em = filled_metals and not elmer_thermal
 
+    # names of the conductor layers meshed as volumes in an EM model (all others: surface impedance)
+    filled_layers = set()
+    if not elmer_thermal:
+        if filled_metals_setting == 'auto':
+            # a layer thinner than its mesh cell size is meshed only about one cell thick anyway, so a volume costs
+            # little; and a thin layer that carries current on one face only (e.g. a Metal1-Metal5 ground plane) gets up
+            # to twice its loss in the surface model (both faces share the thickness). Independent of the frequency range.
+            for metal in metals_list.metals:
+                if metal.is_metal and metal.thickness > 0 and not _is_pec_material(metal.material):
+                    if metal.thickness < refined_cellsize_override_dict.get(metal.name, refined_cellsize):
+                        filled_layers.add(metal.name)
+            print(f"filled_metals = 'auto': conductor layers thinner than refined_cellsize meshed as volumes: "
+                  f"{', '.join(m.name for m in metals_list.metals if m.name in filled_layers) or 'none'}")
+        elif filled_metals_setting not in (True, False, None):
+            print(f"ERROR: settings['filled_metals'] must be True, False or 'auto', not {filled_metals_setting!r}")
+            exit(1)
+        elif filled_metals_em:
+            filled_layers = {metal.name for metal in metals_list.metals if metal.is_metal}
+
     # thin conductor layers along all faces of filled conductors (skin effect), see add_conductor_skin_cores()
     skin_layers = get_optional_setting(settings, 'skin_layers', False)
-    if skin_layers and not filled_metals_em:
-        print("Note: settings['skin_layers'] only applies to filled metals (filled_metals = True), ignored.")
+    if skin_layers and not filled_layers:
+        print("Note: settings['skin_layers'] only applies to filled metals (filled_metals = True or 'auto'), ignored.")
         skin_layers = False
 
     # scale via conductivity (thermal: heat conductivity) by the fill factor of merged via arrays
@@ -1642,7 +1663,7 @@ def create_model (excite_ports, settings):
         elif metal.is_sheet: # sheet layer for resistor etc
             metal_sheet_dict[metal.name] = []
         else:
-            if filled_metals_em:
+            if metal.name in filled_layers:
                 # EM volume-conductor mode: solid bulk-conductivity domain only,
                 # no surface-impedance BC on the same faces
                 metal_volume_dict[metal.name]=[]
@@ -1685,6 +1706,9 @@ def create_model (excite_ports, settings):
     if skin_layers:
         # thin layers along all conductor faces: nested core volumes, split from the conductors by fragment() below
         depths_by_layer, notes_by_layer = skin_layer_depths(skin_layers, metals_list, materials_list, fmax, unit)
+        # only filled conductors can be split (with filled_metals = 'auto', the others are hollow surface impedance bodies)
+        depths_by_layer = {k: v for k, v in depths_by_layer.items() if k in filled_layers}
+        notes_by_layer = {k: v for k, v in notes_by_layer.items() if k in filled_layers}
         metal_dimtags_created_3D.extend(add_conductor_skin_cores(allpolygons, metals_list, depths_by_layer, notes_by_layer))
 
 
@@ -1768,7 +1792,7 @@ def create_model (excite_ports, settings):
 
 
     # restore names with possibly new tag numbers
-    if filled_metals_em:
+    if filled_layers:
         # EM volume-conductor mode: if a via and a regular conductor geometrically
         # overlap (e.g. a via drawn to extend slightly into its pad, for a
         # watertight boolean), fragment() above produces a shared piece that
@@ -1777,11 +1801,12 @@ def create_model (excite_ports, settings):
         # conductor's name always overwrites a via's for any such shared region
         # (the conductor wins the overlap, matching regular circuit-design intent
         # of a via making contact into, not displacing, the conductor above/below it).
-        via_indices, other_indices = [], []
+        # (only filled conductors are moved behind the vias: with filled_metals = 'auto', the order between vias
+        # and surface impedance conductors stays as without filled metals)
+        other_indices, filled_indices = [], []
         for n, (dim, original_tag) in enumerate(geom_dimtags):
-            layer = metals_list.getbylayername(original_volume_names_dict[original_tag])
-            (via_indices if (layer is not None and layer.is_via) else other_indices).append(n)
-        name_restore_order = via_indices + other_indices
+            (filled_indices if original_volume_names_dict[original_tag] in filled_layers else other_indices).append(n)
+        name_restore_order = other_indices + filled_indices
     else:
         name_restore_order = range(len(geom_dimtags))
 
@@ -1996,7 +2021,7 @@ def create_model (excite_ports, settings):
                 vertical_faces = [t for loop in surfaceloops for t in loop if is_vertical_surface(t)]
                 if vertical_faces:
                     via_surface_dict.setdefault(name, []).append([vertical_faces])
-            elif filled_metals_em and via_metal is not None and via_metal.is_metal:
+            elif via_metal is not None and via_metal.is_metal and name in filled_layers:
                 # volumized regular conductor gets no surface physical group (pure
                 # domain conductor, like a via above), but mesh refinement near its
                 # edges should still work - collect boundary curves the same way the
@@ -3290,7 +3315,7 @@ def create_model (excite_ports, settings):
                 # Step 1: Get all physical volumes
                 volume_groups = [(dim, tag) for dim, tag in gmsh.model.getPhysicalGroups() if dim == 3]
 
-                if filled_metals_em:
+                if filled_layers:
                     # EM volume-conductor mode: don't hide conductor domains here -
                     # unlike vias/dielectric/airbox, these are the model's actual
                     # metal, and hiding them would leave nothing meaningful visible
@@ -3298,7 +3323,7 @@ def create_model (excite_ports, settings):
                     kept_volume_groups = []
                     for dim, tag in volume_groups:
                         layer = metals_list.getbylayername(gmsh.model.getPhysicalName(dim, tag))
-                        if layer is None or not layer.is_metal:
+                        if layer is None or layer.name not in filled_layers:
                             kept_volume_groups.append((dim, tag))
                     volume_groups = kept_volume_groups
 
