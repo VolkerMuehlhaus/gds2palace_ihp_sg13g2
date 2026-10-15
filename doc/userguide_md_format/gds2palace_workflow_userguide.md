@@ -487,11 +487,11 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 **settings['fill_factor_correction']:** Only has an effect with merge_polygon_size > 0. Via array merging fills the gaps between vias with via material, so each merged via polygon is scaled down to its real via conductivity: its conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials, starting a new group when the fill factor is more than 20% below the group's highest value, and each group uses its mean fill factor. Vias with the reserved PEC material are grouped but not scaled. Applies to Palace and Elmer EM (electrical conductivity) and to Elmer thermal (heat conductivity, including temperature table values). Default is False  
 **settings['skin_layers']:** Only with `filled_metals`. Splits each conductor into thin layers along all its faces (top, bottom and side walls) plus a core, so that the mesh has thin cells next to the conductor surface, where the skin effect puts the current, while the cell size along the surface stays at `refined_cellsize`. Without it, filled metals need a small `refined_cellsize` everywhere to be accurate at high frequency. Values:
 
-- `True`: all conductor layers, depths of about 0.4 and 1 skin depth at the highest simulation frequency, from the layer's conductivity
-- a list of depths in drawing units, e.g. `[0.1, 0.25]`: these depths for all conductor layers
+- `True`: all conductor layers that are at least 2 skin depths thick at the highest simulation frequency (in SG13G2: TopMetal1 and TopMetal2 from about 10 GHz, never Metal1-Metal5), depths of about 0.4 and 1 skin depth, from the layer's conductivity
+- a list of depths in drawing units, e.g. `[0.1, 0.25]`: these depths for the same layers as `True`
 - a dictionary for selected layers, e.g. `{'TopMetal2': True, 'TopMetal1': [0.1, 0.25]}`: recommended, because the skin layers are only needed where the conductor loss matters, and each layer adds mesh cells
 
-A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. PEC layers and vias are not split, and with `True` or a list, neither are layers with a conductivity above 1e8 S/m: no real metal conducts better than silver (6.3e7 S/m), so such a material stands in for a perfect conductor, e.g. `LOWLOSS` (1e10 S/m) for SUBGND in older stackups, and its skin layers would be a few nanometres thin. Tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Default is False  
+A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. PEC layers and vias are not split. With `True` or a list, layers thinner than 2 skin depths are not split either, because the current fills most of their thickness anyway: for the 0.42 µm Metal1 ground plane of `palace_line_viaport.py`, skin layers changed the line resistance by about 1 % and made the simulation 2.6 times slower. Neither are layers with a conductivity above 1e8 S/m: no real metal conducts better than silver (6.3e7 S/m), so such a material stands in for a perfect conductor, e.g. `LOWLOSS` (1e10 S/m) for SUBGND in older stackups, and its skin layers would be a few nanometres thin. Tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Default is False  
 
 **settings['z_thickness_factor']:** This optional setting can tweak the conductor loss modelling when using the default "hollow body with skin-effect-aware surface impedance" approach, also known as "do not solve inside". This factor will be applied for metal thickness value on conductor side walls[^z-thickness], default is 1.  
 
@@ -1023,9 +1023,10 @@ Note: up to version 1.10.4 of `util_simulation_setup.py`, part of the side walls
 
 ### Accuracy at high frequency
 
-The two conductor models have opposite errors at high frequency:
+Both conductor models have errors at high frequency, of different kinds:
 
 - **Surface impedance** (default): the conductor loss is too low, also well above the frequency range of the side wall effect described above. Each face gets an impedance that is exact for a wide sheet, but near the edges and corners of a conductor the current crowds into a region where the skin layers of two faces overlap, and a surface impedance per face cannot describe that. For TopMetal2 lines of 2-20 µm width, the resistance is still 7-22 % too low at 50-150 GHz.
+- **Surface impedance on thin conductors with current on one face** (default): the conductor loss is too high. Each conductor is a hollow body, so its faces carry current only where the field reaches them, and gds2palace writes Palace's conductivity boundary for a sheet that carries current on both faces: at low frequency each face gets twice the sheet resistance of the layer. Where only one face carries the current, as in a Metal1-Metal5 ground plane under a line, the loss of that layer is doubled for layers thinner than about 2 skin depths, which in SG13G2 means Metal1-Metal5 up to 100 GHz and beyond. In `palace_line_viaport.py` (TopMetal2 line over a Metal1 ground plane) the line resistance is 21-41 % too high from 1 to 100 GHz. Palace's `"External": true` on the ground plane faces (the formula for a sheet excited from one side) removes this error in that example, but would halve the loss of Metal1 lines that carry current on both faces; gds2palace does not set it.
 - **Filled metals** with `refined_cellsize` 2: the conductor loss is too high, because two cell layers through the 3 µm thick TopMetal2 cannot resolve a skin depth of 0.3-0.5 µm. What matters is the cell size normal to the conductor surface: the first cell layer needs to be about half the skin depth. A small `refined_cellsize` gives that, but also makes the mesh fine along the surface, which is expensive. `skin_layers` adds the thin layers only where they are needed.
 
 Single-turn inductor, w = 4.5 µm, TopMetal2, peak Q at 77 GHz, compared with filled metals at `refined_cellsize` 0.125 µm (converged: 0.25 µm changes R by less than 1.4 %):
@@ -1040,13 +1041,17 @@ Single-turn inductor, w = 4.5 µm, TopMetal2, peak Q at 77 GHz, compared with fi
 
 `skin_layers = True` (depths from the skin depth at the highest frequency, here 0.094 and 0.236 µm at 150 GHz) gives the same result. On straight TopMetal2 lines of 4.5 and 20 µm width, compared with an independent 2D calculation, the skin layer models are within -2 to +6 % from 1 to 150 GHz, as close as filled metals at `refined_cellsize` 0.25.
 
+`palace_line_viaport.py`, line resistance from two line lengths compared with a 2D calculation of the TopMetal2 line and the lossy Metal1 ground plane: filled metals with `skin_layers = True` (skin layers in TopMetal2 only, Metal1 is too thin) are within -0.5 to +6.4 % from 1 to 100 GHz, as close as filled metals at `refined_cellsize` 0.5 (up to +6.6 %) at half of its run time (34 vs. 68 min on the same machine); filled metals at `refined_cellsize` 2 are up to 11 % too high. Skin layers in the Metal1 plane as well improve the result by about 1 % and make the simulation 2.6 times slower. The surface model is 21-41 % too high here, see above.
+
+![palace_line_viaport.py: line resistance of the conductor models, relative to a 2D calculation](./images/skin_layers_viaport_line_R.png)
+
 ![Single-turn inductor: differential resistance of the conductor models, relative to the converged filled model](./images/skin_layers_inductor_R.png)
 
 Practical guide:
 
 | purpose | conductor model |
 |---|---|
-| resonance frequencies, coupling, matching networks where conductor loss is a small part | surface impedance, the fastest |
+| resonance frequencies, coupling, matching networks where conductor loss is a small part | surface impedance, the fastest (loss of Metal1-Metal5 ground planes too high, see above) |
 | Q or insertion loss below about 5 GHz | filled_metals |
 | Q or insertion loss at higher frequencies | filled_metals + skin_layers, for the layers that carry the current |
 

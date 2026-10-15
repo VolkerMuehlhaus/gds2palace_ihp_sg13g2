@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.11.1"
+__version__ = "1.12.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -660,12 +660,21 @@ def skin_layer_depths (skin_layers, metals_list, materials_list, fmax, unit):
             # Still possible by naming the layer in a dict.
             notes_by_layer[metal.name] = f'conductivity {material.sigma:.3g} S/m is a perfect conductor stand-in'
             continue
+        delta = None
+        if material is not None and material.sigma > 0 and fmax > 0:
+            delta = 1 / math.sqrt(math.pi * fmax * 4e-7 * math.pi * material.sigma) / unit   # skin depth at fmax
+        if not isinstance(skin_layers, dict) and delta is not None and metal.thickness < 2 * delta:
+            # thinner than 2 skin depths at fmax: the current fills most of the thickness anyway. Metal1 ground plane
+            # of palace_line_viaport.py (0.42 um, 100 GHz): skin layers improved R' by about 1 % at 2.6 x run time.
+            # Still possible by naming the layer in a dict.
+            notes_by_layer[metal.name] = (f'thickness {metal.thickness:g} is less than 2 skin depths at the highest '
+                                          f'frequency ({delta:.3g})')
+            continue
         value = requested[metal.name]
         if value is True:
             # auto: about 0.4 and 1 skin depth at the highest frequency (tested: TopMetal2, 0.1 / 0.25 um up to 150 GHz)
-            if material is None or material.sigma <= 0 or fmax <= 0:
+            if delta is None:
                 continue
-            delta = 1 / math.sqrt(math.pi * fmax * 4e-7 * math.pi * material.sigma) / unit
             depths = [round(0.4 * delta, 3), round(delta, 3)]
         elif value is False or value is None:
             continue
