@@ -150,6 +150,20 @@ What is not shown in this table: Palace also calculates internal "quality" metri
 
 **IMPORTANT NOTE:  For accurate loss calculation, volume mesh requires to mesh into skin effect! In this frequency range here, δ = 0.91µm @ 10 GHz, so we might be already on the edge: mesh refined along the edges is enforced by settings['refined_cellsize']=2 micron here. This gets even harder at higher frequencies where the skin depth becomes much smaller than 1 µm, e.g. 0.41µm @ 50 GHz and 0.2 µm @ 200 GHz.**
 
+How far off is a filled metal when the cells are larger than the skin depth? The plot below answers this for the 3 µm thick TopMetal2 with a simple 1D model: the field across the metal, computed with the same order 2 finite elements that Palace uses, compared with the exact solution ([results/skin_1d_fem.py](results/skin_1d_fem.py)). A 2 µm mesh means two cells of 1.5 µm through the metal. Left: current density from the surface to the centre of the metal at 75 GHz. Right: the RF resistance per square of TopMetal2, which starts at the DC value of 11 mΩ and rises as the current moves to the surfaces.
+
+![FEM order 2: current density inside TopMetal2 and RF sheet resistance for different mesh sizes](results/plots/skin_1d_fem.png)
+
+Inside each cell, the order 2 elements let the field bend, so even a 1.5 µm cell follows the decay near the surface quite well. But it leaves some current too deep in the metal, so the resistance comes out too high once the skin depth is a fraction of the cell size:
+
+| mesh | 10 GHz | 20 GHz | 50 GHz | 100 GHz |
+|---|---:|---:|---:|---:|
+| 2 µm | +2.4 % | +10 % | +18 % | +17 % |
+| 1 µm | +0.5 % | +2.3 % | +9 % | +19 % |
+| 0.5 µm | 0 % | 0 % | +0.7 % | +3 % |
+
+For this inductor, with SRF at 11 GHz, the 2 µm mesh is good enough: the 1D model predicts an error of about 2 % in conductor loss at 10 GHz, and the 1 µm "ultimate" model in section 7 indeed changes peak Q by only 1.4 %. For inductors and lines at mm-wave frequencies, the error of the 2 µm mesh grows to 10-20 %, and a finer mesh is needed in the conductors. This is a 1D model of the numerical method, not a Palace run: in a real layout, edges and corners add their own mesh error, and the field at the faces is not symmetric.
+
 
 ## 4. Conformal passivation over TopMetal2
 
