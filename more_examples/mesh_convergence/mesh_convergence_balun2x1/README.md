@@ -13,7 +13,7 @@ The findings apply to this balun, with this stackup, in this frequency range. Ot
 ## The details of this study
 
 - **Model:** `balun2x1_edgecoupled_do200_w8_s2.gds`, stackup `SG13G2_200um.xml`
-- **Ports:** 4 via ports (Metal1 → TopMetal2), Z0 = 50 Ω, de-embedded: 1/2 = primary pair, 3/4 = secondary pair, no center tap
+- **Ports:** 4 via ports (Metal1 → TopMetal2), Z0 = 50 Ω, de-embedded: 1/2 = primary pair, 3/4 = secondary pair, no center tap. The de-embedding was redone in October 2026 with the corrected `combine_extend_snp.py`, which before had put the inductance of all ports at port 1 (see `doc/CHANGES.md`, 12 October 2026); it changed L, k and Q by up to about 1.5% and |Sdd21| by about 0.03 dB, not the convergence trends.
 - **Solver:** AWS Palace (FEM), ABC boundaries, 100 µm margin + 20 µm air, order 2 unless noted
 - **Sweep:** 1–50 GHz in 1 GHz steps (adaptive frequency sweep)
 - **Execution:** `hpz2`, 16 of 32 cores
@@ -28,7 +28,7 @@ A single octagonal loop of 4 edge-coupled lines on TopMetal2, 8 µm wide with a 
 **What we look at.** From the 4-port Z-matrix we form the differential impedances of primary and secondary and read:
 
 - **Coupling factor** k, **inductance** L and **Q factor** of each coil. These are only meaningful below the primary's self-resonance at about 29 GHz.
-- **|Sdd21|** and **|Sdd11|**: differential transmission and reflection at 200 Ω / 50 Ω. |Sdd21| peaks at about −1.3 dB near 34 GHz.
+- **|Sdd21|** and **|Sdd11|**: differential transmission and reflection at 200 Ω / 50 Ω. |Sdd21| peaks at about −1.2 dB near 34 GHz.
 
 ## 1. Uniform mesh refinement
 
@@ -38,7 +38,7 @@ We ran the model at `refined_cellsize` = 5, 2 and 1 µm, all at FEM order 2.
 
 - **The 5 µm mesh stands apart; 2 µm and 1 µm nearly coincide.** A 5 µm cell is wider than the 2 µm coupling gap, so it can't resolve the field there. (gmsh also reported a few ill-shaped elements at this setting.)
 - **Coupling and inductance change little.** At 10 GHz, 5 µm overestimates k by 1.3% and L by 0.5%.
-- **Q is the most sensitive coil property.** Peak primary Q is 6.6% low at 5 µm and 1.4% low at 2 µm (1 µm: 19.0 at 14 GHz).
+- **Q is the most sensitive coil property.** Peak primary Q is 6.6% low at 5 µm and 1.4% low at 2 µm (1 µm: 19.1 at 13 GHz).
 - **Transmission shifts in frequency.** The |Sdd21| peak moves from 32 GHz (5 µm) to 34 GHz (1 µm). The 5 µm mesh also shows about 0.08 dB less loss than the finer meshes.
 
 The step from 2 to 1 µm is much smaller than the step from 5 to 2 µm, on every quantity. The mesh is converging.
@@ -55,9 +55,9 @@ AMR started from the 5 µm mesh and ran 2 refinement iterations, ending at 1.08 
 
 | | Peak primary Q | \|Sdd21\| peak | Max\|ΔS\| vs. 1 µm | Total time | Peak RAM |
 |---|---:|---:|---:|---:|---:|
-| 2 µm uniform | 18.77 | −1.26 dB at 33 GHz | 0.018 | 11m 18s | 11.0 GB |
-| 1 µm uniform | 19.04 | −1.27 dB at 34 GHz | (reference) | 27m 5s | 24.2 GB |
-| AMR, 2 iterations | 18.57 | −1.27 dB at 34 GHz | 0.011 | 32m 36s | 15.6 GB |
+| 2 µm uniform | 18.86 | −1.22 dB at 34 GHz | 0.018 | 11m 18s | 11.0 GB |
+| 1 µm uniform | 19.13 | −1.24 dB at 34 GHz | (reference) | 27m 5s | 24.2 GB |
+| AMR, 2 iterations | 18.66 | −1.23 dB at 34 GHz | 0.011 | 32m 36s | 15.6 GB |
 
 - **For the S-parameters, AMR confirms the 1 µm result.** Its |Sdd21| peak is identical, and its Max|ΔS| distance to 1 µm is smaller than that of the 2 µm mesh.
 - **For Q, AMR is less accurate than the 2 µm uniform mesh.** It ends between the 2 µm and 5 µm results. AMR refines where Palace's error estimate is largest, and for this model that isn't where Q is decided.
@@ -70,7 +70,7 @@ FEM order 1 runs about 10× faster than order 2 on the same mesh. We re-ran all 
 ![Accuracy vs. solve time](results/plots/story_accuracy_vs_cost.png)
 
 - **Order 1 is far off on this balun.** At 5 µm, peak Q is 26% low and the |Sdd21| peak sits at 26 GHz instead of 34 GHz. The error shrinks with a finer mesh, but at 1 µm Q is still 10% low and the peak is at 31 GHz.
-- **Order 1 also makes the balun look better than it is.** Its |Sdd21| peak is −0.96 dB at 5 µm and −1.14 dB at 1 µm, compared with −1.27 dB for the reference.
+- **Order 1 also makes the balun look better than it is.** Its |Sdd21| peak is −0.94 dB at 5 µm and −1.11 dB at 1 µm, compared with −1.24 dB for the reference.
 - **Order 2 at 5 µm is more accurate than order 1 at 1 µm**, in Q, in frequency and in Max|ΔS|, at 1.7× the time (4 vs. 2.4 minutes).
 
 ## Summary for this balun
