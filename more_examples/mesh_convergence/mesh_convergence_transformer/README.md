@@ -13,7 +13,7 @@ The findings apply to this transformer, with this stackup, in this frequency ran
 ## The details of this study
 
 - **Model:** `Transformer_IMN_ports.gds`, stackup `SG13G2_200um.xml`
-- **Ports:** 5 via ports, Z0 = 50 Ω, de-embedded: 1/2 = primary (TopMetal1), 3 = primary center tap, 4/5 = secondary (TopMetal2)
+- **Ports:** 5 via ports, Z0 = 50 Ω, de-embedded: 1/2 = primary (TopMetal1), 3 = primary center tap, 4/5 = secondary (TopMetal2). The de-embedding was redone in October 2026 with the corrected `combine_extend_snp.py`, which before had put the inductance of all ports at port 1 (see `doc/CHANGES.md`, 12 October 2026); it changed L by about 1% and Q by about 1%, not the convergence trends.
 - **Solver:** AWS Palace (FEM), order 2, ABC boundaries, 50 µm air margin
 - **Sweep:** 0–200 GHz in 1 GHz steps (adaptive frequency sweep). This report looks at 1–40 GHz, below the primary self-resonance near 48 GHz.
 - **Mesh:** `refined_cellsize` varied as described below. The Metal3 ground plane is always kept at 5 µm (`refined_cellsize_override`).
@@ -65,9 +65,9 @@ AMR started from the 2 µm mesh and ran 3 iterations, refining wherever Palace's
 
 | | Primary L | Coupling k | Primary Q | Secondary Q | Total time | Peak RAM |
 |---|---:|---:|---:|---:|---:|---:|
-| 2 µm uniform | 0.743 nH | 0.716 | 11.97 | 11.07 | 7m 4s | 4.19 GB |
-| 1 µm uniform | 0.739 nH | 0.712 | 12.16 | 11.26 | 14m 4s | 7.51 GB |
-| AMR, 3 iterations | 0.738 nH | 0.711 | 12.60 | 11.66 | 1h 47m | 25.1 GB |
+| 2 µm uniform | 0.751 nH | 0.715 | 12.09 | 10.99 | 7m 4s | 4.19 GB |
+| 1 µm uniform | 0.747 nH | 0.711 | 12.29 | 11.18 | 14m 4s | 7.51 GB |
+| AMR, 3 iterations | 0.746 nH | 0.710 | 12.74 | 11.57 | 1h 47m | 25.1 GB |
 
 - **L and k confirm the uniform result**: AMR agrees with 1 µm within 0.3%.
 - **Q continues the upward trend**: AMR is another 3.6% above the 1 µm result, for both coils. This confirms what step 2 suggested. The Q of this transformer is not converged at 1 µm, and the true value is likely at least a few percent higher.
@@ -75,7 +75,7 @@ AMR started from the 2 µm mesh and ran 3 iterations, refining wherever Palace's
 
 ## Summary for this transformer
 
-- **For inductance and coupling, 2 µm is enough** (within 0.5% of the finest results, about 7 minutes).
+- **For inductance and coupling, 2 µm is enough** (within 1% of the finest results, about 7 minutes).
 - **Q is the hard quantity.** Even the finest run here (AMR, almost 2 hours) is still rising. Treat simulated Q at 30 GHz as a lower bound: the 2 µm mesh underestimates it by roughly 5% compared with AMR, and the true value may be higher still.
 - **5 µm is too coarse for this geometry** and crashed the solver. The cell size should not be much larger than the 2 µm trace width.
 
