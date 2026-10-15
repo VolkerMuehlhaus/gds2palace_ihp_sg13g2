@@ -11,8 +11,10 @@ gds2palace 0.9.0
 **Documentation**  
 New section "Accuracy at high frequency" in chapter "Conductor loss modelling" of the user's guide. It also describes a limitation of the surface impedance model that was not documented: thin conductors that carry current on one face only, e.g. a Metal1-Metal5 ground plane under a line, get up to twice their real loss (line resistance of `palace_line_viaport.py` 21-41 % too high).
 
-**Bugfix**  
+**Bugfixes**  
 Conductor faces of surface impedance models were sorted into horizontal (`_xy`) and vertical (`_z`) groups by a normal computed from their boundary vertices, which gave a wrong or zero normal when a face was split, e.g. by a port: in a single-turn inductor, 68 % of the side wall area ended up in the horizontal group. Now the normal of the planar CAD face is used. This only matters for `z_thickness_factor` other than 1 (the default 1 gives both groups the same thickness): before, only part of the side walls got the reduced thickness.
+
+Reading a GDSII file printed "WARNING: could not auto-repair 2 invalid polygon(s)" for via ports drawn as a zero-width line (e.g. layers 201/202 in `workflow/line_simple_viaport.gds`), although the port works and nothing was changed. The check for self-intersecting polygons now only looks at layers that are meshed as solids (stackup metals and vias, dielectric boundary layers, derived layers), not at port and marker layers. Polygons that need repair are repaired as before.
 
 ## 12 October-2026
 **Bugfixes**  
