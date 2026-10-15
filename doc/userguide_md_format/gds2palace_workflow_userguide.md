@@ -1026,7 +1026,7 @@ Note: up to version 1.10.4 of `util_simulation_setup.py`, part of the side walls
 Both conductor models have errors at high frequency, of different kinds:
 
 - **Surface impedance** (default): the conductor loss is too low, also well above the frequency range of the side wall effect described above. Each face gets an impedance that is exact for a wide sheet, but near the edges and corners of a conductor the current crowds into a region where the skin layers of two faces overlap, and a surface impedance per face cannot describe that. For TopMetal2 lines of 2-20 µm width, the resistance is still 7-22 % too low at 50-150 GHz.
-- **Surface impedance on thin conductors with current on one face** (default): the conductor loss is too high. Each conductor is a hollow body, so its faces carry current only where the field reaches them, and gds2palace writes Palace's conductivity boundary for a sheet that carries current on both faces: at low frequency each face gets twice the sheet resistance of the layer. Where only one face carries the current, as in a Metal1-Metal5 ground plane under a line, the loss of that layer is doubled for layers thinner than about 2 skin depths, which in SG13G2 means Metal1-Metal5 up to 100 GHz and beyond. In `palace_line_viaport.py` (TopMetal2 line over a Metal1 ground plane) the line resistance is 21-41 % too high from 1 to 100 GHz. Palace's `"External": true` on the ground plane faces (the formula for a sheet excited from one side) removes this error in that example, but would halve the loss of Metal1 lines that carry current on both faces; gds2palace does not set it.
+- **Surface impedance on thin conductors with current on one face** (default): the conductor loss is too high. Both faces of a conductor share its thickness (see "Palace's External option" below), which assumes that both carry the same current. Where the field reaches only one face, as in a Metal1-Metal5 ground plane under a line, that face carries all the current with twice the sheet resistance of the layer: up to twice the loss of that layer, for layers thinner than about 2 skin depths (in SG13G2: Metal1-Metal5 up to 150 GHz, TopMetal1 below about 9 GHz, TopMetal2 below about 4 GHz). In `palace_line_viaport.py` (TopMetal2 line over a Metal1 ground plane) the line resistance is 21-41 % too high from 1 to 100 GHz.
 - **Filled metals** with `refined_cellsize` 2: the conductor loss is too high, because two cell layers through the 3 µm thick TopMetal2 cannot resolve a skin depth of 0.3-0.5 µm. What matters is the cell size normal to the conductor surface: the first cell layer needs to be about half the skin depth. A small `refined_cellsize` gives that, but also makes the mesh fine along the surface, which is expensive. `skin_layers` adds the thin layers only where they are needed.
 
 Single-turn inductor, w = 4.5 µm, TopMetal2, peak Q at 77 GHz, compared with filled metals at `refined_cellsize` 0.125 µm (converged: 0.25 µm changes R by less than 1.4 %):
@@ -1054,6 +1054,19 @@ Practical guide:
 | resonance frequencies, coupling, matching networks where conductor loss is a small part | surface impedance, the fastest (loss of Metal1-Metal5 ground planes too high, see above) |
 | Q or insertion loss below about 5 GHz | filled_metals |
 | Q or insertion loss at higher frequencies | filled_metals + skin_layers, for the layers that carry the current |
+| loss with ground planes or shields on Metal1-Metal5 | filled_metals (also below 5 GHz, see "Palace's External option") |
+
+#### Palace's External option
+
+Palace's `Conductivity` boundary uses the surface impedance Zs = (γ/σ)·coth(γh/2) for a conductor of thickness h, which tends to 2/(σh) at DC: twice the sheet resistance. This is meant for a conductor that has two faces in the mesh, which share its thickness: a thin sheet drawn as a surface inside the model is split by Palace into two faces ("Added ... duplicate boundary elements for interior boundaries" in the Palace output), each gets this Zs, and in parallel they give the sheet resistance 1/(σh). The option `"External": true` (Palace: "Whether this boundary is on the exterior of the computational domain") doubles h, so that Zs tends to 1/(σh): it is meant for a conductor that has only one face in the mesh, on the outer boundary of the model, e.g. a metal enclosure wall or a ground plane that forms the bottom of the model.
+
+gds2palace models each conductor as a hollow body with all its faces in the mesh, the same situation as Palace's split sheet, and does not set `External`. This is exact at low frequency when the top and bottom faces carry the same current, and makes no difference for conductors much thicker than the skin depth. Real current distributions lie in between, and a boundary condition per face cannot be exact: the current on one face depends on the field at the other face through the metal. Ratio of the real part of Zs with and without `External`:
+
+| thickness / skin depth | ≤ 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 4 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Re Zs with External / without | 0.50 | 0.54 | 0.67 | 0.87 | 1.03 | 1.09 | 1.05 |
+
+Setting `External` by hand on the faces of a wide ground plane removes the error above in `palace_line_viaport.py`, but it would halve the low frequency loss of conductors that carry current on both faces, e.g. Metal1 lines, and gds2palace groups the top and bottom faces of a conductor together. For thin layers that carry current mainly on one face, `filled_metals` is the better choice: a layer thinner than 2 skin depths is only one or two cells thick, so filling it costs little, and the current distribution in it is then right.
 
 ## Dielectric loss modelling 
 
