@@ -491,7 +491,7 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 - a list of depths in drawing units, e.g. `[0.1, 0.25]`: these depths for all conductor layers
 - a dictionary for selected layers, e.g. `{'TopMetal2': True, 'TopMetal1': [0.1, 0.25]}`: recommended, because the skin layers are only needed where the conductor loss matters, and each layer adds mesh cells
 
-A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. PEC layers and vias are not split. Tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Default is False  
+A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. PEC layers and vias are not split, and with `True` or a list, neither are layers with a conductivity above 1e8 S/m: no real metal conducts better than silver (6.3e7 S/m), so such a material stands in for a perfect conductor, e.g. `LOWLOSS` (1e10 S/m) for SUBGND in older stackups, and its skin layers would be a few nanometres thin. Tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Default is False  
 
 **settings['z_thickness_factor']:** This optional setting can tweak the conductor loss modelling when using the default "hollow body with skin-effect-aware surface impedance" approach, also known as "do not solve inside". This factor will be applied for metal thickness value on conductor side walls[^z-thickness], default is 1.  
 

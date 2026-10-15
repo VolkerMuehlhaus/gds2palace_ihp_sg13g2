@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.11.0"
+__version__ = "1.11.1"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -636,7 +636,8 @@ def skin_layer_depths (skin_layers, metals_list, materials_list, fmax, unit):
 
     Returns:
         dict {layername: sorted list of depths}, only layers that get at least one skin layer, and
-        dict {layername: list of requested depths that are too deep for the layer thickness}
+        dict {layername: note}, why a requested layer gets fewer or no skin layers (printed by
+        add_conductor_skin_cores() if the layer has polygons)
     """
     if isinstance(skin_layers, dict):
         requested = dict(skin_layers)
@@ -646,16 +647,22 @@ def skin_layer_depths (skin_layers, metals_list, materials_list, fmax, unit):
     else:
         requested = {metal.name: skin_layers for metal in metals_list.metals}
 
-    depths_by_layer, dropped_by_layer = {}, {}
+    depths_by_layer, notes_by_layer = {}, {}
     for metal in metals_list.metals:
         if metal.name not in requested or not metal.is_metal or metal.thickness <= 0:
             continue
         if _is_pec_material(metal.material):
             continue
+        material = materials_list.get_by_name(metal.material)
+        if not isinstance(skin_layers, dict) and material is not None and material.sigma > 1e8:
+            # above any real metal (silver: 6.3e7 S/m at 20 C, CRC Handbook): a stand-in for a perfect conductor,
+            # e.g. a ground plane, whose skin layers would be nanometres thin and only add badly shaped cells.
+            # Still possible by naming the layer in a dict.
+            notes_by_layer[metal.name] = f'conductivity {material.sigma:.3g} S/m is a perfect conductor stand-in'
+            continue
         value = requested[metal.name]
         if value is True:
             # auto: about 0.4 and 1 skin depth at the highest frequency (tested: TopMetal2, 0.1 / 0.25 um up to 150 GHz)
-            material = materials_list.get_by_name(metal.material)
             if material is None or material.sigma <= 0 or fmax <= 0:
                 continue
             delta = 1 / math.sqrt(math.pi * fmax * 4e-7 * math.pi * material.sigma) / unit
@@ -668,11 +675,14 @@ def skin_layer_depths (skin_layers, metals_list, materials_list, fmax, unit):
         usable = sorted({d for d in depths if 0.005 <= d <= metal.thickness / 3})
         if usable:
             depths_by_layer[metal.name] = usable
-            dropped_by_layer[metal.name] = sorted(set(depths) - set(usable))
-    return depths_by_layer, dropped_by_layer
+        dropped = sorted(set(depths) - set(usable))
+        if dropped:
+            notes_by_layer[metal.name] = (f'depths {dropped} not used (a core of at least 1/3 of the thickness '
+                                          f'{metal.thickness:g} must remain, minimum depth 0.005)')
+    return depths_by_layer, notes_by_layer
 
 
-def add_conductor_skin_cores (allpolygons, metals_list, depths_by_layer, dropped_by_layer=None, meshseed=0):
+def add_conductor_skin_cores (allpolygons, metals_list, depths_by_layer, notes_by_layer=None, meshseed=0):
     """Add nested core volumes inside filled conductors, so that fragmenting splits each conductor into thin skin
     layers along all its faces plus a core. The mesh then has thin cells next to the conductor surface (where the
     skin effect needs them) without a fine mesh along the surface. All pieces keep the conductor layer name, so
@@ -685,7 +695,7 @@ def add_conductor_skin_cores (allpolygons, metals_list, depths_by_layer, dropped
         allpolygons: from gds reader
         metals_list: from stackup reader
         depths_by_layer (dict): {layername: sorted list of depths}, see skin_layer_depths()
-        dropped_by_layer (dict, optional): {layername: depths not used}, only for the report
+        notes_by_layer (dict, optional): {layername: note}, see skin_layer_depths(), only for the report
 
     Returns:
         list of created 3D dimtags
@@ -694,16 +704,21 @@ def add_conductor_skin_cores (allpolygons, metals_list, depths_by_layer, dropped
     from shapely.validation import make_valid
     from shapely import unary_union
 
+    notes_by_layer = notes_by_layer or {}
     created = []
     for metal in metals_list.metals:
         depths = depths_by_layer.get(metal.name)
-        if not depths:
+        note = notes_by_layer.get(metal.name)
+        if not depths and not note:
             continue
         shapes = []
         for poly in allpolygons.polygons:
             if int(poly.layernum) == int(metal.layernum) and len(poly.pts_x) >= 3:
                 shapes.append(make_valid(ShapelyPolygon(list(zip(poly.pts_x, poly.pts_y)))))
         if not shapes:
+            continue
+        if not depths:
+            print(f'No skin layers for {metal.name}: {note}')
             continue
         outline = unary_union(shapes)
         count = 0
@@ -727,9 +742,7 @@ def add_conductor_skin_cores (allpolygons, metals_list, depths_by_layer, dropped
                             created.append(dimtag)
                             count += 1
         gmsh.model.occ.synchronize()
-        dropped = (dropped_by_layer or {}).get(metal.name)
-        note = f', not used: {dropped} (a core of at least 1/3 of the thickness {metal.thickness:g} must remain)' if dropped else ''
-        print(f'Skin layers for {metal.name}: depths {depths} (drawing units), {count} core volume(s){note}')
+        print(f'Skin layers for {metal.name}: depths {depths} (drawing units), {count} core volume(s)' + (f'; {note}' if note else ''))
     return created
 
 
@@ -1662,8 +1675,8 @@ def create_model (excite_ports, settings):
 
     if skin_layers:
         # thin layers along all conductor faces: nested core volumes, split from the conductors by fragment() below
-        depths_by_layer, dropped_by_layer = skin_layer_depths(skin_layers, metals_list, materials_list, fmax, unit)
-        metal_dimtags_created_3D.extend(add_conductor_skin_cores(allpolygons, metals_list, depths_by_layer, dropped_by_layer))
+        depths_by_layer, notes_by_layer = skin_layer_depths(skin_layers, metals_list, materials_list, fmax, unit)
+        metal_dimtags_created_3D.extend(add_conductor_skin_cores(allpolygons, metals_list, depths_by_layer, notes_by_layer))
 
 
     if elmer_thermal:
