@@ -230,7 +230,6 @@ settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, mu
 
 settings['meshsize_max'] = 70  # microns, override cells_per_wavelength
 settings['adaptive_mesh_iterations'] = 0
-settings['z_thickness_factor'] = 0.33
 ```
 
 Users who are familiar with the IHP openEMS workflow will notice many similarities, although some implementation details are different.  
@@ -496,7 +495,7 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 
 A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. PEC layers and vias are not split. With `True` or a list, layers thinner than 2 skin depths are not split either, because the current fills most of their thickness anyway: for the 0.42 µm Metal1 ground plane of `palace_line_viaport.py`, skin layers changed the line resistance by about 1 % and made the simulation 2.6 times slower. Neither are layers with a conductivity above 1e8 S/m: no real metal conducts better than silver (6.3e7 S/m), so such a material stands in for a perfect conductor, e.g. `LOWLOSS` (1e10 S/m) for SUBGND in older stackups, and its skin layers would be a few nanometres thin. Tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Default is False  
 
-**settings['z_thickness_factor']:** This optional setting can tweak the conductor loss modelling when using the default "hollow body with skin-effect-aware surface impedance" approach, also known as "do not solve inside". This factor will be applied for metal thickness value on conductor side walls[^z-thickness], default is 1.  
+**settings['z_thickness_factor']:** This optional setting can tweak the conductor loss modelling when using the default "hollow body with skin-effect-aware surface impedance" approach, also known as "do not solve inside". This factor will be applied for metal thickness value on conductor side walls[^z-thickness], default is 1. Not recommended, see "z_thickness_factor (not recommended)" in chapter "Conductor loss modelling"; use `filled_metals` and `skin_layers` for accurate conductor loss.  
 
 [^z-thickness]: See chapter on metal loss at low frequency, where skin depth is larger than metal thickness.  
 
@@ -619,7 +618,6 @@ settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, mu
 
 settings['meshsize_max'] = 70  # microns, override cells_per_wavelength
 settings['adaptive_mesh_iterations'] = 0
-settings['z_thickness_factor'] = 0.33
 settings['order'] = order
 ```
 
@@ -838,7 +836,7 @@ However, in our RFIC use case, we might have conductor aspect ratio that reaches
 
 Mapping the surface impedance (as calculated internally by Palace from conductor thickness) onto all surfaces, i.e. side walls as well as top and bottom, will lead to an overestimate of available conductor cross section at low frequency:  
 
-The Palace calculation[^palace-zs] of Zs is exact when applied to top and bottom side only. If we apply this value to all sides, the extreme case at DC will over-estimate the conductor cross section by factor (width+thickness)/width.  
+The Palace calculation [^palace-zs] of Zs is exact when applied to top and bottom side only. If we apply this value to all sides, the extreme case at DC will over-estimate the conductor cross section by factor (width+thickness)/width.  
 
 
 ![Surface impedance for a thin sheet (left) and a conductor with near-square cross section (right)](./images/gds2palace_workflow_userguide.pdf-0029-10.png)
@@ -846,148 +844,15 @@ The Palace calculation[^palace-zs] of Zs is exact when applied to top and bottom
 
 [^palace-zs]: <https://github.com/awslabs/palace/blob/main/palace/models/surfaceconductivityoperator.cpp> 
 
-The approach taken by the gds2palace workflow script is to have a **scaling factor** that **reduces** the thickness value for the side walls. This reduces the error at low frequency (where skin depth is not much smaller than physical dimensions) and we converge towards the precise result in skin effect regime. 
+### z_thickness_factor (not recommended)
 
-In the model code, you can set this value by parameter 'z_thickness_factor': 
+An early workaround in gds2palace reduces the thickness used on the side walls: `settings['z_thickness_factor']`, default 1.0. It is not recommended any more. Palace's thickness correction then changes the side wall impedance well into the skin effect regime, not only at low frequency: for TopMetal2 with z_thickness_factor = 0.33 (1 µm instead of 3 µm on the side walls), the real part of Zs on the side walls is 2.6 times higher at 5 GHz and the imaginary part about 3 times lower, and at 50 GHz the imaginary part is still 23 % lower. In tests with the L2n0 inductor and TopMetal2 microstrip lines, the default 1.0 was closer to openEMS and measured data than 0.33 (see below). For accurate conductor loss, use `filled_metals` and `skin_layers` instead, see "Accuracy at high frequency".
 
+Note: up to version 1.10.4 of `util_simulation_setup.py`, part of the side walls could end up in the group of horizontal faces (for faces split by a port or another shape), and then got the full thickness instead of the reduced one. The default z_thickness_factor = 1 is not affected.
 
-```python
-settings['meshsize_max'] = 30  # microns, override cells_per_wavelength
-settings['adaptive_mesh_iterations'] = 0
-settings['z_thickness_factor'] = 0.33
-```
+### Transmission line compared with openEMS and measurement
 
-
-If you do not specify this option, the default value for that scaling factor is 1.0 
-
-### Testcase L2n0 with z_thickness_factor 0.33, 0.5 and 1.0 
-
-One testcase to check the effect of parameter z_thickness_factor is the 2nH inductor already known from IHP openEMS workflow. 
-
-The simulated inductance in differential model is visually identical for all 3 cases as expected, but  differential resistance shows a significant difference. 
-
-
-![L2n0 inductor: differential inductance for z_thickness_factor 0.33, 0.5 and 1.0](./images/gds2palace_workflow_userguide.pdf-0031-07.png)
-
-
-
-![L2n0 inductor: differential resistance for z_thickness_factor 0.33, 0.5 and 1.0](./images/gds2palace_workflow_userguide.pdf-0031-08.png)
-
-
-Of course, this change in series resistance also shows up in Q factor: 
-
-
-![L2n0 inductor: differential Q factor for z_thickness_factor 0.33, 0.5 and 1.0](./images/gds2palace_workflow_userguide.pdf-0032-01.png)
-
-
-It was confirmed by single frequency simulations near peak Q that this change is not an artefact from adaptive frequency sweep. 
-
-This is not what we expected, because conductor width is 12µm. We do not have an extreme case where side walls give a massive over-estimate of total DC cross section, and indeed the low frequency resistance at 0.1 GHz is quite close: 1.27 Ohm @ z_thickness_factor = 0.33, 1.40 Ohm @ 0.5 and 1.45 Ohm @ 1.0 
-
-The percentage difference increases in the medium frequency range, just around frequency of maximum Q for this testcase. 
-
-To understand this, we check the skin depth of TopMetal2 in IHP SG13 technology: 1.29 µm @ 5 GHz. The skin effect correction done in internally in Palace calculates a correction factor from skin depth and half physical thickness, and at these frequencies both values are roughly the same, so that a correction of effective surface impedance takes place. By applying a correct factor on thickness used for side walls, we change surface impedance well into the skin effect regime! 
-
-To check losses more wideband, we now look at “loss factor” which is the relative amount of power dissipated in the simulation model. The plot below shows that the main difference between the different runs for this model is in the frequency range 2 to 10 GHz, and results converge at higher frequencies. The Q factor comparison for the L2n0 testcase falls into the range of worst error. 
-
-
-![L2n0 inductor: loss factor 1 - |S11|² - |S21|² for z_thickness_factor 0.33, 0.5 and 1.0](./images/gds2palace_workflow_userguide.pdf-0032-07.png)
-
-
-To verify that the difference is not caused by insufficient mesh density, adaptive mesh refinement was carried out with 3 iterations at 5 GHz: loss factor changed by no more than 0.05 dB with those 3 steps of mesh refinement. 
-
-The calculation below reproduces the surface impedance correction in the Palace source code for two frequencies: 5 GHz (left column) and 50 GHz (right column).
-
-Palace code:
-
-```cpp
-double delta = std::sqrt(2.0 / (bdr.mu * bdr.sigma * omega));
-std::complex<double> Z = 1.0 / (bdr.sigma * delta);
-Z.imag(Z.real());
-if (bdr.h > 0.0)
-{
-  double nu = bdr.h / delta;
-  double den = std::cosh(nu) - std::cos(nu);
-  Z.real(Z.real() * (std::sinh(nu) + std::sin(nu)) / den);
-  Z.imag(Z.imag() * (std::sinh(nu) - std::sin(nu)) / den);
-}
-```
-
-Calculation for TopMetal2 with 3 µm thickness, as used for the top and bottom surfaces:
-
-| Simple DC cross section calculation | 5 GHz | 50 GHz |
-|---|---|---|
-| conductivity S/m | 3.03E+07 | 3.03E+07 |
-| thickness µm | **3.0** | **3.0** |
-| Rs, DC from geometry 1/(sigma\*t) | 1.10E-02 | 1.10E-02 |
-
-| Calculation steps per Palace source code | 5 GHz | 50 GHz |
-|---|---|---|
-| freq | 5.0E+09 | 5.0E+10 |
-| omega | 3.14E+10 | 3.14E+11 |
-| µ0 | 1.26E-06 | 1.26E-06 |
-| delta (skin depth) | 1.29E-06 | 4.09E-07 |
-| nu | 2.32E+00 | 7.33E+00 |
-| den | 5.82E+00 | 7.66E+02 |
-| Zs_re from skin effect (no modif.) | 2.55E-02 | 8.07E-02 |
-| Zs_im from skin effect (no modif.) | 2.55E-02 | 8.07E-02 |
-| **factor_re** | **0.99** | **1.00** |
-| **factor_im** | **0.74** | **1.00** |
-| Zs_re including modif. factor | 2.53E-02 | 8.08E-02 |
-| Zs_im including modif. factor | 1.89E-02 | 8.07E-02 |
-
-At 5 GHz, skin depth is on the order of half conductor thickness (TopMetal2 thickness is 3 µm) and the correction of real and imaginary part of Zs takes effect. The correction factor used at 5 GHz for Re{Zs} is 0.99 whereas the correction factor used for Im{Zs} is 0.74.
-
-If we now apply a different thickness to the side walls, to achieve a correction of available cross section at low frequencies, this has a strong effect on correction values calculated by Palace.
-
-The previous table showed that on the top/bottom side where metal thickness is specified as 3 µm, the correction factors are 1.0 at 50 GHz.
-
-If we use z_thickness_factor = 0.33, so that side wall sheets are specified as 3 µm \* 0.33 = 1 µm thickness, this results in massive changes at 5 GHz but even the 50 GHz imaginary part of Zs on the side walls is changed significantly:
-
-| Simple DC cross section calculation | 5 GHz | 50 GHz |
-|---|---|---|
-| conductivity S/m | 3.03E+07 | 3.03E+07 |
-| thickness µm | **1.0** | **1.0** |
-| Rs, DC from geometry 1/(sigma\*t) | 3.30E-02 | 3.30E-02 |
-
-| Calculation steps per Palace source code | 5 GHz | 50 GHz |
-|---|---|---|
-| freq | 5.0E+09 | 5.0E+10 |
-| omega | 3.14E+10 | 3.14E+11 |
-| µ0 | 1.26E-06 | 1.26E-06 |
-| delta (skin depth) | 1.29E-06 | 4.09E-07 |
-| nu | 7.73E-01 | 2.44E+00 |
-| den | 5.98E-01 | 6.58E+00 |
-| Zs_re from skin effect (no modif.) | 2.55E-02 | 8.07E-02 |
-| Zs_im from skin effect (no modif.) | 2.55E-02 | 8.07E-02 |
-| **factor_re** | **2.59** | **0.97** |
-| **factor_im** | **0.26** | **0.77** |
-| Zs_re including modif. factor | 6.61E-02 | 7.81E-02 |
-| Zs_im including modif. factor | 6.57E-03 | 6.23E-02 |
-
-In other words, we do not only change low frequency losses, but we also change high frequency impedance on the side walls, especially the imaginary part.
-
-### Testcase microstrip line 
-
-As another test case, we use the 50 Ohm microstrip line from a previous chapter, where the mesh density and basis functions were investigated. The line is 15µm wide on TopMetal2 over Metal1 ground, with 880µm line length. 
-
-Below is a plot of S21 where we can see some difference between z_thickness_factor=0.33 and z_thickness_factor=1.0 in insertion loss, especially in the frequency range up to 40 GHz. 
-
-
-![Microstrip line, 15 µm wide: S21 for z_thickness_factor 1.0 and 0.33](./images/gds2palace_workflow_userguide.pdf-0035-03.png)
-
-
-When testing a narrower line with 7µm TopMetal2 over Metal3, this is not matched to 50 Ohm very well and S21 would show some ripple, so we better look at loss factor 1 - |S11|² - |S21|² to compare the metal losses between z_thickness_factor=0.33 and z_thickness_factor=1.0 
-
-
-![Microstrip line, 7 µm wide: loss factor for z_thickness_factor 0.33 and 1.0](./images/gds2palace_workflow_userguide.pdf-0035-05.png)
-
-
-This testcases uses a shorter line length of 500µm only, for faster simulation, so the total insertion loss of the shorter line is lower. Both 15µm line and 7µm line testcase were simulated with refined_cellsize = 2 and mesh order = 2, with no adaptive mesh refinement. 
-
-### Compare to other data 
-
-We can also compare simulated results of the line with 15µm TopMetal2 over Metal1 to other data sources: openEMS simulation and measurement. 
+The 15 µm wide TopMetal2 line over Metal1 ground (`palace_line_viaport.py`) can be compared with an openEMS simulation and with measurement. The Palace results in this section use the default surface impedance model, which overestimates the loss of the Metal1 ground plane, see "Accuracy at high frequency" below. 
 
 Palace simulations for this line were done without the substrate below, the stackup didn’t include the silicon substrate because we expect the Metal1 ground plane to shield the substrate from the fields in the transmission line. It was verified that the difference with/without substrate below is negligible for these line models.  
 
@@ -1001,7 +866,7 @@ For openEMS (red curve), the simulation was also done without substrate below, u
 ![880 µm line: S21 from Palace, openEMS and measurement](./images/gds2palace_workflow_userguide.pdf-0036-06.png)
 
 
-Looking at the S21 plot, the blue curve (Palace with z_thickness_factor=1) is closer to the others than the pink curve with z_thickness_factor=0.33  
+In S21, Palace with the default z_thickness_factor = 1 (blue) is closer to openEMS and measurement than with 0.33 (pink).  
 We can also compare data for a longer line of 2580µm, width 15µm TopMetal2 over Metal1.  
 
 
@@ -1012,17 +877,10 @@ We can also compare data for a longer line of 2580µm, width 15µm TopMetal2 ove
 ![2580 µm line: S21 from Palace and measurement](./images/gds2palace_workflow_userguide.pdf-0037-02.png)
 
 
-The pink curve (Palace with z_thickness_factor=1) is closer to measured data up to 40 GHz. Above that frequency range, z_thickness_factor has very little effect.  
+Palace with z_thickness_factor = 1 is closer to measured data up to 40 GHz; above, z_thickness_factor has very little effect.  
 It can also be seen that measured insertion increases more with frequency than simulated. One possible explanation from an earlier paper was dielectric loss in the SiO2. This dielectric was modelled here as lossless dielectric, loss tangent = 0.  
-If you prefer to use another value for loss tangent, that is fully supported by the gds2palace workflow, and can be specified easily in the XML stackup file.  
+If you prefer to use another value for loss tangent, that is fully supported by the gds2palace workflow, and can be specified easily in the XML stackup file.
 
-### Conclusion regarding z_thickness_factor 
-
-Reduced thickness for the side walls looked like a simple, effective correction to prevent an over-estimate of low frequency conductor cross section, but this effect spreads out into the microwave frequency range.  
-
-If you have a need to model conductor loss accurately at low frequency, consider using the settings['filled_metals'] option. 
-
-Note: up to version 1.10.4 of `util_simulation_setup.py`, part of the side walls could end up in the group of horizontal faces (for faces split by a port or another shape), and then got the full thickness instead of the reduced one. The tests with z_thickness_factor 0.33 and 0.5 above were made with that version. The default z_thickness_factor = 1 is not affected, because both groups get the same thickness.
 
 ### Accuracy at high frequency
 

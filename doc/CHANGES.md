@@ -11,6 +11,8 @@ gds2palace 0.9.0
 `settings['filled_metals'] = 'auto'` meshes only the conductor layers thinner than `refined_cellsize` as volumes (in SG13G2 with `refined_cellsize` 2: Metal1-Metal5, MIM, Activ) and keeps the others as surface impedance. The surface model overestimates the loss of thin layers that carry current on one face only, e.g. ground planes and MIM capacitor plates, up to twice: the series resistance of the MIM capacitor `palace_rfcmim.py` at 1 GHz is 2.0 Ω with surface impedance, 0.88 Ω with 'auto' and 0.90 Ω with all metals filled, at about the run time of the surface model. The default (False) is unchanged.
 
 **Documentation**  
+Chapter "Conductor loss modelling" of the user's guide: the `z_thickness_factor` workaround is now a short subsection marked "not recommended" (the L2n0 and microstrip tests and the Palace code walk-through are removed), `filled_metals` and `skin_layers` are the recommended options. The code examples no longer set `z_thickness_factor`.
+
 New section "Accuracy at high frequency" in chapter "Conductor loss modelling" of the user's guide. It also describes a limitation of the surface impedance model that was not documented: thin conductors that carry current on one face only, e.g. a Metal1-Metal5 ground plane under a line, get up to twice their real loss (line resistance of `palace_line_viaport.py` 21-41 % too high).
 
 **Bugfixes**  
