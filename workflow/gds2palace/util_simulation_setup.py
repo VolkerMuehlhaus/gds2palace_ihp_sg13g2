@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.14.0"
+__version__ = "1.15.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -1514,9 +1514,24 @@ def create_model (excite_ports, settings):
     # separate_z_group_for_metals setting 
     z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
 
+    # conductor_model: one designer-level choice that presets the expert settings filled_metals and skin_layers
+    #   'surface'  (default) surface impedance on all conductor faces: fastest, Q of thick top metal coils 18-30 % high
+    #   'balanced' filled_metals = True: conductors as volumes, Q a few percent low at a 2 um mesh
+    #   'accurate' filled_metals = True + skin_layers = True: about half the error of 'balanced', at 1.4-2x its unknowns
+    # filled_metals / skin_layers given explicitly in the settings override the preset.
+    conductor_model = get_optional_setting(settings, 'conductor_model', 'surface')
+    conductor_presets = {'surface': (False, False), 'balanced': (True, False), 'accurate': (True, True)}
+    if conductor_model not in conductor_presets:
+        print(f"ERROR: settings['conductor_model'] must be 'surface', 'balanced' or 'accurate', not {conductor_model!r}")
+        exit(1)
+    preset_filled, preset_skin = conductor_presets[conductor_model]
+    overridden = [key for key in ('filled_metals', 'skin_layers') if key in settings]
+    if 'conductor_model' in settings and overridden:
+        print(f"Note: conductor_model = '{conductor_model}', overridden by settings {', '.join(overridden)}")
+
     # metal layers are modeled as surface for EM by default; True: all conductor layers as volumes;
     # 'auto': only conductor layers thinner than their refined_cellsize as volumes (see filled_layers below)
-    filled_metals_setting = get_optional_setting(settings, 'filled_metals', False)
+    filled_metals_setting = get_optional_setting(settings, 'filled_metals', preset_filled)
     filled_metals = filled_metals_setting is True
 
     # solver choice
@@ -1556,7 +1571,7 @@ def create_model (excite_ports, settings):
             filled_layers = {metal.name for metal in metals_list.metals if metal.is_metal}
 
     # thin conductor layers along all faces of filled conductors (skin effect), see add_conductor_skin_cores()
-    skin_layers = get_optional_setting(settings, 'skin_layers', False)
+    skin_layers = get_optional_setting(settings, 'skin_layers', preset_skin)
     if skin_layers and not filled_layers:
         print("Note: settings['skin_layers'] only applies to filled metals (filled_metals = True or 'auto'), ignored.")
         skin_layers = False

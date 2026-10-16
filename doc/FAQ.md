@@ -244,38 +244,66 @@ quick sanity check of port setup or layout, not for a number you'd report;
 see the [mesh convergence studies](../more_examples/mesh_convergence/README.md)
 for real order-1-vs-2 error data on five actual structures.
 
-### Surface impedance or filled metals? And what do `filled_metals = 'auto'` and `skin_layers` do?
+### Surface impedance or filled metals? Which conductor model should I use?
 
-By default every conductor is a hollow body with a surface impedance on its
-faces (like HFSS's "solve on surface" or Momentum's sheets), which is fast
-but has known limits: too low loss at low frequency for narrow traces and
-10-25 % too low at high frequency (edges and corners), and up to twice the
-loss for thin layers that carry current on one face only (Metal1-Metal5
-ground planes, MIM capacitor plates). `filled_metals` meshes conductors as
-volumes with bulk conductivity instead (like "solve inside"):
+One setting chooses how conductors are modeled:
 
 ```python
-settings['filled_metals'] = False    # default: surface impedance on all conductors
-settings['filled_metals'] = True     # all conductor layers as volumes
-settings['filled_metals'] = 'auto'   # only layers thinner than refined_cellsize as volumes
+settings['conductor_model'] = 'surface'    # default: surface impedance on all conductor faces
+settings['conductor_model'] = 'balanced'   # conductors meshed as volumes
+settings['conductor_model'] = 'accurate'   # volumes + thin layers along the faces for the skin effect
 ```
 
-`'auto'` fills the layers that are meshed only about one cell thick anyway, so
-it costs little: with `refined_cellsize` 2 in SG13G2, Metal1-Metal5, MIM and
-Activ are filled and TopMetal1/TopMetal2 stay surface impedance. The choice
-does not depend on the frequency range. Example: the series resistance of the
-MIM capacitor `palace_rfcmim.py` is 0.85 Ω at low frequency (10 MHz) with
-`'auto'`, 0.87 Ω with all metals filled and 1.88 Ω with surface impedance, at about the
-run time of the surface model.
+| | `'surface'` | `'balanced'` | `'accurate'` |
+|---|---|---|---|
+| Comparable to | HFSS impedance boundary ("solve on surface"), Sonnet/Momentum thin metal | HFSS "solve inside", Sonnet thick metal, Momentum thick conductor | HFSS "solve inside" with a skin-depth-based mesh operation |
+| Q of coils on TopMetal1/2 | 18–30 % too high | 4–8 % too low | 2–3 % too low |
+| Insertion loss (baluns) | 0.02–0.14 dB too low | 0.03–0.15 dB too high | up to 0.05 dB too high |
+| Unknowns at the same mesh | 1× | about 1.2× | 1.75–2.5× |
 
-Filled metals with a 2 µm mesh overestimate the loss of thick metals at high
-frequency (TopMetal2: +10 % at 20 GHz, up to +18 % above 50 GHz), because the
-current crowds into a skin depth of 0.2-0.5 µm. `skin_layers` adds thin
-layers along all faces of filled conductors, so that the mesh resolves the
-skin effect without a fine mesh along the surface:
+Errors are relative to `'accurate'` at a 1 µm mesh, from the
+[mesh convergence studies](../more_examples/mesh_convergence/README.md)
+(five SG13G2 structures, 2 µm mesh). `'surface'` is fine for inductance,
+coupling, match and balance, which hardly depend on the conductor model. For
+Q and loss, use `'balanced'` while designing and `'accurate'` for final
+numbers. The surface model has three known errors: too little loss in thick
+conductors (side walls at low frequency, edges and corners at high
+frequency), and up to twice the loss in thin layers that carry current on
+one face only (Metal1-Metal5 ground planes, MIM capacitor plates). On a
+given layout, these can add up or cancel, so its loss error is hard to
+predict.
+
+`'accurate'` sets its skin layers for the highest simulation frequency, so
+there is no need to tune anything when the sweep runs far beyond the band of
+interest (skin layers sized for 200 GHz on a 30 GHz transformer changed Q by
+1 %). Don't combine skin layers with a coarse mesh: where traces are about
+2 µm apart, `'accurate'` at 4-5 µm was worse than `'balanced'` at 2 µm.
+
+**Expert details.** `conductor_model` is a preset for two settings, which
+can also be given directly (they then override the preset):
 
 ```python
-settings['skin_layers'] = True                         # automatic depths, eligible layers
+settings['filled_metals'] = False    # 'surface'
+settings['filled_metals'] = True     # 'balanced' (all conductor layers as volumes)
+settings['filled_metals'] = 'auto'   # only layers thinner than refined_cellsize as volumes
+settings['skin_layers'] = True       # 'accurate' together with filled_metals = True
+```
+
+`filled_metals = 'auto'` fills only the layers that are meshed about one cell
+thick anyway (with `refined_cellsize` 2 in SG13G2: Metal1-Metal5, MIM and
+Activ), at about the cost of the surface model. It fixes the thin-layer error,
+e.g. the series resistance of the MIM capacitor `palace_rfcmim.py` at 10 MHz is
+0.85 Ω with `'auto'`, 0.87 Ω with all metals filled and 1.88 Ω with surface
+impedance. But it leaves coils on TopMetal1/TopMetal2 as surface impedance, so
+their Q is as high as with `'surface'`, and on a MIM-loaded balun it was the
+least accurate model (0.24 dB too optimistic). Use it only when you know where
+the current flows.
+
+`skin_layers` adds thin layers along all faces of filled conductors, so that
+the mesh resolves the skin effect without a fine mesh along the surface.
+Besides `True` (automatic depths), it takes fixed depths:
+
+```python
 settings['skin_layers'] = [0.1, 0.25]                  # fixed depths (drawing units), eligible layers
 settings['skin_layers'] = {'TopMetal2': True,          # per layer: automatic ...
                            'TopMetal1': [0.1, 0.25]}   # ... or fixed depths
@@ -291,7 +319,7 @@ a 0.15 µm layer at every face, plus a core. The rules, in this order:
    perfect conductor, e.g. SUBGND in older stackups), and layers thinner than
    4 skin depths at the highest frequency (they gain little, but their very
    thin skin layers cost much solver effort; in SG13G2 Metal1-Metal5 up to
-   about 1 THz).
+   about 1 THz, TopMetal1 below about 35 GHz, TopMetal2 below about 15 GHz).
 3. `True` uses 0.4 and 1 skin depth at the highest simulation frequency (the
    largest of `fstop`, `fpoint`, `fdump`), from each layer's conductivity, e.g.
    0.094 and 0.236 µm for TopMetal2 at 150 GHz.
@@ -299,11 +327,7 @@ a 0.15 µm layer at every face, plus a core. The rules, in this order:
    remains. The model script prints the depths used per layer, or why a
    layer got none.
 
-For a single-turn TopMetal2 inductor with peak Q at 77 GHz, filled metals with
-`refined_cellsize` 2 and `skin_layers = True` are within about 1 % of a
-converged filled model (`refined_cellsize` 0.125) up to 100 GHz, at a ninth
-of its run time. Validated so far on TopMetal2 inductors and lines up to
-150 GHz; see "Accuracy at high frequency" in the [user's
+See also "Accuracy at high frequency" in the [user's
 guide](userguide_md_format/gds2palace_workflow_userguide.md#accuracy-at-high-frequency).
 
 ### What does `z_thickness_factor` do?
@@ -311,8 +335,8 @@ guide](userguide_md_format/gds2palace_workflow_userguide.md#accuracy-at-high-fre
 It scales the thickness used for a conductor's side-wall surface impedance,
 an early workaround for the over-estimated low-frequency cross-section of
 the surface model. It is not recommended any more: it also changes the
-side-wall impedance well into the skin-effect regime. Use `filled_metals`
-(and `skin_layers`) instead, see the previous question.
+side-wall impedance well into the skin-effect regime. Use
+`conductor_model` instead, see the previous question.
 
 ### Why is my simulated DC/low-frequency resistance wrong for a narrow trace?
 
@@ -327,8 +351,8 @@ README](../more_examples/EM_temperature_coefficient/README.md) walks through
 hitting this with a 2 µm-wide test line and switching to the standard,
 much-wider `line_simple_viaport` structure instead. See also ["Limits of
 conductor loss calculation"](userguide_md_format/gds2palace_workflow_userguide.md#limits-of-conductor-loss-calculation).
-`settings['filled_metals'] = True` gives the correct DC/low-frequency
-resistance for any trace width.
+`settings['conductor_model'] = 'balanced'` (or `'accurate'`) gives the
+correct DC/low-frequency resistance for any trace width.
 
 ### What boundary condition types are available?
 
@@ -344,10 +368,10 @@ By default this FEM workflow models conductors as hollow shells with a
 surface impedance boundary condition, so there's no need to mesh into skin
 depth the way a solid-conductor FDTD tool (like openEMS) does. 2-5 µm is a
 good `refined_cellsize` starting point for most IHP SG13G2 models. With
-`filled_metals`, the second order elements still follow the skin effect
-reasonably with 2 µm cells (loss up to about 18 % too high above 50 GHz for
-TopMetal2), and `skin_layers` removes most of that error without a finer
-mesh.
+`conductor_model = 'balanced'` (conductors as volumes), the second order
+elements still follow the skin effect reasonably with 2 µm cells (loss up to
+about 18 % too high above 50 GHz for TopMetal2), and `'accurate'` removes most
+of that error without a finer mesh.
 
 ### Can I refine one layer more finely than the global mesh setting?
 
