@@ -75,7 +75,7 @@ AMR started from the 2 µm mesh and ran 3 iterations, refining wherever Palace's
 
 ## 4. Conductor model: surface impedance vs. filled metals
 
-Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the transformer with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True`, and with `filled_metals = 'auto'` (only layers thinner than the 2 µm mesh as volumes: here the Metal3 and Metal5 connections, while both coils stay surface impedance). The sweep goes to 200 GHz, so the automatic skin layers are only 0.08 and 0.21 µm deep in TopMetal1/TopMetal2. The reference is the filled model with skin layers at 1 µm. These runs used 8 MPI processes on a machine shared with a second run, so their times are only comparable with each other.
+Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the transformer with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True`, and with `filled_metals = 'auto'` (only layers thinner than the 2 µm mesh as volumes: here the Metal3 and Metal5 connections, while both coils stay surface impedance). The sweep goes to 200 GHz, so the automatic skin layers are only 0.08 and 0.21 µm deep in TopMetal1/TopMetal2. The reference is the filled model with skin layers at 1 µm. These runs, and a rerun of the surface model at 2 µm, used 8 MPI processes on a machine shared with a second run, so their times are only comparable with each other.
 
 ![Primary and secondary Q for surface impedance and filled metals](results/plots/story_conductor_models.png)
 
@@ -88,7 +88,7 @@ Steps 1–3 use the default surface impedance conductor model, so they show how 
 | filled, 2 µm (no skin layers) | 0.37 M | 29 min | +0.3% | +0.6% | −3.9% | −4.9% |
 | filled `'auto'`, 2 µm | 0.32 M | 22 min | 0.0% | +0.7% | +27% | +21% |
 | surface impedance, 1 µm | 0.58 M | | −0.8% | +0.2% | +30% | +23% |
-| surface impedance, 2 µm | 0.31 M | | −0.2% | +0.7% | +28% | +21% |
+| surface impedance, 2 µm | 0.31 M | 20 min | −0.2% | +0.7% | +28% | +21% |
 
 - **The surface model's Q is 21–30% too high**, much more than anything the mesh changes in steps 1–3. L and k agree within 1% for all models.
 - **`'auto'` does not help here.** Both coils are on the thick top metals, which stay surface impedance. Filling the thin Metal3/Metal5 connections changes almost nothing.

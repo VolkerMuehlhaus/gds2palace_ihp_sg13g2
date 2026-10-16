@@ -77,7 +77,7 @@ Refining the mesh closes about a third of the gap. The rest is plausibly real: t
 
 ## 4. Conductor model: surface impedance vs. filled metals
 
-Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the balun with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (0.25 and 0.62 µm deep in TopMetal2 for 22 GHz; TopMetal1 is too thin for skin layers at this frequency), and with `filled_metals = 'auto'` (only layers thinner than the 2 µm mesh as volumes: here Metal3–Metal5 and the MIM top plate, while the TopMetal1/TopMetal2 coils stay surface impedance). The reference is the filled model with skin layers at 1 µm. These runs used 8 MPI processes, on two different machines shared with a second run, so their times are only a rough guide.
+Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the balun with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (0.25 and 0.62 µm deep in TopMetal2 for 22 GHz; TopMetal1 is too thin for skin layers at this frequency), and with `filled_metals = 'auto'` (only layers thinner than the 2 µm mesh as volumes: here Metal3–Metal5 and the MIM top plate, while the TopMetal1/TopMetal2 coils stay surface impedance). The reference is the filled model with skin layers at 1 µm. These runs, and a rerun of the surface model at 2 µm, used 8 MPI processes, on two different machines shared with a second run, so their times are only a rough guide.
 
 ![Insertion loss and input match for surface impedance and filled metals](results/plots/story_conductor_models.png)
 
@@ -89,7 +89,7 @@ Steps 1–3 use the default surface impedance conductor model, so they show how 
 | filled, 2 µm (no skin layers) | 1.15 M | 79 min | 1.26–1.37 dB | +0.09 dB | −16.3 dB | 18.2 GHz |
 | filled `'auto'`, 2 µm | 1.01 M | 66 min | 0.97–1.08 dB | −0.24 dB | −16.6 dB | 18.2 GHz |
 | surface impedance, 1 µm | 1.95 M | | 1.18–1.27 dB | −0.02 dB | −17.0 dB | 18.4 GHz |
-| surface impedance, 2 µm | 0.95 M | | 1.18–1.31 dB | −0.02 dB | −15.9 dB | 18.1 GHz |
+| surface impedance, 2 µm | 0.95 M | 48 min | 1.18–1.31 dB | −0.02 dB | −15.9 dB | 18.1 GHz |
 
 - **The surface model gets the loss right here, but by cancellation.** It has two errors that pull in opposite directions. The thick TopMetal coils get too little loss, as in the other studies of this series. The thin layers, above all the MIM capacitor plates, get too much: the plate current flows mainly on the face toward the dielectric, but the surface model puts the full thickness behind each face, which can double the loss of such a plate (see "Palace's External option" in the user's guide). On this balun, the two errors happen to cancel within 0.02 dB.
 - **`'auto'` removes only one of the two errors and is 0.24 dB too optimistic.** It fixes the thin layers but leaves the coils as surface impedance. This is the worst result in the table.

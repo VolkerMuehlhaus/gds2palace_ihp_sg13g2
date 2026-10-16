@@ -75,7 +75,7 @@ FEM order 1 runs about 10× faster than order 2 on the same mesh. We re-ran all 
 
 ## 4. Conductor model: surface impedance vs. filled metals
 
-Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the balun with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (0.17 and 0.43 µm deep in TopMetal1/TopMetal2 for 50 GHz), and with `filled_metals = 'auto'` (only layers thinner than the 2 µm mesh as volumes: here the Metal1 port connections, while both coils stay surface impedance). The reference is the filled model with skin layers at 1 µm. These runs used 8 MPI processes on a machine shared with a second run, so their times are only comparable with each other.
+Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the balun with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (0.17 and 0.43 µm deep in TopMetal1/TopMetal2 for 50 GHz), and with `filled_metals = 'auto'` (only layers thinner than the 2 µm mesh as volumes: here the Metal1 port connections, while both coils stay surface impedance). The reference is the filled model with skin layers at 1 µm. These runs, and a rerun of the surface model at 2 µm, used 8 MPI processes on a machine shared with a second run, so their times are only comparable with each other.
 
 ![Primary Q and |Sdd21| for surface impedance and filled metals](results/plots/story_conductor_models.png)
 
@@ -87,7 +87,7 @@ Steps 1–3 use the default surface impedance conductor model, so they show how 
 | filled, 2 µm (no skin layers) | 1.02 M | 46 min | 0.0% | +0.3% | −5.4% | −6.7% | −1.41 dB |
 | filled `'auto'`, 2 µm | 0.91 M | 38 min | −0.6% | +1.4% | +23% | +19% | −1.22 dB |
 | surface impedance, 1 µm | 1.67 M | | −0.8% | +1.2% | +24% | +20% | −1.24 dB |
-| surface impedance, 2 µm | 0.84 M | | −0.7% | +1.4% | +22% | +18% | −1.22 dB |
+| surface impedance, 2 µm | 0.84 M | 17 min | −0.7% | +1.4% | +22% | +18% | −1.22 dB |
 
 - **The surface model's Q is about 20% too high**, and its |Sdd21| peak is 0.14 dB too optimistic. That is much more than the mesh changes in steps 1–3 (Q within 1.5% from 2 to 1 µm).
 - **`'auto'` does not help here.** Both coils are on the thick top metals, which stay surface impedance.

@@ -260,10 +260,12 @@ settings['conductor_model'] = 'accurate'   # volumes + thin layers along the fac
 | Q of coils on TopMetal1/2 | 18–30 % too high | 4–8 % too low | 2–3 % too low |
 | Insertion loss (baluns) | 0.02–0.14 dB too low | 0.03–0.15 dB too high | up to 0.05 dB too high |
 | Unknowns at the same mesh | 1× | about 1.2× | 1.75–2.5× |
+| Run time at the same mesh | 1× | 0.7–2.7×, median 1.4× | 1.5–4.7×, median 2× |
 
 Errors are relative to `'accurate'` at a 1 µm mesh, from the
 [mesh convergence studies](../more_examples/mesh_convergence/README.md)
-(five SG13G2 structures, 2 µm mesh). `'surface'` is fine for inductance,
+(five SG13G2 structures, 2 µm mesh; run times on machines shared with
+other runs, so they vary by structure and load). `'surface'` is fine for inductance,
 coupling, match and balance, which hardly depend on the conductor model. For
 Q and loss, use `'balanced'` while designing and `'accurate'` for final
 numbers. The surface model has three known errors: too little loss in thick
