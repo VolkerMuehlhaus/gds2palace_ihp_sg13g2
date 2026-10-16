@@ -73,12 +73,34 @@ FEM order 1 runs about 10× faster than order 2 on the same mesh. We re-ran all 
 - **Order 1 also makes the balun look better than it is.** Its |Sdd21| peak is −0.94 dB at 5 µm and −1.11 dB at 1 µm, compared with −1.24 dB for the reference.
 - **Order 2 at 5 µm is more accurate than order 1 at 1 µm**, in Q, in frequency and in Max|ΔS|, at 1.7× the time (4 vs. 2.4 minutes).
 
+## 4. Conductor model: surface impedance vs. filled metals
+
+Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the balun with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (0.17 and 0.43 µm deep in TopMetal1/TopMetal2 for 50 GHz), and with `filled_metals = 'auto'` (only layers thinner than the 2 µm mesh as volumes: here the Metal1 port connections, while both coils stay surface impedance). The reference is the filled model with skin layers at 1 µm. These runs used 8 MPI processes on a machine shared with a second run, so their times are only comparable with each other.
+
+![Primary Q and |Sdd21| for surface impedance and filled metals](results/plots/story_conductor_models.png)
+
+| Model | DOF | Time | L at 10 GHz | k at 10 GHz | Peak primary Q | Peak secondary Q | Peak \|Sdd21\| |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| filled + skin layers, 1 µm (reference) | 3.74 M | 165 min | 1.183 nH | 0.664 | 15.5 | 11.9 | −1.38 dB |
+| filled + skin layers, 2 µm | 1.68 M | 80 min | 0.0% | +0.3% | −1.8% | −1.9% | −1.36 dB |
+| filled + skin layers, 5 µm | 0.60 M | 27 min | +0.3% | +1.5% | −7.5% | −8.4% | −1.31 dB |
+| filled, 2 µm (no skin layers) | 1.02 M | 46 min | 0.0% | +0.3% | −5.4% | −6.7% | −1.41 dB |
+| filled `'auto'`, 2 µm | 0.91 M | 38 min | −0.6% | +1.4% | +23% | +19% | −1.22 dB |
+| surface impedance, 1 µm | 1.67 M | | −0.8% | +1.2% | +24% | +20% | −1.24 dB |
+| surface impedance, 2 µm | 0.84 M | | −0.7% | +1.4% | +22% | +18% | −1.22 dB |
+
+- **The surface model's Q is about 20% too high**, and its |Sdd21| peak is 0.14 dB too optimistic. That is much more than the mesh changes in steps 1–3 (Q within 1.5% from 2 to 1 µm).
+- **`'auto'` does not help here.** Both coils are on the thick top metals, which stay surface impedance.
+- **Filled metals at 2 µm are slightly pessimistic.** Without skin layers, Q is 5–7% low and |Sdd21| 0.03 dB low. Skin layers at the same mesh bring Q within 2%, at 1.6× the unknowns.
+- **A coarse mesh does not pay off with skin layers here.** At 5 µm, the cell is wider than the 2 µm coupling gap (see step 1), and Q is 8% low, worse than filled 2 µm without skin layers.
+
 ## Summary for this balun
 
 - **2 µm uniform mesh, order 2, is the working point.** Q is within 1.5%, |Sdd21| within 0.02 dB and 1 GHz of the finest result, in about 11 minutes.
 - **5 µm is too coarse for this geometry**, because the cell is wider than the 2 µm coupling gap. It's still usable for a first look at L and k.
 - **Don't use order 1 for this balun**, not even on a fine mesh. It shifts the response down in frequency and underestimates loss.
 - **AMR matched the S-parameters but not Q.** When Q matters, check it on a uniform mesh.
+- **For Q and loss, the conductor model matters more than the mesh.** The default surface impedance gives about 20% higher Q than filled metals. Filled metals at 2 µm are within 7% (2% with skin layers). `filled_metals = 'auto'` does not change Q here, because both coils are on the thick top metals.
 
 These numbers belong to this layout. Other gap widths, line widths or frequency ranges will change them.
 
@@ -90,11 +112,14 @@ mesh_convergence_balun2x1/
 ├── balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}.py    # uniform mesh, order 2
 ├── balun2x1_edgecoupled_do200_w8_s2_mesh{5,2,1}_order1.py  # uniform mesh, order 1
 ├── balun2x1_edgecoupled_do200_w8_s2_amr2.py           # AMR, 5 µm start, 2 iterations
+├── balun2x1_edgecoupled_do200_w8_s2_skin_mesh{5,2,1}.py    # filled metals + skin layers (step 4)
+├── balun2x1_edgecoupled_do200_w8_s2_{filled,auto}_mesh2.py # filled metals True / 'auto', no skin layers (step 4)
 ├── palace_model/balun2x1_edgecoupled_do200_w8_s2_<name>_data/  # mesh, config and full Palace output per run
 └── results/
     ├── story_plots.py            # the story_*.png plots and numbers in this report
     ├── analyze_convergence.py    # mixed-mode Sdd ΔS tables (CSV) and Sdd overlays
     ├── order_comparison.py       # order 1 vs. order 2 overlays and timing table
+    ├── story_conductor_models.py # step 4 plot and numbers
     ├── delta_S_table.csv, delta_S_vs_finest.csv, order_comparison_table.csv
     ├── snp/                      # de-embedded 4-port Touchstone files, one per run
     │                             #   (the AMR iteration files balun2x1_amr2_iter1..2 are raw)

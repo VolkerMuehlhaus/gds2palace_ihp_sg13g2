@@ -19,11 +19,11 @@ RUNS = [  # label, Touchstone file, DOF, iterations per solve, color, line style
     ("surface impedance, 1 µm", "balun_mesh1um.s3p", 665874, None, BLUE, "-"),
     ("filled, 2 µm", "balun_filled_mesh2.s3p", 408116, 32, S.ORANGE, "--"),
     ("filled 'auto', 2 µm", "balun_auto_mesh2.s3p", 360744, 32, BLUE, "--"),
-    ("filled + skin layers, 2 µm", "balun_skin_mesh2.s3p", 799550, 55, S.AQUA, "--"),
-    ("filled + skin layers, 1 µm", "balun_skin_mesh1.s3p", 1736666, 44, S.INK, "-"),
+    ("filled + skin layers, 2 µm", "balun_skin_mesh2.s3p", 741012, 37, S.AQUA, "--"),
+    ("filled + skin layers, 1 µm", "balun_skin_mesh1.s3p", 1663836, 29, S.INK, "-"),
 ]
-TABLE = RUNS + [("filled + skin layers, 3 µm", "balun_skin_mesh3.s3p", 539578, 63, None, None),
-                ("filled + skin layers, 5 µm", "balun_skin_mesh5.s3p", 389870, 82, None, None),
+TABLE = RUNS + [("filled + skin layers, 3 µm", "balun_skin_mesh3.s3p", 487374, 50, None, None),
+                ("filled + skin layers, 5 µm", "balun_skin_mesh5.s3p", 342894, 68, None, None),
                 ("surface impedance, 2 µm", "balun_mesh2um.s3p", 340226, None, None, None)]
 
 

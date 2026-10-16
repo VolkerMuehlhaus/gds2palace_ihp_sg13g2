@@ -94,30 +94,31 @@ For this balun:
 
 ## 4. Conductor model: surface impedance vs. filled metals
 
-Steps 1–3 use the default surface impedance conductor model. Here the same balun runs with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (thin layers along the conductor faces, depths for 200 GHz, the top of the sweep), and with `settings['filled_metals'] = 'auto'` (only the layers thinner than `refined_cellsize` filled: Metal3–Metal5 here; TopMetal1/TopMetal2 stay surface impedance). The reference is the filled model with skin layers at 1 µm.
+Steps 1–3 use the default surface impedance conductor model. Here the same balun runs with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (thin layers along the TopMetal1/TopMetal2 faces, 0.08 and 0.21 µm deep for 200 GHz, the top of the sweep; Metal3–Metal5 are too thin for skin layers), and with `settings['filled_metals'] = 'auto'` (only the layers thinner than `refined_cellsize` filled: Metal3–Metal5 here; TopMetal1/TopMetal2 stay surface impedance). The reference is the filled model with skin layers at 1 µm.
 
 ![Insertion loss and match for surface impedance and filled metals](results/plots/story_conductor_models.png)
 
 | Model | DOF | GMRES iterations per solve | Insertion loss in band | S11 null |
 |---|---:|---:|---:|---:|
-| filled + skin layers, 1 µm (reference) | 1.74 M | 44 | 1.05–1.20 dB | 144 GHz |
-| filled + skin layers, 2 µm | 0.80 M | 55 | 1.06–1.22 dB | 141 GHz |
-| filled + skin layers, 5 µm | 0.39 M | 82 | 1.14–1.35 dB | 130 GHz |
+| filled + skin layers, 1 µm (reference) | 1.66 M | 29 | 1.06–1.21 dB | 144 GHz |
+| filled + skin layers, 2 µm | 0.74 M | 37 | 1.06–1.23 dB | 141 GHz |
+| filled + skin layers, 3 µm | 0.49 M | 50 | 1.09–1.27 dB | 137 GHz |
+| filled + skin layers, 5 µm | 0.34 M | 68 | 1.15–1.35 dB | 131 GHz |
 | filled, 2 µm (no skin layers) | 0.41 M | 32 | 1.19–1.36 dB | 138 GHz |
 | filled 'auto', 2 µm | 0.36 M | 32 | 0.98–1.14 dB | 142 GHz |
 | surface impedance, 1 µm | 0.67 M | | 0.96–1.08 dB | 146 GHz |
 | surface impedance, 2 µm | 0.34 M | | 1.00–1.15 dB | 141 GHz |
 
 - **For this balun, the mesh matters more than the conductor model.** With every conductor model, the response moves up by 3–5 GHz per refinement step, as in step 1. The 2 µm coupling gap sets the mesh, and skin layers don't change that. Amplitude and phase balance agree within about 0.1 dB and 1° between the models at the same mesh.
-- **The conductor model shifts the loss by about 0.1–0.15 dB.** Filled metals without skin layers are about 0.15 dB too lossy at 2 µm, because the current near the conductor surface is under-resolved at these frequencies. With skin layers, the 2 µm mesh is within 0.02 dB of the reference. The surface impedance model is about 0.1 dB more optimistic than the reference, and `'auto'` about 0.06 dB.
-- **Cost:** skin layers double the unknowns at 2 µm and also need more solver iterations per frequency (55 instead of 32), more so on coarse meshes (82 at 5 µm), where the thin layers make flat cells. `'auto'` costs about the same as the surface model.
+- **The conductor model shifts the loss by about 0.1–0.15 dB.** Filled metals without skin layers are about 0.15 dB too lossy at 2 µm, because the current near the conductor surface is under-resolved at these frequencies. With skin layers, the 2 µm mesh is within 0.02 dB of the reference. The surface impedance model is about 0.1 dB more optimistic than the reference, and `'auto'` about 0.07 dB.
+- **Cost:** skin layers nearly double the unknowns at 2 µm (0.74 M instead of 0.41 M) and need a few more solver iterations per frequency (37 instead of 32), more so on coarse meshes (68 at 5 µm), where the thin layers make flat cells. `'auto'` costs about the same as the surface model.
 
 ## Summary for this balun
 
 - **2 µm uniform mesh, order 2, is a good working point for design iterations.** It gets amplitude and phase balance right and finishes in about 3 minutes. Its main error is a frequency shift of the response of about 5 GHz (S11 null at 141 GHz instead of 146 GHz), which makes insertion loss look up to about 0.07 dB worse in the target band.
 - **For final numbers, run 1 µm once** (about 7 minutes here). This moves the result into the range where three independent methods agree.
 - **Mesh size mostly shifts this balun's response in frequency rather than changing its balance.** That is plausibly because the 2 µm coupling gap is under-resolved at coarse settings, but this study doesn't prove the cause.
-- **The conductor model shifts the insertion loss by about 0.1 dB.** Filled metals with skin layers at 2 µm are the accurate choice for loss; `filled_metals = 'auto'` at 2 µm is within about 0.06 dB at the cost of the surface model.
+- **The conductor model shifts the insertion loss by about 0.1 dB.** Filled metals with skin layers at 2 µm are the accurate choice for loss; `filled_metals = 'auto'` at 2 µm is within about 0.07 dB at the cost of the surface model, but this does not carry over to coils on the top metals (see the transformer and balun studies in this folder).
 
 Again, these numbers belong to this layout. A structure with different feature sizes, frequency range or stackup needs its own check. Running one medium and one fine mesh and comparing them is the minimum.
 
