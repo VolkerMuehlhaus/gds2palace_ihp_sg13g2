@@ -259,10 +259,12 @@ The names follow HFSS: "Solve Inside" meshes the inside of a conductor.
 | | `'surface'` | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|
 | In HFSS | impedance boundary (Solve Inside off) | Solve Inside | Solve Inside with a skin-depth-based mesh operation |
-| Q of coils on TopMetal1/2 | 18–30 % too high | 4–8 % too low | 2–3 % too low |
+| Peak Q of coils on TopMetal1/2 | 18–30 % too high | 4–8 % too low | 2–3 % too low |
 | Insertion loss (baluns) | 0.02–0.14 dB too low | 0.03–0.15 dB too high | up to 0.05 dB too high |
 | Unknowns at the same mesh | 1× | about 1.2× | 1.75–2.5× |
 | Run time at the same mesh | 1× | 0.7–2.7×, median 1.4× | 1.5–4.7×, median 2× |
+
+The Q errors are for the peak Q of coils with 2–8 µm traces. Below the peak, the surface model is even more optimistic: 24–37 % at half the peak frequency. Coils with wider traces were not tested. Their error is probably smaller, because the side walls and edges carry a smaller part of the current.
 
 Errors are relative to `'solve_inside_skin'` at a 1 µm mesh, from the
 [mesh convergence studies](../more_examples/mesh_convergence/README.md)
@@ -282,7 +284,7 @@ What the errors mean for typical designs (2 µm mesh; reference
 
 | Design | Figure of merit | `'surface'` | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|---|
-| LC VCO tank, coil on TopMetal1/TopMetal2 | coil Q; phase noise ~ 1/Q² where the coil sets the tank Q | Q +18…+30 %: phase noise 1.4–2.3 dB too optimistic | Q -4…-8 %: phase noise 0.35–0.7 dB pessimistic | Q -2…-3 % |
+| LC VCO tank, coil on TopMetal1/TopMetal2 with 2–8 µm traces | coil Q at its peak; phase noise ~ 1/Q² where the coil sets the tank Q | Q +18…+30 %: phase noise 1.4–2.3 dB too optimistic | Q -4…-8 %: phase noise 0.35–0.7 dB pessimistic | Q -2…-3 % |
 | LNA input match, baluns, matching networks | insertion loss, adds 1:1 to the noise figure of an LNA | 0.02–0.14 dB too optimistic | 0.03–0.15 dB pessimistic | up to 0.05 dB pessimistic |
 | MIM capacitor in a tank or matching network | series resistance, capacitor Q | series R about 2x (`palace_rfcmim.py`, 10 MHz: 1.88 instead of 0.87 Ω), capacitor Q about half | right | right |
 | TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | loss per length | line resistance +21…+41 % | up to +11 % | -0.5…+6.4 % |

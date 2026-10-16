@@ -1517,7 +1517,7 @@ def create_model (excite_ports, settings):
               f"For accurate conductor loss, use settings['conductor_model'].")
 
     # conductor_model: one designer-level choice that presets the expert settings filled_metals and skin_layers
-    #   'surface'           (default) surface impedance on all conductor faces: fastest, Q of thick top metal coils 18-30 % high
+    #   'surface'           (default) surface impedance on all conductor faces: fastest, peak Q of top metal coils (2-8 um traces) 18-30 % high
     #   'solve_inside'      filled_metals = True: conductors as volumes, Q a few percent low at a 2 um mesh
     #   'solve_inside_skin' filled_metals = True + skin_layers = True: about half the error of 'solve_inside', at 1.4-2x its unknowns
     # filled_metals / skin_layers given explicitly in the settings override the preset.
