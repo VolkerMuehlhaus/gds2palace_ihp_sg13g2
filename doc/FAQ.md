@@ -280,14 +280,16 @@ given layout, these can add up or cancel, so its loss error is hard to
 predict.
 
 What the errors mean for typical designs (2 µm mesh; reference
-`'solve_inside_skin'` at 1 µm, for the line a 2D calculation):
+`'solve_inside_skin'` at 1 µm; for the line, R' against a 2D calculation and the
+attenuation against the most accurate run, with skin layers also in the Metal1
+ground plane):
 
 | Design | Figure of merit | `'surface'` | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|---|
 | LC VCO tank, coil on TopMetal1/TopMetal2 with 2–8 µm traces | coil Q at its peak; phase noise ~ 1/Q² where the coil sets the tank Q | Q +18…+30 %: phase noise 1.4–2.3 dB too optimistic | Q -4…-8 %: phase noise 0.35–0.7 dB pessimistic | Q -2…-3 % |
 | LNA input match, baluns, matching networks | insertion loss, adds 1:1 to the noise figure of an LNA | 0.02–0.14 dB too optimistic | 0.03–0.15 dB pessimistic | up to 0.05 dB pessimistic |
 | MIM capacitor in a tank or matching network | series resistance, capacitor Q | series R about 2x (`palace_rfcmim.py`, 10 MHz: 1.88 instead of 0.87 Ω), capacitor Q about half | right | right |
-| TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | loss per length | line resistance +21…+41 % | up to +11 % | -0.5…+6.4 % |
+| TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | attenuation (dB/mm), line resistance R' | up to 0.09 dB/mm too lossy (+9…+39 %); R' +21…+41 % | up to 0.03 dB/mm too lossy (+8 %); R' up to +11 % | within 0.01 dB/mm (+1 %); R' -0.5…+6.4 % |
 | any structure | inductance, coupling, SRF, match, amplitude and phase balance | all three models within about 1 % of each other | | |
 
 - **The surface model's loss error has no fixed sign.** It gives too little loss in thick conductors (coils on TopMetal1/TopMetal2) and too much in thin layers that carry current on one face (Metal1-Metal5 ground planes, MIM capacitor plates). On the MIM-loaded balun of the mesh convergence studies, both errors cancelled to 0.02 dB. So a surface model result is not even a bound for the loss.

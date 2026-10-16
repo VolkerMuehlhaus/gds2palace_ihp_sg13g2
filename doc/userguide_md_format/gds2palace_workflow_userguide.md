@@ -855,7 +855,7 @@ The surface model does not mesh the inside of a conductor. Instead, each face ge
 
 **Too little loss in thick conductors.** At the edges and corners of a trace, the current crowds into the corners. A surface impedance per face cannot describe this. So the loss of TopMetal1 and TopMetal2 traces is too low, not only at low frequency (see "Limits of conductor loss calculation"), but also at mm-wave frequencies. For TopMetal2 lines, the resistance is still about 10-20 % too low at 50-150 GHz. For coils with 2-8 µm traces on the top metals, the peak Q is about 20-30 % too high, and below the peak even more. Coils with wider traces were not tested. Their error is probably smaller, because the side walls and edges carry a smaller part of the current.
 
-**Too much loss in thin layers with current on one face.** A ground plane under a line carries its current only on the face toward the line. The same is true for the plates of a MIM capacitor. The surface model assumes that both faces of a conductor share the current. The face that carries all the current then gets twice the real sheet resistance. This matters for layers thinner than about two skin depths: in SG13G2, Metal1-Metal5 and the MIM plates up to 150 GHz. The loss of such a layer can double. For the line example `palace_line_viaport.py` below, the line loss is 20-40 % too high. The subsection "Palace's External option" explains the details.
+**Too much loss in thin layers with current on one face.** A ground plane under a line carries its current only on the face toward the line. The same is true for the plates of a MIM capacitor. The surface model assumes that both faces of a conductor share the current. The face that carries all the current then gets twice the real sheet resistance. This matters for layers thinner than about two skin depths: in SG13G2, Metal1-Metal5 and the MIM plates up to 150 GHz. The loss of such a layer can double. For the line example `palace_line_viaport.py` below, the line resistance is 20-40 % too high, and the 880 µm line shows up to 0.08 dB too much insertion loss. The subsection "Palace's External option" explains the details.
 
 The two errors have opposite signs. On a given structure, they can add up or cancel. So a surface model result does not tell you whether the loss is too high or too low.
 
@@ -876,6 +876,8 @@ For a single-turn TopMetal2 inductor up to 100 GHz, skin layers with a 2 µm mes
 ![Single-turn inductor: differential resistance of the conductor models, relative to the converged filled model](./images/skin_layers_inductor_R.png)
 
 The line example `palace_line_viaport.py` is a 15 µm wide TopMetal2 line over a Metal1 ground plane. Its line resistance, from two line lengths, is compared here with a 2D calculation. With skin layers, the model is within a few percent of the 2D result up to 100 GHz. The surface model is 20-40 % too high, because of the thin Metal1 ground plane.
+
+In S21, the 880 µm example line has an insertion loss of 0.1-0.5 dB between 1 and 100 GHz. Compared with the most accurate run, the surface model adds up to 0.08 dB to that, and `'solve_inside'` up to 0.03 dB. With skin layers, the difference is below 0.01 dB.
 
 ![palace_line_viaport.py: line resistance of the conductor models, relative to a 2D calculation](./images/skin_layers_viaport_line_R.png)
 
@@ -903,14 +905,14 @@ The table below sums up the three models. The errors are for a 2 µm mesh, compa
 
 The Q errors are for the peak Q of coils with 2-8 µm traces. Below the peak, the surface model is even more optimistic: 24-37 % at half the peak frequency. Coils with wider traces were not tested. Their error is probably smaller, because the side walls and edges carry a smaller part of the current.
 
-What the errors mean for typical designs, with the same mesh and reference (for the line, the 2D calculation):
+What the errors mean for typical designs, with the same mesh and reference. For the line, the line resistance R' is compared with the 2D calculation, and the attenuation in dB/mm with the most accurate run (skin layers also in the Metal1 ground plane).
 
 | Design | Figure of merit | `surface` | `solve_inside` | `solve_inside_skin` |
 |---|---|---|---|---|
 | LC VCO tank, coil on TopMetal1/TopMetal2 with 2-8 µm traces | coil Q at its peak; phase noise ~ 1/Q² where the coil sets the tank Q | Q +18…+30 %: phase noise 1.4-2.3 dB too optimistic | Q -4…-8 %: phase noise 0.35-0.7 dB pessimistic | Q -2…-3 % |
 | LNA input match, baluns, matching networks | insertion loss, adds 1:1 to the noise figure of an LNA | 0.02-0.14 dB too optimistic | 0.03-0.15 dB pessimistic | up to 0.05 dB pessimistic |
 | MIM capacitor in a tank or matching network | series resistance, capacitor Q | series R about 2x (`palace_rfcmim.py`, 10 MHz: 1.88 instead of 0.87 Ω), capacitor Q about half | right | right |
-| TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | loss per length | line resistance +21…+41 % | up to +11 % | -0.5…+6.4 % |
+| TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | attenuation (dB/mm), line resistance R' | up to 0.09 dB/mm too lossy (+9…+39 %); R' +21…+41 % | up to 0.03 dB/mm too lossy (+8 %); R' up to +11 % | within 0.01 dB/mm (+1 %); R' -0.5…+6.4 % |
 | any structure | inductance, coupling, SRF, match, amplitude and phase balance | all three models within about 1 % of each other | | |
 
 Some notes on these numbers:
