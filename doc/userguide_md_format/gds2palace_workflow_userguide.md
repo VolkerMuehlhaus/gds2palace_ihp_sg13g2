@@ -847,33 +847,49 @@ The volume models of `settings['conductor_model']` (`'solve_inside'`, `'solve_in
 
 ### Accuracy at high frequency
 
-Both conductor models have errors at high frequency, of different kinds:
+At high frequency, the current flows in a thin layer at the surface of a conductor. This is the skin effect. In TopMetal2, the skin depth is about 0.9 µm at 10 GHz and 0.3 µm at 100 GHz, much less than the 3 µm metal thickness. The three conductor models of `settings['conductor_model']` handle the skin effect in different ways, and each has its own error. This section explains these errors, so that you can choose the right model for your design.
 
-- **Surface impedance** (default): the conductor loss is too low, also well above the frequency range of the side wall effect in "Limits of conductor loss calculation". Each face gets an impedance that is exact for a wide sheet, but near the edges and corners of a conductor the current crowds into a region where the skin layers of two faces overlap, and a surface impedance per face cannot describe that. For TopMetal2 lines of 2-20 µm width, the resistance is still 7-22 % too low at 50-150 GHz.
-- **Surface impedance on thin conductors with current on one face** (default): the conductor loss is too high. Both faces of a conductor share its thickness (see "Palace's External option" below), which assumes that both carry the same current. Where the field reaches only one face, as in a Metal1-Metal5 ground plane under a line, that face carries all the current with twice the sheet resistance of the layer: up to twice the loss of that layer, for layers thinner than about 2 skin depths (in SG13G2: Metal1-Metal5 up to 150 GHz, TopMetal1 below about 9 GHz, TopMetal2 below about 4 GHz). In `palace_line_viaport.py` (TopMetal2 line, 15 µm wide, over a Metal1 ground plane) the line resistance is 21-41 % too high from 1 to 100 GHz.
-- **Filled metals** with `refined_cellsize` 2: the conductor loss is too high: with two cell layers of 1.5 µm through the 3 µm thick TopMetal2, the order 2 elements follow the current decay near the surface quite well, but leave some current too deep in the metal once the skin depth (0.3-0.5 µm above 20 GHz) is a fraction of the cell size; the resistance is then 10-20 % too high. What matters is the cell size normal to the conductor surface. A small `refined_cellsize` reduces the error (0.5 µm, i.e. cells of up to 2 skin depths at 100 GHz: +3 % for the inductor below and up to +7 % for `palace_line_viaport.py` up to 100 GHz), but also makes the mesh fine along the surface, which is expensive. Thin layers at the surface (`skin_layers`, about 0.4 and 1 skin depth at the highest frequency) do better at lower cost; thicker layers of 1 and 2.5 skin depths were tested and gave up to +5.5 % (inductor) and +12 % (line) at 100 GHz. `skin_layers` adds the thin layers only where they are needed.
+#### Surface impedance (`'surface'`, the default)
 
-Single-turn inductor, w = 4.5 µm, TopMetal2, peak Q at 77 GHz, compared with filled metals at `refined_cellsize` 0.125 µm (converged: 0.25 µm changes R by less than 1.4 %):
+The surface model does not mesh the inside of a conductor. Instead, each face gets a surface impedance that describes the skin effect. This impedance is exact for a wide, flat sheet. Real conductors are not wide sheets, and this causes two errors.
 
-| conductor model | refined_cellsize | R at 30 / 75 / 100 GHz | peak Q | run time (8 cores) |
-|---|---:|---|---:|---:|
-| filled_metals (reference) | 0.125 | 1 / 1 / 1 | 22.2 | 89 min |
-| filled_metals | 0.25 | +0.4 / +0.8 / +0.9 % | 22.0 | 34 min |
-| filled_metals | 2 | +5.7 / +8.1 / +9.4 % | 20.4 | 8 min |
-| filled_metals + skin_layers `[0.1, 0.25]` | 2 | -0.6 / -0.7 / +1.3 % | 22.4 | 10 min |
-| surface impedance (default) | 2 | -24 / -18 / -14 % | 27.1 | 6 min |
+**Too little loss in thick conductors.** At the edges and corners of a trace, the current crowds into the corners. A surface impedance per face cannot describe this. So the loss of TopMetal1 and TopMetal2 traces is too low, not only at low frequency (see "Limits of conductor loss calculation"), but also at mm-wave frequencies. For TopMetal2 lines, the resistance is still about 10-20 % too low at 50-150 GHz. Coils on the top metals get a Q that is about 20-30 % too high.
 
-`skin_layers = True` (depths from the skin depth at the highest frequency, here 0.094 and 0.236 µm at 150 GHz) gives the same result. On straight TopMetal2 lines of 4.5 and 20 µm width, compared with an independent 2D calculation, the skin layer models are within -2 to +6 % from 1 to 150 GHz, as close as filled metals at `refined_cellsize` 0.25.
+**Too much loss in thin layers with current on one face.** A ground plane under a line carries its current only on the face toward the line. The same is true for the plates of a MIM capacitor. The surface model assumes that both faces of a conductor share the current. The face that carries all the current then gets twice the real sheet resistance. This matters for layers thinner than about two skin depths: in SG13G2, Metal1-Metal5 and the MIM plates up to 150 GHz. The loss of such a layer can double. For the line example `palace_line_viaport.py` below, the line loss is 20-40 % too high. The subsection "Palace's External option" explains the details.
 
-`palace_line_viaport.py` (TopMetal2 line, 15 µm wide, over a Metal1 ground plane, via ports at both ends): the line resistance per length, from two line lengths (440 and 880 µm) and without the losses outside the conductors, is compared with a 2D calculation of the TopMetal2 line and the lossy Metal1 ground plane. Filled metals with `skin_layers = True` (skin layers in TopMetal2 only, Metal1 is too thin) are within -0.5 to +6.4 % from 1 to 100 GHz, as close as filled metals at `refined_cellsize` 0.5 (up to +6.6 %) at half of its run time (34 vs. 68 min on the same machine); filled metals at `refined_cellsize` 2 are up to 11 % too high. Skin layers in the Metal1 plane as well improve the result by about 1 % and make the simulation 2.6 times slower. The surface model is 21-41 % too high here, because of the Metal1 ground plane (second item of the list above).
+The two errors have opposite signs. On a given structure, they can add up or cancel. So a surface model result does not tell you whether the loss is too high or too low.
 
-![palace_line_viaport.py: line resistance of the conductor models, relative to a 2D calculation](./images/skin_layers_viaport_line_R.png)
+#### Conductors meshed as volumes (`'solve_inside'`)
+
+With `'solve_inside'`, gds2palace meshes the conductors as volumes with their bulk conductivity. The solver then computes the current inside the metal, including the current crowding at edges and corners. At low frequency, this model is exact.
+
+At high frequency, the mesh must resolve the skin effect. What matters is the cell size normal to the conductor surface. With a 2 µm mesh, the 3 µm thick TopMetal2 gets about two cells through its thickness. The second order elements follow the current decay into the metal quite well, but they leave some current too deep in the metal. The loss is then a few percent too high, up to about 10 % at 100 GHz. A finer mesh reduces this error. But it also refines the mesh along the whole conductor surface, which makes the model much larger.
+
+#### Volumes with skin layers (`'solve_inside_skin'`)
+
+`'solve_inside_skin'` adds thin layers along all faces of the conductors. The mesh cells in these layers are thin normal to the surface, where the current changes fast. Along the surface, they keep the normal cell size. This is the same idea as a skin depth based mesh operation in HFSS.
+
+The depths of the skin layers follow from the skin depth at the highest simulation frequency. You don't need to set them. Thin layers like Metal1-Metal5 get no skin layers: they would gain little, but their very thin skin layers would cost much solver time.
+
+For a single-turn TopMetal2 inductor up to 100 GHz, skin layers with a 2 µm mesh came within about 1 % of a fully converged model, in a ninth of its run time. Without skin layers, the 2 µm mesh gave a Q about 8 % too low. The surface model gave a Q about 22 % too high.
 
 ![Single-turn inductor: differential resistance of the conductor models, relative to the converged filled model](./images/skin_layers_inductor_R.png)
 
+The line example `palace_line_viaport.py` is a 15 µm wide TopMetal2 line over a Metal1 ground plane. Its line resistance, from two line lengths, is compared here with a 2D calculation. With skin layers, the model is within a few percent of the 2D result up to 100 GHz. The surface model is 20-40 % too high, because of the thin Metal1 ground plane.
+
+![palace_line_viaport.py: line resistance of the conductor models, relative to a 2D calculation](./images/skin_layers_viaport_line_R.png)
+
 #### Choosing the conductor model
 
-`settings['conductor_model']` selects one of three models, named as in HFSS:
+For most designs, the choice is simple:
+
+| purpose | `settings['conductor_model']` |
+|---|---|
+| resonance frequencies, inductance, coupling, match and balance | `'surface'`, the fastest |
+| Q and insertion loss during design | `'solve_inside'`, a few percent pessimistic at a 2 µm mesh |
+| Q and insertion loss, final numbers | `'solve_inside_skin'` |
+
+The table below sums up the three models. The errors are for a 2 µm mesh, compared with `'solve_inside_skin'` at 1 µm. They come from step 4 of the mesh convergence studies in `more_examples/mesh_convergence`, with five SG13G2 structures.
 
 | | `'surface'` (default) | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|
@@ -885,15 +901,7 @@ Single-turn inductor, w = 4.5 µm, TopMetal2, peak Q at 77 GHz, compared with fi
 | Unknowns at the same mesh | 1x | about 1.2x | 1.75-2.5x |
 | Run time at the same mesh | 1x | 0.7-2.7x, median 1.4x | 1.5-4.7x, median 2x |
 
-Errors at a 2 µm mesh, relative to `'solve_inside_skin'` at 1 µm, from step 4 of the mesh convergence studies in `more_examples/mesh_convergence` (five SG13G2 structures). Run times on machines shared with other runs, so they vary by structure and load.
-
-| purpose | `settings['conductor_model']` |
-|---|---|
-| resonance frequencies, inductance, coupling, match and balance | `'surface'`, the fastest |
-| Q and insertion loss during design | `'solve_inside'` (a few percent pessimistic at a 2 µm mesh) |
-| Q and insertion loss, final numbers | `'solve_inside_skin'` |
-
-What the errors mean for typical designs (2 µm mesh; reference `'solve_inside_skin'` at 1 µm, for the line a 2D calculation):
+What the errors mean for typical designs, with the same mesh and reference (for the line, the 2D calculation):
 
 | Design | Figure of merit | `surface` | `solve_inside` | `solve_inside_skin` |
 |---|---|---|---|---|
@@ -903,26 +911,24 @@ What the errors mean for typical designs (2 µm mesh; reference `'solve_inside_s
 | TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | loss per length | line resistance +21…+41 % | up to +11 % | -0.5…+6.4 % |
 | any structure | inductance, coupling, SRF, match, amplitude and phase balance | all three models within about 1 % of each other | | |
 
-- **The surface model's loss error has no fixed sign.** It gives too little loss in thick conductors (coils on TopMetal1/TopMetal2) and too much in thin layers that carry current on one face (Metal1-Metal5 ground planes, MIM capacitor plates). On the MIM-loaded balun of the mesh convergence studies, both errors cancelled to 0.02 dB. So a surface model result is not even a bound for the loss.
-- **Loss errors in dB hide the relative error.** 0.05 dB on a balun with 1.2 dB insertion loss is 4 % of its loss, 0.1 dB on 1.1 dB is 9 %. At a PA output, 0.1 dB is 2.3 % of the output power.
-- **The reference is converged FEM, not measurement.** Against measurement, the stackup matters as much as the conductor model: in the L6n2 inductor study (`more_examples/measured_vs_simulated/more_accurate_models_L6n2_v3`), filled metals at 2 µm with the planar stackup gave peak Q -8.4 % and SRF -9.0 %, with conformal passivation over TopMetal2 Q -4.6 % and SRF -1.6 %, and at 1 µm Q -3.3 % and SRF -1.0 %.
+Some notes on these numbers:
 
-Two more results from the mesh convergence studies:
-
-- Skin layers are sized for the highest simulation frequency, and that costs little accuracy when the sweep goes far beyond the band of interest: skin layers sized for 200 GHz changed the Q of a 30 GHz transformer by 1 %.
-- The cell size must not exceed the smallest gap or trace width, for every conductor model. With traces 2 µm apart, `'solve_inside_skin'` at a 4-5 µm mesh was worse than `'solve_inside'` at 2 µm. Where gaps and traces are wider (5 µm in the spiral inductor), `'solve_inside_skin'` at a 5 µm mesh was within 4 % in Q.
+- **Loss errors in dB hide the relative error.** 0.05 dB on a balun with 1.2 dB insertion loss is 4 % of its loss. At a PA output, 0.1 dB is 2.3 % of the output power.
+- **The reference is a converged simulation, not a measurement.** Compared with a measurement, the stackup matters as much as the conductor model. In the L6n2 inductor study (`more_examples/measured_vs_simulated/more_accurate_models_L6n2_v3`), a volume model with the planar stackup had a Q 8 % below the measured one. With the conformal passivation over TopMetal2, it came within 3-5 % in Q and within 2 % in SRF.
+- **Sweeping far beyond your band is fine.** The skin layers are sized for the highest frequency. On a 30 GHz transformer, skin layers sized for 200 GHz changed Q by only 1 %.
+- **Skin layers don't replace a fine enough mesh.** The cell size must not exceed the smallest gap or trace width, for every conductor model. With traces 2 µm apart, `'solve_inside_skin'` at a 4-5 µm mesh was worse than `'solve_inside'` at 2 µm.
 
 #### Palace's External option
 
-Palace's `Conductivity` boundary uses the surface impedance Zs = (γ/σ)·coth(γh/2) for a conductor of thickness h, which tends to 2/(σh) at DC: twice the sheet resistance. This is meant for a conductor that has two faces in the mesh, which share its thickness: a thin sheet drawn as a surface inside the model is split by Palace into two faces ("Added ... duplicate boundary elements for interior boundaries" in the Palace output), each gets this Zs, and in parallel they give the sheet resistance 1/(σh). The option `"External": true` (Palace: "Whether this boundary is on the exterior of the computational domain") doubles h, so that Zs tends to 1/(σh): it is meant for a conductor that has only one face in the mesh, on the outer boundary of the model, e.g. a metal enclosure wall or a ground plane that forms the bottom of the model.
+This subsection explains why the surface model doubles the loss of thin layers with current on one face.
 
-gds2palace models each conductor as a hollow body with all its faces in the mesh, the same situation as Palace's split sheet, and does not set `External`. This is exact at low frequency when the top and bottom faces carry the same current, and makes no difference for conductors much thicker than the skin depth. Real current distributions lie in between, and a boundary condition per face cannot be exact: the current on one face depends on the field at the other face through the metal. Ratio of the real part of Zs with and without `External`:
+Palace's `Conductivity` boundary uses the surface impedance Zs = (γ/σ)·coth(γh/2) for a conductor of thickness h. At DC, this is 2/(σh), twice the sheet resistance of the layer. This is meant for a conductor with two faces in the mesh. A thin sheet inside the model is an example: Palace splits it into two faces, each face gets this Zs, and the two faces in parallel give the right sheet resistance 1/(σh).
 
-| thickness / skin depth | ≤ 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 4 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Re Zs with External / without | 0.50 | 0.54 | 0.67 | 0.87 | 1.03 | 1.09 | 1.05 |
+The option `"External": true` doubles h. Then Zs tends to 1/(σh), the full sheet resistance on one face. This is meant for a conductor with only one face in the mesh, such as a metal wall that forms the outer boundary of the model.
 
-Setting `External` by hand on the faces of a wide ground plane removes the error above in `palace_line_viaport.py`, but it would halve the low frequency loss of conductors that carry current on both faces, e.g. Metal1 lines, and gds2palace groups the top and bottom faces of a conductor together. For thin layers that carry current mainly on one face, `filled_metals` is the better choice: a layer thinner than 2 skin depths is only one or two cells thick, so filling it costs little, and the current distribution in it is then right. `filled_metals = 'auto'` does this for all layers thinner than `refined_cellsize` and keeps the thicker layers as surface impedance.
+gds2palace models each conductor as a hollow body with all its faces in the mesh, and does not set `External`. This is exact when both faces carry the same current, for example a Metal1 line at low frequency. It makes no difference for conductors much thicker than the skin depth: with or without `External`, Zs is then nearly the same. For a ground plane with current on one face, it doubles the loss.
+
+Setting `External` by hand on a ground plane would fix that case. But it would halve the loss of conductors that carry current on both faces, and gds2palace puts all faces of a conductor in one group. So no setting of the surface model is right for all conductors. Meshing the thin layers as volumes is the better fix: a thin layer is only one or two cells thick, so this costs little, and the current in it is then right. The volume models `'solve_inside'` and `'solve_inside_skin'` do this. The expert setting `filled_metals = 'auto'` does it only for the layers thinner than `refined_cellsize`, and keeps the thicker layers as surface impedance.
 
 ## Dielectric loss modelling 
 
