@@ -258,7 +258,7 @@ The names follow HFSS: "Solve Inside" meshes the inside of a conductor.
 
 | | `'surface'` | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|
-| Comparable to | HFSS impedance boundary (Solve Inside off), Sonnet/Momentum thin metal | HFSS Solve Inside, Sonnet thick metal, Momentum thick conductor | HFSS Solve Inside with a skin-depth-based mesh operation |
+| In HFSS | impedance boundary (Solve Inside off) | Solve Inside | Solve Inside with a skin-depth-based mesh operation |
 | Q of coils on TopMetal1/2 | 18–30 % too high | 4–8 % too low | 2–3 % too low |
 | Insertion loss (baluns) | 0.02–0.14 dB too low | 0.03–0.15 dB too high | up to 0.05 dB too high |
 | Unknowns at the same mesh | 1× | about 1.2× | 1.75–2.5× |

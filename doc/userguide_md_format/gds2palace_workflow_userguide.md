@@ -894,7 +894,7 @@ The table below sums up the three models. The errors are for a 2 µm mesh, compa
 | | `'surface'` (default) | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|
 | Model | surface impedance on all conductor faces | conductors meshed as volumes | volumes with thin layers along the faces for the skin effect |
-| Comparable to | HFSS impedance boundary (Solve Inside off), Sonnet/Momentum thin metal | HFSS Solve Inside, Sonnet thick metal, Momentum thick conductor | HFSS Solve Inside with a skin depth based mesh operation |
+| In HFSS | impedance boundary (Solve Inside off) | Solve Inside | Solve Inside with a skin depth based mesh operation |
 | Expert settings | `filled_metals = False` | `filled_metals = True` | `filled_metals = True`, `skin_layers = True` |
 | Q of coils on TopMetal1/2 | 18-30 % too high | 4-8 % too low | 2-3 % too low |
 | Insertion loss (baluns) | 0.02-0.14 dB too low | 0.03-0.15 dB too high | up to 0.05 dB too high |
