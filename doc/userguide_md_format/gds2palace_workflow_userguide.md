@@ -64,7 +64,7 @@ This chapter gives a brief overview of major features added since the previous e
 
 - **settings['conductor_model']** chooses the conductor model in one setting, with names as in HFSS: `'surface'` (default, surface impedance), `'solve_inside'` (conductors meshed as volumes) or `'solve_inside_skin'` (volumes with thin layers along their faces for the skin effect). With the surface model, the Q of coils on TopMetal1/TopMetal2 is 18-30 % too high; for Q and loss, use `'solve_inside'` while designing and `'solve_inside_skin'` for final numbers. See "Choosing the conductor model" in chapter "Conductor loss modelling".
 - Expert settings behind `conductor_model`: **settings['filled_metals']** (conductors as volumes: `True` for all conductor layers, `'auto'` for the layers thinner than `refined_cellsize` only) and **settings['skin_layers']** (automatic depths, a list of depths, or per layer). See "Conductor modelling" in chapter "settings".
-- **settings['z_thickness_factor'] was removed.** The reduced side wall thickness also changed the side wall impedance well into the skin effect regime, and was not closer to measurement than the full thickness. Scripts that still set it get a warning, and the full thickness is used.
+- **settings['z_thickness_factor'] was removed.** Scripts that still set it get a warning, and the full metal thickness is used on all conductor faces. Use `conductor_model` for accurate conductor loss.
 - **Elmer FEM as an additional solver.** gds2palace can now generate simulation input not only for AWS Palace, but also for [Elmer FEM](https://www.elmerfem.org/), an open-source multiphysics solver. This adds two new workflows, both built from the same GDSII layout + XML stackup + Python model script approach already used for Palace:
   - **Elmer EM simulation** — S-parameter simulation, see chapter "Using gds2palace with Elmer FEM for EM simulation".
   - **Elmer thermal simulation** — steady-state heat conduction (temperature) simulation from user-defined heat sources and constant-temperature boundaries, see chapter "Using gds2palace with Elmer FEM for thermal simulation".
@@ -843,39 +843,7 @@ The Palace calculation [^palace-zs] of Zs is exact when applied to top and botto
 
 [^palace-zs]: <https://github.com/awslabs/palace/blob/main/palace/models/surfaceconductivityoperator.cpp> 
 
-The volume models of `settings['conductor_model']` (`'solve_inside'`, `'solve_inside_skin'`) do not have this error, see "Choosing the conductor model" below. An earlier workaround, `settings['z_thickness_factor']`, reduced the thickness used on the side walls. It was removed in gds2palace 0.9.0: Palace's thickness correction then changed the side wall impedance well into the skin effect regime, not only at low frequency, and the full thickness was closer to openEMS and measured data (see below).
-
-### Transmission line compared with openEMS and measurement
-
-The 15 µm wide TopMetal2 line over Metal1 ground (`palace_line_viaport.py`) can be compared with an openEMS simulation and with measurement. The Palace results in this section use the default surface impedance model, which overestimates the loss of the Metal1 ground plane, see "Accuracy at high frequency" below. 
-
-Palace simulations for this line were done without the substrate below, the stackup didn’t include the silicon substrate because we expect the Metal1 ground plane to shield the substrate from the fields in the transmission line. It was verified that the difference with/without substrate below is negligible for these line models.  
-
-For openEMS (red curve), the simulation was also done without substrate below, using metal (PEC) side walls. Mesh refinement was set to 0.5µm because openEMS needs to mesh into skin effect. The measurement (light blue) was obtained by de-embedding the line from the overall measurement data with GSG pads, so the overall ripple might be partially due to this more complex setup.  
-
-
-![880 µm line: S11 from Palace, openEMS and measurement](./images/gds2palace_workflow_userguide.pdf-0036-05.png)
-
-
-
-![880 µm line: S21 from Palace, openEMS and measurement](./images/gds2palace_workflow_userguide.pdf-0036-06.png)
-
-
-In S21, Palace with the full metal thickness on the side walls (blue) is closer to openEMS and measurement than with the side wall thickness reduced to 1 µm (pink, the removed `z_thickness_factor` = 0.33).  
-We can also compare data for a longer line of 2580µm, width 15µm TopMetal2 over Metal1.  
-
-
-![2580 µm line: S11 from Palace and measurement](./images/gds2palace_workflow_userguide.pdf-0037-01.png)
-
-
-
-![2580 µm line: S21 from Palace and measurement](./images/gds2palace_workflow_userguide.pdf-0037-02.png)
-
-
-Palace with the full side wall thickness is closer to measured data up to 40 GHz; above, the side wall thickness has very little effect.  
-It can also be seen that measured insertion increases more with frequency than simulated. One possible explanation from an earlier paper was dielectric loss in the SiO2. This dielectric was modelled here as lossless dielectric, loss tangent = 0.  
-If you prefer to use another value for loss tangent, that is fully supported by the gds2palace workflow, and can be specified easily in the XML stackup file.
-
+The volume models of `settings['conductor_model']` (`'solve_inside'`, `'solve_inside_skin'`) do not have this error, see "Choosing the conductor model" below.
 
 ### Accuracy at high frequency
 
@@ -958,9 +926,9 @@ Setting `External` by hand on the faces of a wide ground plane removes the error
 
 ## Dielectric loss modelling 
 
-The transmission line examples in the metal loss chapter showed a difference between simulated and measured insertion loss which increases toward higher frequencies.  
+The 15 µm wide TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) was measured with lengths of 880 µm and 2580 µm. The line was de-embedded from the measurement with GSG pads, so part of the ripple in the measured data can come from this de-embedding. The Palace models leave out the silicon substrate, which is shielded by the Metal1 ground plane (with and without substrate, the difference was negligible), and use the surface impedance model, which overestimates the loss of the Metal1 ground plane (see "Accuracy at high frequency" in chapter "Conductor loss modelling"). An openEMS simulation of the 880 µm line with a 0.5 µm mesh gave about the same insertion loss as Palace.  
 
-As already mentioned in that metal loss chapter, this could indicate higher **dielectric loss** than modelled. In the supplied XML stackup files, SiO2 is modelled as a lossless dielectric. To verify if dielectric loss could be the reason for poor agreement in that frequency range, we repeat the simulation of the 2580 µm line with non-zero loss tangent for the SiO2 layer.  
+Up to about 40 GHz, simulated and measured insertion loss agree; above, the measured loss increases faster with frequency than the simulated one. This could indicate higher **dielectric loss** than modelled. In the supplied XML stackup files, SiO2 is modelled as a lossless dielectric. To verify if dielectric loss could be the reason for poor agreement in that frequency range, we repeat the simulation of the 2580 µm line with non-zero loss tangent for the SiO2 layer.  
 
 Loss tangent value used in this simulation is **0.01** , which is a rough estimate based on a paper published by IHP authors for SG25H technologies back in 2007:  
 _Korndörfer F, F Sischka Optimization of the Substrate Parameters for EM-simulators MOSAK/ESSDERC/ESSCIRC Workshop (Munich) 14 Sep., 2007_  
