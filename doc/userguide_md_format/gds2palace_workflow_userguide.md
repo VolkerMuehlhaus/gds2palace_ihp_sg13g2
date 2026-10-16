@@ -62,10 +62,9 @@ Document version: 2026-10-16
 
 This chapter gives a brief overview of major features added since the previous edition of this guide. For the complete, dated change log, see [`CHANGES.md`](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/doc/CHANGES.md) in the repository.
 
-- **settings['conductor_model']** chooses the conductor model in one setting: `'surface'` (default), `'balanced'` (conductors as volumes) or `'accurate'` (volumes with skin layers). It presets the expert settings `filled_metals` and `skin_layers` below. See "Conductor modelling" in chapter "settings".
-- **settings['filled_metals']** is a new option for Palace, used for volume meshing of conductors instead of placing a surface impedance onto the side walls. This gives more accurate conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section.
-- **settings['filled_metals'] = 'auto'** fills only the conductor layers thinner than `refined_cellsize` (in SG13G2: Metal1-Metal5, MIM) and keeps TopMetal1 and TopMetal2 as surface impedance. This removes an error of the surface model for thin layers with current on one face, e.g. ground planes and MIM capacitor plates, at little extra cost.
-- **settings['skin_layers']** adds thin layers along all faces of filled conductors, so that the mesh resolves the skin effect without a fine mesh along the surface. For an inductor with peak Q at 77 GHz, `refined_cellsize` 2 µm with skin layers is as accurate as filled metals with `refined_cellsize` 0.125 µm (within 1.3 % from 10 to 100 GHz), at about a ninth of the run time. See "Accuracy at high frequency" in chapter "Conductor loss modelling".
+- **settings['conductor_model']** chooses the conductor model in one setting, with names as in HFSS: `'surface'` (default, surface impedance), `'solve_inside'` (conductors meshed as volumes) or `'solve_inside_skin'` (volumes with thin layers along their faces for the skin effect). With the surface model, the Q of coils on TopMetal1/TopMetal2 is 18-30 % too high; for Q and loss, use `'solve_inside'` while designing and `'solve_inside_skin'` for final numbers. See "Choosing the conductor model" in chapter "Conductor loss modelling".
+- Expert settings behind `conductor_model`: **settings['filled_metals']** (conductors as volumes: `True` for all conductor layers, `'auto'` for the layers thinner than `refined_cellsize` only) and **settings['skin_layers']** (automatic depths, a list of depths, or per layer). See "Conductor modelling" in chapter "settings".
+- **settings['z_thickness_factor'] was removed.** The reduced side wall thickness also changed the side wall impedance well into the skin effect regime, and was not closer to measurement than the full thickness. Scripts that still set it get a warning, and the full thickness is used.
 - **Elmer FEM as an additional solver.** gds2palace can now generate simulation input not only for AWS Palace, but also for [Elmer FEM](https://www.elmerfem.org/), an open-source multiphysics solver. This adds two new workflows, both built from the same GDSII layout + XML stackup + Python model script approach already used for Palace:
   - **Elmer EM simulation** — S-parameter simulation, see chapter "Using gds2palace with Elmer FEM for EM simulation".
   - **Elmer thermal simulation** — steady-state heat conduction (temperature) simulation from user-defined heat sources and constant-temperature boundaries, see chapter "Using gds2palace with Elmer FEM for thermal simulation".
@@ -285,7 +284,7 @@ To see the structure of the 3D model, you can go to Tools > Visibility.
 
 In the screenshot, you can see that dielectric boxes (SiO2, Passive, AIR etc) have been added around the GDSII polygons, with an offset value in xy direction from the “margins” parameter in the model file. Around that, we have another layer of air on all six sides, using the same margins value.  
 
-Metals have been created as surfaces. All polygons on each layer are merged, if possible, and then each of the resulting polygons is created as a separate surface. To be more precise, we have two surfaces for each polygon: the horizontal (xy) surfaces and the vertical (z) surfaces are assigned to different groups, for reasons explained later in this document. 
+Metals have been created as surfaces. All polygons on each layer are merged, if possible, and then each of the resulting polygons is created as a separate surface. To be more precise, all faces of each resulting polygon body (top, bottom and side walls) form one surface group, named after the layer and a number, e.g. TopMetal2_1. 
 
 You can also see two ports P1 and P2 created as surfaces. The outer simulation boundary is this example is a surface “Absorbing boundary” that is defined as absorbing boundary in the Palace config file.  
 
@@ -484,13 +483,12 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 
 #### Conductor modelling
 
-**settings['conductor_model']:** The conductor model in one choice, for designers: `'surface'` (default) puts a surface impedance on all conductor faces, the fastest model; `'balanced'` meshes the conductors as volumes (= `filled_metals = True`); `'accurate'` adds thin layers along their faces for the skin effect (= `filled_metals = True` and `skin_layers = True`). In the mesh convergence studies (five SG13G2 structures, 2 µm mesh, compared with `'accurate'` at 1 µm), the Q of coils on TopMetal1/TopMetal2 was 18-30 % too high with `'surface'`, 4-8 % too low with `'balanced'` and 2-3 % too low with `'accurate'`; the insertion loss of the baluns was 0.02-0.14 dB too low, 0.03-0.15 dB too high and up to 0.05 dB too high. `'balanced'` has about 1.2 times and `'accurate'` 1.75-2.5 times the unknowns of `'surface'` at the same mesh; their run times were 0.7-2.7 times (median 1.4) and 1.5-4.7 times (median 2) that of `'surface'`. Inductance, coupling, match and balance hardly depend on the conductor model. See "Accuracy at high frequency" in chapter "Conductor loss modelling". `filled_metals` and `skin_layers` below are the expert settings behind it; when given, they override the preset. Default is 'surface'  
+**settings['conductor_model']:** The conductor model in one choice, named as in HFSS: `'surface'` (default) puts a surface impedance on all conductor faces, the fastest model; `'solve_inside'` meshes the conductors as volumes (= `filled_metals = True`); `'solve_inside_skin'` adds thin layers along their faces for the skin effect (= `filled_metals = True` and `skin_layers = True`). For Q and loss, use `'solve_inside'` while designing and `'solve_inside_skin'` for final numbers; `'surface'` is fine for inductance, coupling, match and balance. Errors, run times and what they mean for typical designs: see "Choosing the conductor model" in chapter "Conductor loss modelling". `filled_metals` and `skin_layers` below are the expert settings behind it; when given, they override the preset. Default is 'surface'  
 
-**settings['filled_metals']:** Model conductors as solid volumes with bulk conductivity (volume mesh) instead of the default surface impedance on the conductor surfaces. This gives more accurate conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section. Not recommended as a default: it needs more RAM and simulation time, and becomes inaccurate at higher frequencies unless the mesh resolves the skin depth. Tested with Palace, Elmer thermal models always use solid conductor volumes. Default is False  
+**settings['filled_metals']:** Expert setting, set by `conductor_model`. Model conductors as solid volumes with bulk conductivity (volume mesh) instead of a surface impedance on the conductor surfaces. This gives the right conductor loss at low frequency, where the skin depth is no longer small compared to the conductor cross section. At high frequency, where the skin depth is a fraction of the cell size, the loss is a few percent too high at a 2 µm mesh (see `skin_layers`). Needs more RAM and simulation time than the surface model. Tested with Palace, Elmer thermal models always use solid conductor volumes. Default is False  
 
 `settings['filled_metals'] = 'auto'` meshes only the conductor layers thinner than `refined_cellsize` as volumes and keeps the others as surface impedance. A thin layer is meshed only about one cell thick anyway, so a volume costs little, and the surface model overestimates the loss of thin layers that carry current on one face only, up to twice (see "Palace's External option"). With `refined_cellsize` 2 in SG13G2, Metal1-Metal5, MIM and Activ are filled, TopMetal1 and TopMetal2 stay surface impedance. The choice does not depend on the frequency range, so an over-specified highest frequency does not change it. MIM capacitor `palace_rfcmim.py`: series resistance at low frequency (10 MHz) 0.85 Ω with 'auto', 0.87 Ω with all metals filled, 1.88 Ω with surface impedance, at about the run time of the surface model. `palace_line_viaport.py` (TopMetal2 line over a Metal1 ground plane): line resistance 3-11 % too low with 'auto' (the surface model error of TopMetal2), instead of 16-41 % too high with surface impedance. Use 'auto' with care: coils on TopMetal1/TopMetal2 keep the Q error of the surface model, and on a MIM-loaded balun of the mesh convergence studies, where the two errors of the surface model (thick metals too little loss, MIM plates too much) cancelled, 'auto' removed only one of them and was 0.24 dB too optimistic.  
-**settings['fill_factor_correction']:** Only has an effect with merge_polygon_size > 0. Via array merging fills the gaps between vias with via material, so each merged via polygon is scaled down to its real via conductivity: its conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials, starting a new group when the fill factor is more than 20% below the group's highest value, and each group uses its mean fill factor. Vias with the reserved PEC material are grouped but not scaled. Applies to Palace and Elmer EM (electrical conductivity) and to Elmer thermal (heat conductivity, including temperature table values). Default is False  
-**settings['skin_layers']:** Only with `filled_metals`. Splits each conductor into thin layers along all its faces (top, bottom and side walls) plus a core, so that the mesh has thin cells next to the conductor surface, where the skin effect puts the current, while the cell size along the surface stays at `refined_cellsize`. Without it, filled metals need a small `refined_cellsize` everywhere to be accurate at high frequency. Values:
+**settings['skin_layers']:** Expert setting, set by `conductor_model = 'solve_inside_skin'`. Only with `filled_metals`. Splits each conductor into thin layers along all its faces (top, bottom and side walls) plus a core, so that the mesh has thin cells next to the conductor surface, where the skin effect puts the current, while the cell size along the surface stays at `refined_cellsize`. Without it, filled metals need a small `refined_cellsize` everywhere to be accurate at high frequency. Values:
 
 - `True`: all conductor layers that are at least 4 skin depths thick at the highest simulation frequency (in SG13G2: TopMetal2 from about 15 GHz, TopMetal1 from about 35 GHz, Metal1-Metal5 not below about 1 THz), depths of about 0.4 and 1 skin depth, from the layer's conductivity
 - a list of depths in drawing units, e.g. `[0.1, 0.25]`: these depths for the same layers as `True`
@@ -498,9 +496,7 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 
 A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. PEC layers and vias are not split. With `True` or a list, layers thinner than 4 skin depths are not split either: they gain little, while their very thin skin layers cost much solver effort. For the 0.42 µm Metal1 ground plane of `palace_line_viaport.py`, skin layers changed the line resistance by about 1 % and made the simulation 2.6 times slower; in the D-band balun of the mesh convergence studies, skin layers in Metal3-Metal5 left the result unchanged and made it 1.7 times slower. Neither are layers with a conductivity above 1e8 S/m: no real metal conducts better than silver (6.3e7 S/m), so such a material stands in for a perfect conductor, e.g. `LOWLOSS` (1e10 S/m) for SUBGND in older stackups, and its skin layers would be a few nanometres thin. Tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Default is False  
 
-**settings['z_thickness_factor']:** This optional setting can tweak the conductor loss modelling when using the default "hollow body with skin-effect-aware surface impedance" approach, also known as "do not solve inside". This factor will be applied for metal thickness value on conductor side walls[^z-thickness], default is 1. Not recommended, see "z_thickness_factor (not recommended)" in chapter "Conductor loss modelling"; use `conductor_model` for accurate conductor loss.  
-
-[^z-thickness]: See chapter on metal loss at low frequency, where skin depth is larger than metal thickness.  
+**settings['fill_factor_correction']:** Only has an effect with merge_polygon_size > 0. Via array merging fills the gaps between vias with via material, so each merged via polygon is scaled down to its real via conductivity: its conductivity is multiplied by its fill factor (original via area / merged polygon area). Merged vias on the same layer are grouped into separate materials, starting a new group when the fill factor is more than 20% below the group's highest value, and each group uses its mean fill factor. Vias with the reserved PEC material are grouped but not scaled. Applies to Palace and Elmer EM (electrical conductivity) and to Elmer thermal (heat conductivity, including temperature table values). Default is False  
 
 #### Script control and output files
 
@@ -847,11 +843,7 @@ The Palace calculation [^palace-zs] of Zs is exact when applied to top and botto
 
 [^palace-zs]: <https://github.com/awslabs/palace/blob/main/palace/models/surfaceconductivityoperator.cpp> 
 
-### z_thickness_factor (not recommended)
-
-An early workaround in gds2palace reduces the thickness used on the side walls: `settings['z_thickness_factor']`, default 1.0. It is not recommended any more. Palace's thickness correction then changes the side wall impedance well into the skin effect regime, not only at low frequency: for TopMetal2 with z_thickness_factor = 0.33 (1 µm instead of 3 µm on the side walls), the real part of Zs on the side walls is 2.6 times higher at 5 GHz and the imaginary part about 3 times lower, and at 50 GHz the imaginary part is still 23 % lower. In tests with the L2n0 inductor and TopMetal2 microstrip lines, the default 1.0 was closer to openEMS and measured data than 0.33 (see below). For accurate conductor loss, use `conductor_model` instead, see "Accuracy at high frequency".
-
-Note: up to version 1.10.4 of `util_simulation_setup.py`, part of the side walls could end up in the group of horizontal faces (for faces split by a port or another shape), and then got the full thickness instead of the reduced one. The default z_thickness_factor = 1 is not affected.
+The volume models of `settings['conductor_model']` (`'solve_inside'`, `'solve_inside_skin'`) do not have this error, see "Choosing the conductor model" below. An earlier workaround, `settings['z_thickness_factor']`, reduced the thickness used on the side walls. It was removed in gds2palace 0.9.0: Palace's thickness correction then changed the side wall impedance well into the skin effect regime, not only at low frequency, and the full thickness was closer to openEMS and measured data (see below).
 
 ### Transmission line compared with openEMS and measurement
 
@@ -869,7 +861,7 @@ For openEMS (red curve), the simulation was also done without substrate below, u
 ![880 µm line: S21 from Palace, openEMS and measurement](./images/gds2palace_workflow_userguide.pdf-0036-06.png)
 
 
-In S21, Palace with the default z_thickness_factor = 1 (blue) is closer to openEMS and measurement than with 0.33 (pink).  
+In S21, Palace with the full metal thickness on the side walls (blue) is closer to openEMS and measurement than with the side wall thickness reduced to 1 µm (pink, the removed `z_thickness_factor` = 0.33).  
 We can also compare data for a longer line of 2580µm, width 15µm TopMetal2 over Metal1.  
 
 
@@ -880,7 +872,7 @@ We can also compare data for a longer line of 2580µm, width 15µm TopMetal2 ove
 ![2580 µm line: S21 from Palace and measurement](./images/gds2palace_workflow_userguide.pdf-0037-02.png)
 
 
-Palace with z_thickness_factor = 1 is closer to measured data up to 40 GHz; above, z_thickness_factor has very little effect.  
+Palace with the full side wall thickness is closer to measured data up to 40 GHz; above, the side wall thickness has very little effect.  
 It can also be seen that measured insertion increases more with frequency than simulated. One possible explanation from an earlier paper was dielectric loss in the SiO2. This dielectric was modelled here as lossless dielectric, loss tangent = 0.  
 If you prefer to use another value for loss tangent, that is fully supported by the gds2palace workflow, and can be specified easily in the XML stackup file.
 
@@ -911,15 +903,46 @@ Single-turn inductor, w = 4.5 µm, TopMetal2, peak Q at 77 GHz, compared with fi
 
 ![Single-turn inductor: differential resistance of the conductor models, relative to the converged filled model](./images/skin_layers_inductor_R.png)
 
-Practical guide:
+#### Choosing the conductor model
+
+`settings['conductor_model']` selects one of three models, named as in HFSS:
+
+| | `'surface'` (default) | `'solve_inside'` | `'solve_inside_skin'` |
+|---|---|---|---|
+| Model | surface impedance on all conductor faces | conductors meshed as volumes | volumes with thin layers along the faces for the skin effect |
+| Comparable to | HFSS impedance boundary (Solve Inside off), Sonnet/Momentum thin metal | HFSS Solve Inside, Sonnet thick metal, Momentum thick conductor | HFSS Solve Inside with a skin depth based mesh operation |
+| Expert settings | `filled_metals = False` | `filled_metals = True` | `filled_metals = True`, `skin_layers = True` |
+| Q of coils on TopMetal1/2 | 18-30 % too high | 4-8 % too low | 2-3 % too low |
+| Insertion loss (baluns) | 0.02-0.14 dB too low | 0.03-0.15 dB too high | up to 0.05 dB too high |
+| Unknowns at the same mesh | 1x | about 1.2x | 1.75-2.5x |
+| Run time at the same mesh | 1x | 0.7-2.7x, median 1.4x | 1.5-4.7x, median 2x |
+
+Errors at a 2 µm mesh, relative to `'solve_inside_skin'` at 1 µm, from step 4 of the mesh convergence studies in `more_examples/mesh_convergence` (five SG13G2 structures). Run times on machines shared with other runs, so they vary by structure and load.
 
 | purpose | `settings['conductor_model']` |
 |---|---|
 | resonance frequencies, inductance, coupling, match and balance | `'surface'`, the fastest |
-| Q and insertion loss during design | `'balanced'` (a few percent pessimistic at a 2 µm mesh) |
-| Q and insertion loss, final numbers | `'accurate'` |
+| Q and insertion loss during design | `'solve_inside'` (a few percent pessimistic at a 2 µm mesh) |
+| Q and insertion loss, final numbers | `'solve_inside_skin'` |
 
-The surface model's loss error depends on the layout: too little loss in thick conductors, too much in thin layers with current on one face. On a given structure, these can add up or cancel. The mesh convergence studies in `more_examples/mesh_convergence` compare the three models on five SG13G2 structures (step 4 in each study). Two more results from there: skin layers sized for the highest frequency cost little accuracy when the sweep goes far beyond the band of interest (skin layers sized for 200 GHz changed the Q of a 30 GHz transformer by 1 %), and skin layers do not make up for a coarse mesh where it matters for other reasons (with traces 2 µm apart, `'accurate'` at a 4-5 µm mesh was worse than `'balanced'` at 2 µm).
+What the errors mean for typical designs (2 µm mesh; reference `'solve_inside_skin'` at 1 µm, for the line a 2D calculation):
+
+| Design | Figure of merit | `surface` | `solve_inside` | `solve_inside_skin` |
+|---|---|---|---|---|
+| LC VCO tank, coil on TopMetal1/TopMetal2 | coil Q; phase noise ~ 1/Q² where the coil sets the tank Q | Q +18…+30 %: phase noise 1.4-2.3 dB too optimistic | Q -4…-8 %: phase noise 0.35-0.7 dB pessimistic | Q -2…-3 % |
+| LNA input match, baluns, matching networks | insertion loss, adds 1:1 to the noise figure of an LNA | 0.02-0.14 dB too optimistic | 0.03-0.15 dB pessimistic | up to 0.05 dB pessimistic |
+| MIM capacitor in a tank or matching network | series resistance, capacitor Q | series R about 2x (`palace_rfcmim.py`, 10 MHz: 1.88 instead of 0.87 Ω), capacitor Q about half | right | right |
+| TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | loss per length | line resistance +21…+41 % | up to +11 % | -0.5…+6.4 % |
+| any structure | inductance, coupling, SRF, match, amplitude and phase balance | all three models within about 1 % of each other | | |
+
+- **The surface model's loss error has no fixed sign.** It gives too little loss in thick conductors (coils on TopMetal1/TopMetal2) and too much in thin layers that carry current on one face (Metal1-Metal5 ground planes, MIM capacitor plates). On the MIM-loaded balun of the mesh convergence studies, both errors cancelled to 0.02 dB. So a surface model result is not even a bound for the loss.
+- **Loss errors in dB hide the relative error.** 0.05 dB on a balun with 1.2 dB insertion loss is 4 % of its loss, 0.1 dB on 1.1 dB is 9 %. At a PA output, 0.1 dB is 2.3 % of the output power.
+- **The reference is converged FEM, not measurement.** Against measurement, the stackup matters as much as the conductor model: in the L6n2 inductor study (`more_examples/measured_vs_simulated/more_accurate_models_L6n2_v3`), filled metals at 2 µm with the planar stackup gave peak Q -8.4 % and SRF -9.0 %, with conformal passivation over TopMetal2 Q -4.6 % and SRF -1.6 %, and at 1 µm Q -3.3 % and SRF -1.0 %.
+
+Two more results from the mesh convergence studies:
+
+- Skin layers are sized for the highest simulation frequency, and that costs little accuracy when the sweep goes far beyond the band of interest: skin layers sized for 200 GHz changed the Q of a 30 GHz transformer by 1 %.
+- The cell size must not exceed the smallest gap or trace width, for every conductor model. With traces 2 µm apart, `'solve_inside_skin'` at a 4-5 µm mesh was worse than `'solve_inside'` at 2 µm. Where gaps and traces are wider (5 µm in the spiral inductor), `'solve_inside_skin'` at a 5 µm mesh was within 4 % in Q.
 
 #### Palace's External option
 
@@ -1087,7 +1110,6 @@ A few other Palace features are not yet available in the Elmer EM flow:
 
 - **Sheet resistor layers** (`Type="sheet"` metal paired with a `Resistor` material, as used for on-chip resistors) are not yet supported for Elmer EM output.
 - **Composite ports** (grouping several EM ports into one output port) are not supported, same limitation as for Palace.
-- Metal loss is modeled from conductivity using Elmer's built-in "good conductor" surface impedance; the explicit finite-thickness side-wall correction available for Palace (`settings['z_thickness_factor']`) does not carry over to Elmer output.
 
 ### Running the Elmer EM simulation and getting S-parameters
 
@@ -1337,7 +1359,7 @@ To account for the z-directed nature of via arrays, which allows current flow pr
 
 With settings['fill_factor_correction'] = True, the conductivity of merged via polygons is additionally multiplied by their fill factor, in all directions. Via polygons on the same layer with different fill factors then get separate materials, in physical groups named after the layer and the fill factor, e.g. TopVia2_x0.49. The same applies to Elmer output: Elmer EM scales the (scalar) electrical conductivity, Elmer thermal the heat conductivity, and the Elmer bodies are named after these physical groups.  
 
-**Metal layers** (Type=”conductor”) are created as hollow elements surrounded by surfaces, with surface impedance to define metal loss. The conductivity and thickness are obtained from the XML file.  
+**Metal layers** (Type=”conductor”) are created as hollow elements surrounded by surfaces, with surface impedance to define metal loss (default `conductor_model = 'surface'`). The conductivity and thickness are obtained from the XML file. With `'solve_inside'` or `'solve_inside_skin'`, they are volumes with the conductivity of the XML file instead, like the vias.  
 
 
 ```json
@@ -1353,9 +1375,7 @@ With settings['fill_factor_correction'] = True, the conductivity of merged via p
 ```
 
 
-This is straightforward for top and bottom of the conductors, with the total conductor cross section being calculated properly even at low frequency where skin depth is larger than the physical conductor height.  
-
-However, using that same surface impedance also for the side walls, we would over-estimate the total physical cross section, so the side walls get a different material mapping with a thickness value that is only 1/3 of the top/bottom values. This gives a reasonable result also in the transition from skin effect regime to low frequency.  
+All faces, top, bottom and side walls, get the same conductivity and thickness. This is exact for top and bottom of wide conductors, down to low frequency where the skin depth is larger than the physical conductor height. On the side walls, it over-estimates the conductor cross section at low frequency, see "Limits of conductor loss calculation".  
 
 **Metall sheet layers** (Type=”sheet”) are created as a single, flat surface. Their position in the stackup should be defined with Zmin=Zmax for better readability, but actually the Zmax value is ignored here.  
  

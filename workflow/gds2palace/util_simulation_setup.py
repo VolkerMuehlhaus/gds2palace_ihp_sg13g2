@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.15.0"
+__version__ = "1.17.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -1346,8 +1346,7 @@ def create_model (excite_ports, settings):
         # are planar here, so one evaluation gives the orientation of the whole face. The vertex
         # based estimate below is only a fallback: it collects the boundary points curve by curve,
         # which does not give them in loop order when curves run against the loop direction (e.g.
-        # faces split by a port box), and then returns a wrong or zero normal - this put vertical
-        # end faces into the horizontal (_xy) group and horizontal slivers into the vertical (_z) one.
+        # faces split by a port box), and then returns a wrong or zero normal.
         try:
             umin, umax = gmsh.model.getParametrizationBounds(2, s)
             exact = np.array(gmsh.model.getNormal(s, [(umin[0] + umax[0]) / 2, (umin[1] + umax[1]) / 2]))
@@ -1511,18 +1510,21 @@ def create_model (excite_ports, settings):
         value = item[1]
         refined_cellsize_override_dict[layername]=value
 
-    # separate_z_group_for_metals setting 
-    z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
+    # z_thickness_factor (side wall thickness of surface impedance conductors) was removed in 0.9.0
+    if get_optional_setting(settings, 'z_thickness_factor', 1) != 1:
+        print(f"WARNING: settings['z_thickness_factor'] was removed in gds2palace 0.9.0 and is ignored "
+              f"(full metal thickness on all faces). Results differ from earlier versions that used it. "
+              f"For accurate conductor loss, use settings['conductor_model'].")
 
     # conductor_model: one designer-level choice that presets the expert settings filled_metals and skin_layers
-    #   'surface'  (default) surface impedance on all conductor faces: fastest, Q of thick top metal coils 18-30 % high
-    #   'balanced' filled_metals = True: conductors as volumes, Q a few percent low at a 2 um mesh
-    #   'accurate' filled_metals = True + skin_layers = True: about half the error of 'balanced', at 1.4-2x its unknowns
+    #   'surface'           (default) surface impedance on all conductor faces: fastest, Q of thick top metal coils 18-30 % high
+    #   'solve_inside'      filled_metals = True: conductors as volumes, Q a few percent low at a 2 um mesh
+    #   'solve_inside_skin' filled_metals = True + skin_layers = True: about half the error of 'solve_inside', at 1.4-2x its unknowns
     # filled_metals / skin_layers given explicitly in the settings override the preset.
     conductor_model = get_optional_setting(settings, 'conductor_model', 'surface')
-    conductor_presets = {'surface': (False, False), 'balanced': (True, False), 'accurate': (True, True)}
+    conductor_presets = {'surface': (False, False), 'solve_inside': (True, False), 'solve_inside_skin': (True, True)}
     if conductor_model not in conductor_presets:
-        print(f"ERROR: settings['conductor_model'] must be 'surface', 'balanced' or 'accurate', not {conductor_model!r}")
+        print(f"ERROR: settings['conductor_model'] must be 'surface', 'solve_inside' or 'solve_inside_skin', not {conductor_model!r}")
         exit(1)
     preset_filled, preset_skin = conductor_presets[conductor_model]
     overridden = [key for key in ('filled_metals', 'skin_layers') if key in settings]
@@ -2144,9 +2146,9 @@ def create_model (excite_ports, settings):
             for surfaces in surfaces_list:
                 i=i+1
 
-                # we want to separate surfaces into planar (xy) and vertical (z)
-                new_tags_planar = []
-                new_tags_vertical = []
+                # all faces of this conductor body (top, bottom and side walls) share one group:
+                # they get the same conductivity and thickness
+                new_tags = []
 
                 all_tags = surfaces[0]
                 for tag in all_tags:
@@ -2155,10 +2157,7 @@ def create_model (excite_ports, settings):
                         # surface - see port_surface_tags comment above
                         continue
 
-                    if is_vertical_surface(tag):
-                        new_tags_vertical.append(tag)
-                    else:
-                        new_tags_planar.append(tag)
+                    new_tags.append(tag)
 
                     # we should not have this in list
                     if tag not in already_assigned_tags:
@@ -2169,23 +2168,12 @@ def create_model (excite_ports, settings):
                         print("   Make sure different 'conductor' layers never touch directly, use 'via' layer for connecting to metal layers!")
                         exit(101)
 
-                # we now have separate lists for xy and z surfaces
-
-                # xy in-plane
-                if len(new_tags_planar)>0:
-                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags_planar, tag=-1)
-                    group_name = f"{key}_{i}_xy"
-                    gmsh.model.setPhysicalName(2, phys_group, group_name)            
+                if len(new_tags)>0:
+                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags, tag=-1)
+                    group_name = f"{key}_{i}"
+                    gmsh.model.setPhysicalName(2, phys_group, group_name)
                     # store, used when creating solver config file
-                    physical_groups_2D.append({"layername":key+"_xy", "groupname":group_name, "grouptag":phys_group })
-
-                # z vertical
-                if len(new_tags_vertical)>0:
-                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags_vertical, tag=-1)
-                    group_name = f"{key}_{i}_z"
-                    gmsh.model.setPhysicalName(2, phys_group, group_name)            
-                    # store, used when creating solver config file
-                    physical_groups_2D.append({"layername":key+"_z", "groupname":group_name, "grouptag":phys_group })
+                    physical_groups_2D.append({"layername":key, "groupname":group_name, "grouptag":phys_group })
 
                 # add for edge mesh refinement also
                 if key not in boundary_line_tags_dict.keys():
@@ -2528,12 +2516,7 @@ def create_model (excite_ports, settings):
 
     for item in physical_groups_2D:
         # items can be from surface of metal conductor
-        internal_layername, groupname, grouptag = item.values()
-        is_vertical = '_z' in internal_layername
-
-        # strip suffix _xy and _z
-        layername = internal_layername.replace('_xy','')
-        layername = layername.replace('_z','')
+        layername, groupname, grouptag = item.values()
 
         metal = metals_list.getbylayername(layername)
 
@@ -2570,11 +2553,7 @@ def create_model (excite_ports, settings):
 
                     # regular conductor
                     Palace_conductor['Conductivity'] = material.sigma
-                    # for regular metal, we apply an optional thickness factor to the vertical sheets
-                    if is_vertical:
-                        Palace_conductor['Thickness'] = metal.thickness * z_thickness_factor
-                    else:
-                        Palace_conductor['Thickness'] = metal.thickness 
+                    Palace_conductor['Thickness'] = metal.thickness
                     Palace_conductors.append(Palace_conductor)
 
                 elif metal.is_sheet:
@@ -2885,12 +2864,7 @@ def create_model (excite_ports, settings):
         # surfaces
         for item in physical_groups_2D:
             # items can be from surface of metal conductor
-            internal_layername, groupname, grouptag = item.values()
-            is_vertical = '_z' in internal_layername
-
-            # strip suffix _xy and _z
-            layername = internal_layername.replace('_xy','')
-            layername = layername.replace('_z','')
+            layername, groupname, grouptag = item.values()
 
             metal = metals_list.getbylayername(layername)
 
@@ -2922,10 +2896,7 @@ def create_model (excite_ports, settings):
                             Elmer_boundary = {}
                             Elmer_boundary['name'] = gmsh.model.getPhysicalName(2,grouptag)
                             Elmer_boundary['conductivity'] = material.sigma
-                            if '_z' in internal_layername:                        
-                                Elmer_boundary['thickness'] = metal.thickness * z_thickness_factor
-                            else:    
-                                Elmer_boundary['thickness'] = metal.thickness 
+                            Elmer_boundary['thickness'] = metal.thickness
                             Elmer_boundaries.append(Elmer_boundary)
 
                         elif metal.is_sheet:
