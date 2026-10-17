@@ -894,7 +894,7 @@ For most designs, the choice is simple:
 | Q and insertion loss during design | `'solve_inside'`, a few percent pessimistic at a 2 µm mesh |
 | Q and insertion loss, final numbers | `'solve_inside_skin'` |
 
-The table below sums up the three models. The errors are for a 2 µm mesh, compared with `'solve_inside_skin'` at 1 µm. They come from step 4 of the mesh convergence studies in `more_examples/mesh_convergence`, with five SG13G2 structures.
+The table below sums up the three models. The errors are for a 2 µm mesh, compared with `'solve_inside_skin'` at 1 µm. They come from step 4 of the mesh convergence studies in `more_examples/mesh_convergence`, with five SG13G2 structures. The run times are for the coils and baluns, from the conductor model study in `more_examples/conductor_models`, which ran all models on one machine, one run at a time. On straight lines, the volume models cost less: 1.0-1.1x and 1.4-2.0x.
 
 | | `'surface'` (default) | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|
@@ -904,7 +904,7 @@ The table below sums up the three models. The errors are for a 2 µm mesh, compa
 | Peak Q of coils on TopMetal1/2 | 18-30 % too high | 4-8 % too low | 2-3 % too low |
 | Insertion loss (baluns) | 0.02-0.14 dB too low | 0.03-0.15 dB too high | up to 0.05 dB too high |
 | Unknowns at the same mesh | 1x | about 1.2x | 1.75-2.5x |
-| Run time at the same mesh | 1x | 0.7-2.7x, median 1.4x | 1.5-4.7x, median 2x |
+| Run time at the same mesh | 1x | 1.25-1.7x | 1.5-3.5x |
 
 The Q errors are for the peak Q of coils with 2-8 µm traces. Below the peak, the surface model is even more optimistic: 24-37 % at half the peak frequency. Coils with wider traces were not tested. Their error is probably smaller, because the side walls and edges carry a smaller part of the current.
 

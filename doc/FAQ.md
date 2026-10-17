@@ -260,14 +260,16 @@ settings['conductor_model'] = 'solve_inside_skin'  # volumes + thin layers along
 | Peak Q of coils on TopMetal1/2 | 18–30 % too high | 4–8 % too low | 2–3 % too low |
 | Insertion loss (baluns) | 0.02–0.14 dB too low | 0.03–0.15 dB too high | up to 0.05 dB too high |
 | Unknowns at the same mesh | 1× | about 1.2× | 1.75–2.5× |
-| Run time at the same mesh | 1× | 0.7–2.7×, median 1.4× | 1.5–4.7×, median 2× |
+| Run time at the same mesh | 1× | 1.25–1.7× | 1.5–3.5× |
 
 The Q errors are for the peak Q of coils with 2–8 µm traces. Below the peak, the surface model is even more optimistic: 24–37 % at half the peak frequency. Coils with wider traces were not tested. Their error is probably smaller, because the side walls and edges carry a smaller part of the current.
 
 Errors are relative to `'solve_inside_skin'` at a 1 µm mesh, from the
 [mesh convergence studies](../more_examples/mesh_convergence/README.md)
-(five SG13G2 structures, 2 µm mesh; run times on machines shared with
-other runs, so they vary by structure and load). `'surface'` is fine for inductance,
+(five SG13G2 structures, 2 µm mesh). Run times are for coils and baluns,
+from the [conductor model study](../more_examples/conductor_models/README.md),
+which ran all models on one machine, one run at a time; on straight lines, the
+volume models cost less (1.0–1.1× and 1.4–2.0×). `'surface'` is fine for inductance,
 coupling, match and balance, which hardly depend on the conductor model. For
 Q and loss, use `'solve_inside'` while designing and `'solve_inside_skin'` for final
 numbers. The surface model has three known errors: too little loss in thick

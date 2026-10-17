@@ -2,6 +2,11 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 17 October-2026
+
+**Documentation**  
+Run times of the conductor models in the user's guide ("Choosing the conductor model") and the FAQ now come from the conductor model study, which ran all models on one machine, one run at a time: relative to `'surface'`, `'solve_inside'` takes 1.25-1.7x and `'solve_inside_skin'` 1.5-3.5x the run time on coils and baluns at a 2 µm mesh. The earlier values (0.7-2.7x and 1.5-4.7x) came from machines shared with other runs.
+
 ## 15 October-2026
 gds2palace 0.9.0
 
