@@ -1,0 +1,32 @@
+{
+    "ports": [
+        {
+            "portnumber": 1,
+            "Z0": 50,
+            "direction": "Z",
+            "length": 11.2303,
+            "width": 20.0,
+            "xmin": 0.0,
+            "xmax": 0.1,
+            "ymin": -10.0,
+            "ymax": 10.0,
+            "zmin": 183.87,
+            "zmax": 195.1003
+        },
+        {
+            "portnumber": 2,
+            "Z0": 50,
+            "direction": "Z",
+            "length": 11.2303,
+            "width": 20.0,
+            "xmin": 299.90000000000003,
+            "xmax": 300.0,
+            "ymin": -10.0,
+            "ymax": 10.0,
+            "zmin": 183.87,
+            "zmax": 195.1003
+        }
+    ],
+    "unit": 1e-06,
+    "name": "line_w20_L300_solve_inside_skin_mesh2"
+}

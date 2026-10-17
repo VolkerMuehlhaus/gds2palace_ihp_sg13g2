@@ -1,0 +1,45 @@
+{
+    "ports": [
+        {
+            "portnumber": 1,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 7.7102999999999895,
+            "width": 7.0,
+            "xmin": -35.0,
+            "xmax": -35.0,
+            "ymin": 0.0,
+            "ymax": 7.0,
+            "zmin": 187.27,
+            "zmax": 194.9803
+        },
+        {
+            "portnumber": 2,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 7.7102999999999895,
+            "width": 3.0,
+            "xmin": 315.0,
+            "xmax": 315.0,
+            "ymin": -13.5,
+            "ymax": -10.5,
+            "zmin": 187.27,
+            "zmax": 194.9803
+        },
+        {
+            "portnumber": 3,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 7.7102999999999895,
+            "width": 3.0,
+            "xmin": 315.0,
+            "xmax": 315.0,
+            "ymin": -23.5,
+            "ymax": -20.5,
+            "zmin": 187.27,
+            "zmax": 194.9803
+        }
+    ],
+    "unit": 1e-06,
+    "name": "mim_balun_auto_mesh2"
+}

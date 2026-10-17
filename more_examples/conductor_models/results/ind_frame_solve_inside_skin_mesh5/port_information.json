@@ -1,0 +1,32 @@
+{
+    "ports": [
+        {
+            "portnumber": 1,
+            "Z0": 50,
+            "direction": "Y",
+            "length": 3.0,
+            "width": 5.0,
+            "xmin": 57.5,
+            "xmax": 62.5,
+            "ymin": -3.0,
+            "ymax": 0.0,
+            "zmin": 194.9803,
+            "zmax": 194.9803
+        },
+        {
+            "portnumber": 2,
+            "Z0": 50,
+            "direction": "-Y",
+            "length": 3.0,
+            "width": 5.0,
+            "xmin": 57.5,
+            "xmax": 62.5,
+            "ymin": 129.0,
+            "ymax": 132.0,
+            "zmin": 194.9803,
+            "zmax": 194.9803
+        }
+    ],
+    "unit": 1e-06,
+    "name": "ind_frame_solve_inside_skin_mesh5"
+}

@@ -1,0 +1,235 @@
+{
+    "Problem": {
+        "Type": "Driven",
+        "Verbose": 3,
+        "Output": "output/transformer_surface_mesh2"
+    },
+    "Model": {
+        "Mesh": "transformer_surface_mesh2.msh",
+        "L0": 1e-06,
+        "Refinement": {
+            "UniformLevels": 0,
+            "Tol": 0.01,
+            "MaxIts": 0,
+            "MaxSize": 2000000.0,
+            "Nonconformal": true,
+            "UpdateFraction": 0.7,
+            "SaveAdaptMesh": false
+        }
+    },
+    "Solver": {
+        "Linear": {
+            "Type": "Default",
+            "KSPType": "GMRES",
+            "Tol": 1e-06,
+            "MaxIts": 400,
+            "ComplexCoarseSolve": true
+        },
+        "Order": 2,
+        "Device": "CPU",
+        "Driven": {
+            "Samples": [
+                {
+                    "Type": "Linear",
+                    "MinFreq": 1.0,
+                    "MaxFreq": 200.0,
+                    "FreqStep": 1.0,
+                    "SaveStep": 0
+                },
+                {
+                    "Type": "Point",
+                    "Freq": [
+                        0.01,
+                        0.02
+                    ],
+                    "SaveStep": 0
+                }
+            ],
+            "AdaptiveTol": 0.02
+        }
+    },
+    "Domains": {
+        "Materials": [
+            {
+                "Attributes": [
+                    1
+                ],
+                "Permittivity": 1.0,
+                "Conductivity": [
+                    219100.0,
+                    219100.0,
+                    2191000.0
+                ]
+            },
+            {
+                "Attributes": [
+                    2
+                ],
+                "Permittivity": 1.0,
+                "Conductivity": [
+                    314300.0,
+                    314300.0,
+                    3143000.0
+                ]
+            },
+            {
+                "Attributes": [
+                    11
+                ],
+                "Permittivity": 1.0,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    12
+                ],
+                "Permittivity": 6.6,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    13
+                ],
+                "Permittivity": 4.1,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    14
+                ],
+                "Permittivity": 11.9,
+                "Conductivity": 5.0
+            },
+            {
+                "Attributes": [
+                    15
+                ],
+                "Permittivity": 11.9,
+                "Conductivity": 2.0
+            },
+            {
+                "Attributes": [
+                    16
+                ],
+                "Permittivity": 1.0
+            }
+        ],
+        "Postprocessing": {
+            "Energy": [],
+            "Probe": []
+        }
+    },
+    "Boundaries": {
+        "Conductivity": [
+            {
+                "Attributes": [
+                    3
+                ],
+                "Conductivity": 23190000.0,
+                "Thickness": 0.4900000000000002
+            },
+            {
+                "Attributes": [
+                    4
+                ],
+                "Conductivity": 23190000.0,
+                "Thickness": 0.4900000000000002
+            },
+            {
+                "Attributes": [
+                    5
+                ],
+                "Conductivity": 23190000.0,
+                "Thickness": 0.4900000000000002
+            },
+            {
+                "Attributes": [
+                    6
+                ],
+                "Conductivity": 27800000.0,
+                "Thickness": 2.000000000000001
+            },
+            {
+                "Attributes": [
+                    7
+                ],
+                "Conductivity": 27800000.0,
+                "Thickness": 2.000000000000001
+            },
+            {
+                "Attributes": [
+                    8
+                ],
+                "Conductivity": 27800000.0,
+                "Thickness": 2.000000000000001
+            },
+            {
+                "Attributes": [
+                    9
+                ],
+                "Conductivity": 30300000.0,
+                "Thickness": 3.0
+            },
+            {
+                "Attributes": [
+                    10
+                ],
+                "Conductivity": 30300000.0,
+                "Thickness": 3.0
+            }
+        ],
+        "LumpedPort": [
+            {
+                "Index": 1,
+                "R": 50.0,
+                "Direction": "Z",
+                "Excitation": 1,
+                "Attributes": [
+                    17
+                ]
+            },
+            {
+                "Index": 2,
+                "R": 50.0,
+                "Direction": "Z",
+                "Excitation": 2,
+                "Attributes": [
+                    18
+                ]
+            },
+            {
+                "Index": 3,
+                "R": 50.0,
+                "Direction": "Z",
+                "Excitation": 3,
+                "Attributes": [
+                    19
+                ]
+            },
+            {
+                "Index": 4,
+                "R": 50.0,
+                "Direction": "Z",
+                "Excitation": 4,
+                "Attributes": [
+                    20
+                ]
+            },
+            {
+                "Index": 5,
+                "R": 50.0,
+                "Direction": "Z",
+                "Excitation": 5,
+                "Attributes": [
+                    21
+                ]
+            }
+        ],
+        "Absorbing": {
+            "Attributes": [
+                22
+            ],
+            "Order": 2
+        }
+    }
+}

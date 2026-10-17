@@ -1,0 +1,32 @@
+{
+    "ports": [
+        {
+            "portnumber": 1,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 6.430299999999988,
+            "width": 8.0,
+            "xmin": -103.675,
+            "xmax": -95.675,
+            "ymin": -50.0,
+            "ymax": -50.0,
+            "zmin": 183.75,
+            "zmax": 190.1803
+        },
+        {
+            "portnumber": 2,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 6.430299999999988,
+            "width": 8.0,
+            "xmin": -47.305,
+            "xmax": -39.305,
+            "ymin": -50.005,
+            "ymax": -50.0,
+            "zmin": 183.75,
+            "zmax": 190.1803
+        }
+    ],
+    "unit": 1e-06,
+    "name": "l6n2_auto_mesh2"
+}
