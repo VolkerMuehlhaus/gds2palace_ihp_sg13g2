@@ -75,12 +75,32 @@ Separately from the mesh sweep, the 280 fF capacitor near P1 was simulated alone
 
 Refining the mesh closes about a third of the gap. The rest is plausibly real: the port sits 20–30 µm away from the capacitor, on a Metal3 connection whose own capacitance the EM model includes but the nominal value does not. This was not investigated further.
 
+## 4. Conductor model: surface, solve_inside, solve_inside_skin
+
+Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the balun with the conductors meshed as volumes: `settings['conductor_model'] = 'solve_inside'`, and `'solve_inside_skin'` with thin layers along the conductor faces (0.25 and 0.62 µm deep in TopMetal2 for 22 GHz; TopMetal1 is too thin for skin layers at this frequency). The reference is `'solve_inside_skin'` at 1 µm. These runs, and a rerun of the surface model at 2 µm, used 8 MPI processes, on two different machines shared with a second run, so their times are only a rough guide.
+
+![Insertion loss and input match for the three conductor models](results/plots/story_conductor_models.png)
+
+| Model | DOF | Time | Insertion loss, 17–22 GHz | Largest IL difference | Worst \|Sss11\| | Match null |
+|---|---:|---:|---:|---:|---:|---:|
+| `'solve_inside_skin'`, 1 µm (reference) | 3.63 M | 127 min | 1.20–1.28 dB | | −17.7 dB | 18.6 GHz |
+| `'solve_inside_skin'`, 2 µm | 1.66 M | 96 min | 1.22–1.33 dB | +0.05 dB | −16.6 dB | 18.3 GHz |
+| `'solve_inside_skin'`, 3 µm | 1.14 M | 53 min | 1.24–1.36 dB | +0.08 dB | −16.0 dB | 18.1 GHz |
+| `'solve_inside'`, 2 µm | 1.15 M | 79 min | 1.26–1.37 dB | +0.09 dB | −16.3 dB | 18.2 GHz |
+| surface impedance, 1 µm | 1.95 M | | 1.18–1.27 dB | −0.02 dB | −17.0 dB | 18.4 GHz |
+| surface impedance, 2 µm | 0.95 M | 48 min | 1.18–1.31 dB | −0.02 dB | −15.9 dB | 18.1 GHz |
+
+- **The surface model gets the loss right here, but by cancellation.** It has two errors that pull in opposite directions. The thick TopMetal coils get too little loss, as in the other studies of this series. The thin layers, above all the MIM capacitor plates, get too much: the plate current flows mainly on the face toward the dielectric, but the surface model puts the full thickness behind each face, which can double the loss of such a plate (see "Palace's External option" in the user's guide). On this balun, the two errors happen to cancel within 0.02 dB.
+- **The volume models at 2–3 µm are slightly pessimistic**, by 0.05–0.09 dB. `'solve_inside_skin'` brings the 2 µm result about halfway to the reference.
+- **Match and balance hardly depend on the conductor model.** All models put the match null within 0.5 GHz and the worst in-band match within 2 dB of each other.
+
 ## Summary for this balun
 
 - **Loss and balance are insensitive to the mesh** in this study. Even 3 µm predicts them within about 0.06 dB and 0.3° of the finest result.
 - **1 µm is needed for the final match numbers.** It agrees with AMR, while 2 µm is about 1 dB pessimistic on the worst-case match. For design iterations, 2 µm (13 minutes) gets everything else right.
 - **AMR confirms the 1 µm result**, at 4.5× its cost.
 - **Expect simulated MIM capacitance to come out a few percent above nominal** in this setup. Part of that is mesh, part is the port connection.
+- **The default surface impedance gets the loss right here only because two errors cancel.** The volume models at 2 µm are within 0.1 dB, on the pessimistic side.
 
 These numbers belong to this layout. Other coil sizes, capacitor arrangements or frequency ranges will change them.
 
@@ -91,6 +111,8 @@ mesh_convergence_balun_mim/
 ├── trans_100diff_to_80se_ports.py           # 3 µm (initial check)
 ├── trans_100diff_to_80se_ports_mesh{2,1}.py  # uniform mesh, order 2
 ├── trans_100diff_to_80se_ports_amr2.py      # AMR, 2 µm start, 2 iterations
+├── trans_100diff_to_80se_ports_skin_mesh{3,2,1}.py     # 'solve_inside_skin' (§4)
+├── trans_100diff_to_80se_ports_filled_mesh2.py         # 'solve_inside' (§4)
 ├── verify_MIM_nominal_280.gds / .py         # MIM capacitor side check (§3)
 ├── palace_model/<name>_data/                # mesh, config and full Palace output per run
 └── results/
@@ -98,6 +120,7 @@ mesh_convergence_balun_mim/
     ├── analyze_convergence.py     # mixed-mode ΔS tables (CSV), per-parameter overlays, balance plots
     ├── analyze_baseline.py        # plots of the initial 3 µm run
     ├── verify_mim_capacitance.py  # capacitance from the MIM side check
+    ├── story_conductor_models.py  # §4 plot and numbers
     ├── delta_S_table.csv, delta_S_vs_finest.csv, s_parameter_table.csv, s_parameter_magnitude_table.csv
     ├── snp/                       # raw Touchstone files, one per run
     └── plots/

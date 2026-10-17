@@ -73,11 +73,32 @@ AMR started from the 2 µm mesh and ran 3 iterations, refining wherever Palace's
 - **Q continues the upward trend**: AMR is another 3.6% above the 1 µm result, for both coils. This confirms what step 2 suggested. The Q of this transformer is not converged at 1 µm, and the true value is likely at least a few percent higher.
 - AMR's last iteration changed the S-parameters by as much as the one before (Max|ΔS| 0.020, then 0.019), so AMR itself had not settled either. More iterations would cost several more hours here.
 
+## 4. Conductor model: surface, solve_inside, solve_inside_skin
+
+Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the transformer with the conductors meshed as volumes: `settings['conductor_model'] = 'solve_inside'`, and `'solve_inside_skin'` with thin layers along all conductor faces. The sweep goes to 200 GHz, so the skin layers are only 0.08 and 0.21 µm deep in TopMetal1/TopMetal2. The reference is `'solve_inside_skin'` at 1 µm. These runs, and a rerun of the surface model at 2 µm, used 8 MPI processes on a machine shared with a second run, so their times are only comparable with each other.
+
+![Primary and secondary Q for the three conductor models](results/plots/story_conductor_models.png)
+
+| Model (values at 30 GHz) | DOF | Time | Primary L | k | Primary Q | Secondary Q |
+|---|---:|---:|---:|---:|---:|---:|
+| `'solve_inside_skin'`, 1 µm (reference) | 1.46 M | 116 min | 0.753 nH | 0.710 | 9.45 | 9.12 |
+| `'solve_inside_skin'`, 2 µm | 0.69 M | 38 min | +0.2% | +0.6% | −2.5% | −3.0% |
+| `'solve_inside_skin'`, 4 µm | 0.35 M | 16 min | +0.8% | +1.5% | −4.8% | −6.2% |
+| `'solve_inside_skin'`, layers sized for 50 GHz, 2 µm | 0.67 M | 49 min | +0.5% | +0.5% | −1.6% | −1.9% |
+| `'solve_inside'`, 2 µm | 0.37 M | 29 min | +0.3% | +0.6% | −3.9% | −4.9% |
+| surface impedance, 1 µm | 0.58 M | | −0.8% | +0.2% | +30% | +23% |
+| surface impedance, 2 µm | 0.31 M | 20 min | −0.2% | +0.7% | +28% | +21% |
+
+- **The surface model's Q is 21–30% too high**, much more than anything the mesh changes in steps 1–3. L and k agree within 1% for all models.
+- **All volume models agree within a few percent**, and all are slightly low in Q. `'solve_inside_skin'` at 2 µm brings the error from 4–5% down to 2.5–3%.
+- **Sizing the skin layers for the 200 GHz sweep end costs little accuracy.** Skin layers sized for 50 GHz (0.16 and 0.41 µm deep, set by hand during development, not a setting) are only 1 percentage point closer at 30 GHz. Running the sweep far beyond the band of interest makes the automatic skin layers thinner than needed, but not wrong.
+
 ## Summary for this transformer
 
 - **For inductance and coupling, 2 µm is enough** (within 1% of the finest results, about 7 minutes).
 - **Q is the hard quantity.** Even the finest run here (AMR, almost 2 hours) is still rising. Treat simulated Q at 30 GHz as a lower bound: the 2 µm mesh underestimates it by roughly 5% compared with AMR, and the true value may be higher still.
 - **5 µm is too coarse for this geometry** and crashed the solver. The cell size should not be much larger than the 2 µm trace width.
+- **For Q, the conductor model matters more than the mesh.** The default surface impedance gives 21–30% higher Q at 30 GHz than the volume models. `'solve_inside'` and `'solve_inside_skin'` at 2 µm are within 2.5–5% of the finest `'solve_inside_skin'` result.
 
 These numbers belong to this layout. Wider traces or a different frequency range will change them. When Q matters, check it with one finer run, since L and k settling doesn't mean Q has settled.
 
@@ -87,10 +108,13 @@ These numbers belong to this layout. Wider traces or a different frequency range
 mesh_convergence_transformer/
 ├── palace_transformer_imn_mesh{5,4,3,2,1}.py    # uniform mesh (mesh5 crashes, kept for reference)
 ├── palace_transformer_imn_amr3.py                # AMR, 2 µm start, 3 iterations
+├── palace_transformer_imn_skin_mesh{4,2,1}.py    # 'solve_inside_skin' (step 4)
+├── palace_transformer_imn_filled_mesh2.py        # 'solve_inside' (step 4)
 ├── palace_model/palace_transformer_imn_<name>_data/   # mesh, config and full Palace output per run
 └── results/
     ├── story_plots.py            # the story_*.png plots and numbers in this report
     ├── analyze_convergence.py    # mixed-mode Sdd ΔS tables (CSV) and Sdd overlays
+    ├── story_conductor_models.py # step 4 plot and numbers
     ├── delta_S_table.csv, delta_S_vs_finest.csv
     ├── snp/                      # 5-port Touchstone files, one per run (_raw = without port de-embedding;
     │                             #   the AMR iteration files transformer_amr3_iter1..2 are also raw)

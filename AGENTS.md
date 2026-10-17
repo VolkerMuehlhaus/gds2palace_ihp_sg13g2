@@ -265,9 +265,8 @@ model data keys set at the end of the template. Optional keys and defaults
 | `solver_maxits` / `solver_tol` | `400` / `1e-6` | Palace linear solver limits |
 | `boundary` | 6 × `'ABC'` | xmin, xmax, ymin, ymax, zmin, zmax: `ABC`, `PEC` or `PMC` |
 | `air_around` | `margin` | Air around the dielectrics, one value or 6 values; 0 is allowed |
-| `filled_metals` | `False` | Solid metal volumes instead of surface impedance: better low-frequency R, more RAM and time |
+| `conductor_model` | `'surface'` | Conductor model: `'surface'` (surface impedance on all conductor faces, fastest, Q of top metal coils 18-30 % high), `'solve_inside'` (conductors meshed as volumes), `'solve_inside_skin'` (volumes with thin layers along the faces for the skin effect, most accurate loss). See the FAQ "Which conductor model should I use?". Scripts from before 0.9.0 use `filled_metals` (`True` = `'solve_inside'`, `False` = `'surface'`), which still works |
 | `fill_factor_correction` | `False` | Scale the conductivity of merged via arrays by their fill factor (needs `merge_polygon_size > 0`) |
-| `z_thickness_factor` | `1` | Side-wall thickness factor for conductor loss, see "Conductor loss modelling" in the user's guide |
 | `no_gui` / `no_preview` / `preview_only` | `False` | gmsh windows: none at all / skip the unmeshed preview / preview and stop |
 | `save_gmsh_unrolled` | `False` | Also save the unmeshed gmsh geometry |
 | `config_suffix` | `''` | Suffix for `config.json`/`port_information.json`, e.g. `'_fine'` |
@@ -427,7 +426,7 @@ These are design decisions that the files can't tell you:
 | Meshing errors or wrong results with a stackup that "should work" | A gds2openEMS stackup used with gds2palace |
 | Port missing or at the wrong place | Port layer not in `layernumbers`, wrong `source_layernum`, or the via port drawn with an area |
 | Zero rows in the S-parameter file | Ports with `voltage=0` are not excited |
-| Wrong resistance of narrow lines at low frequency | Surface impedance model: see "Limits of conductor loss calculation" in the user's guide; consider `filled_metals` |
+| Wrong resistance of narrow lines at low frequency | Surface impedance model: see "Limits of conductor loss calculation" in the user's guide; consider `conductor_model = 'solve_inside'` |
 | Unreliable S-parameters at some frequencies | `did NOT converge` in the Palace log; keep `complex_coarse_solve` on, raise `solver_maxits`, check the model |
 
 ## 11. Related tools

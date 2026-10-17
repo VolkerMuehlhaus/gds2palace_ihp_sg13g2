@@ -1,0 +1,58 @@
+{
+    "ports": [
+        {
+            "portnumber": 1,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 9.770299999999992,
+            "width": 8.0,
+            "xmin": -116.0,
+            "xmax": -116.0,
+            "ymin": 14.625,
+            "ymax": 22.625,
+            "zmin": 185.21,
+            "zmax": 194.9803
+        },
+        {
+            "portnumber": 2,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 9.770299999999992,
+            "width": 8.0,
+            "xmin": -116.0,
+            "xmax": -116.0,
+            "ymin": -22.625,
+            "ymax": -14.625,
+            "zmin": 185.21,
+            "zmax": 194.9803
+        },
+        {
+            "portnumber": 3,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 9.770299999999992,
+            "width": 8.0,
+            "xmin": 116.0,
+            "xmax": 116.0,
+            "ymin": 14.625,
+            "ymax": 22.625,
+            "zmin": 185.21,
+            "zmax": 194.9803
+        },
+        {
+            "portnumber": 4,
+            "Z0": 50.0,
+            "direction": "Z",
+            "length": 9.770299999999992,
+            "width": 8.0,
+            "xmin": 116.0,
+            "xmax": 116.0,
+            "ymin": -22.625,
+            "ymax": -14.625,
+            "zmin": 185.21,
+            "zmax": 194.9803
+        }
+    ],
+    "unit": 1e-06,
+    "name": "balun2x1_solve_inside_skin_mesh2"
+}

@@ -79,7 +79,6 @@ settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, mu
 settings['meshsize_max'] = 70  # microns, override cells_per_wavelength 
 
 settings['adaptive_mesh_iterations'] = 0  # Palace adative mesh iterations
-settings['z_thickness_factor'] = 1  # metal side wall thickness = layer thickness * z_thickness_factor
 
 # settings['no_gui'] = True  # create files without showing 3D model
 settings['no_gui'] = ('nogui' in sys.argv)  # check if nogui specified on command line, then create files without showing 3D model

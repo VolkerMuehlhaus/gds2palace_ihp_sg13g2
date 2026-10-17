@@ -18,13 +18,16 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.10.5"
+__version__ = "1.18.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
 
 # Palace linear solver settings this version understands (checked by setupEM)
 PALACE_LINEAR_SOLVER_SETTINGS = ("complex_coarse_solve", "solver_maxits", "solver_tol")
+
+# values of settings['conductor_model'] this version understands (checked by setupEM)
+CONDUCTOR_MODELS = ("surface", "solve_inside", "solve_inside_skin")
 
 import os
 import sys
@@ -623,6 +626,121 @@ def add_metal_volumes (allpolygons, metals_list, meshseed=0):
     
 
 
+def skin_layer_depths (metals_list, materials_list, fmax, unit):
+    """Depths of the skin layers per conductor layer, for settings['conductor_model'] = 'solve_inside_skin':
+    about 0.4 and 1 skin depth at the highest frequency.
+
+    Args:
+        metals_list, materials_list: from stackup reader
+        fmax (float): highest simulation frequency in Hz
+        unit (float): drawing unit in m
+
+    Returns:
+        dict {layername: sorted list of depths}, only layers that get at least one skin layer, and
+        dict {layername: note}, why a layer gets fewer or no skin layers (printed by
+        add_conductor_skin_cores() if the layer has polygons). Depths are measured from the conductor
+        surface inward, in drawing units.
+    """
+    depths_by_layer, notes_by_layer = {}, {}
+    for metal in metals_list.metals:
+        if not metal.is_metal or metal.thickness <= 0:
+            continue
+        if _is_pec_material(metal.material):
+            continue
+        material = materials_list.get_by_name(metal.material)
+        if material is not None and material.sigma > 1e8:
+            # above any real metal (silver: 6.3e7 S/m at 20 C, CRC Handbook): a stand-in for a perfect conductor,
+            # e.g. a ground plane, whose skin layers would be nanometres thin and only add badly shaped cells.
+            notes_by_layer[metal.name] = f'conductivity {material.sigma:.3g} S/m is a perfect conductor stand-in'
+            continue
+        if material is None or material.sigma <= 0 or fmax <= 0:
+            continue
+        delta = 1 / math.sqrt(math.pi * fmax * 4e-7 * math.pi * material.sigma) / unit   # skin depth at fmax
+        if metal.thickness < 4 * delta:
+            # thinner than 4 skin depths at fmax: thin layers (in SG13G2 Metal1-Metal5 up to about 1 THz) gain little,
+            # but their very thin skin layers (e.g. 0.09 um) cost much solver effort. Metal1 ground plane of
+            # palace_line_viaport.py (100 GHz): R' about 1 % better at 2.6 x run time; D-band balun with skin layers in
+            # Metal3-Metal5 (200 GHz): same result (Max|dS| 0.002), 55 instead of 37 GMRES iterations, 1.7 x run time.
+            notes_by_layer[metal.name] = (f'thickness {metal.thickness:g} is less than 4 skin depths at the highest '
+                                          f'frequency ({delta:.3g})')
+            continue
+        # tested: TopMetal2, 0.1 / 0.25 um up to 150 GHz
+        depths = [round(0.4 * delta, 3), round(delta, 3)]
+        # a core of at least a third of the thickness must remain; skip depths below the geometry tolerance
+        usable = sorted({d for d in depths if 0.005 <= d <= metal.thickness / 3})
+        if usable:
+            depths_by_layer[metal.name] = usable
+        dropped = sorted(set(depths) - set(usable))
+        if dropped:
+            notes_by_layer[metal.name] = (f'depths {dropped} not used (a core of at least 1/3 of the thickness '
+                                          f'{metal.thickness:g} must remain, minimum depth 0.005)')
+    return depths_by_layer, notes_by_layer
+
+
+def add_conductor_skin_cores (allpolygons, metals_list, depths_by_layer, notes_by_layer=None, meshseed=0):
+    """Add nested core volumes inside filled conductors, so that fragmenting splits each conductor into thin skin
+    layers along all its faces plus a core. The mesh then has thin cells next to the conductor surface (where the
+    skin effect needs them) without a fine mesh along the surface. All pieces keep the conductor layer name, so
+    they end up in the same physical group and material.
+
+    Core k is the layer's polygon outline offset inward by depth k (sharp corners kept), extruded from zmin + depth k
+    to zmax - depth k. Call after add_metal_volumes(), not before: that function fuses all volumes of a layer.
+
+    Args:
+        allpolygons: from gds reader
+        metals_list: from stackup reader
+        depths_by_layer (dict): {layername: sorted list of depths}, see skin_layer_depths()
+        notes_by_layer (dict, optional): {layername: note}, see skin_layer_depths(), only for the report
+
+    Returns:
+        list of created 3D dimtags
+    """
+    from shapely.geometry import Polygon as ShapelyPolygon
+    from shapely.validation import make_valid
+    from shapely import unary_union
+
+    notes_by_layer = notes_by_layer or {}
+    created = []
+    for metal in metals_list.metals:
+        depths = depths_by_layer.get(metal.name)
+        note = notes_by_layer.get(metal.name)
+        if not depths and not note:
+            continue
+        shapes = []
+        for poly in allpolygons.polygons:
+            if int(poly.layernum) == int(metal.layernum) and len(poly.pts_x) >= 3:
+                shapes.append(make_valid(ShapelyPolygon(list(zip(poly.pts_x, poly.pts_y)))))
+        if not shapes:
+            continue
+        if not depths:
+            print(f'No skin layers for {metal.name}: {note}')
+            continue
+        outline = unary_union(shapes)
+        count = 0
+        for depth in depths:
+            core = outline.buffer(-depth, join_style='mitre').simplify(1e-4)
+            parts = [core] if core.geom_type == 'Polygon' else [g for g in getattr(core, 'geoms', []) if g.geom_type == 'Polygon']
+            for part in parts:
+                if part.is_empty or part.area < depth * depth:
+                    continue                     # tiny remainder of a narrow feature, not worth a separate core
+                z = metal.zmin + depth
+                outer = _build_plane_surface(list(part.exterior.coords)[:-1], z, meshseed)
+                holes = [_build_plane_surface(list(ring.coords)[:-1], z, meshseed) for ring in part.interiors]
+                surfaces = [outer]
+                if holes:
+                    surfaces, _ = gmsh.model.occ.cut([outer], holes)
+                for surface in surfaces:
+                    out = gmsh.model.occ.extrude([surface], 0, 0, metal.thickness - 2 * depth)
+                    for dimtag in out:
+                        if dimtag[0] == 3:
+                            gmsh.model.setEntityName(dim=3, tag=dimtag[1], name=metal.name)
+                            created.append(dimtag)
+                            count += 1
+        gmsh.model.occ.synchronize()
+        print(f'Skin layers for {metal.name}: depths {depths} (drawing units), {count} core volume(s)' + (f'; {note}' if note else ''))
+    return created
+
+
 def create_box_with_meshseed (xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
     """Create a box with given value for mesh seed
     Returns:
@@ -1212,8 +1330,7 @@ def create_model (excite_ports, settings):
         # are planar here, so one evaluation gives the orientation of the whole face. The vertex
         # based estimate below is only a fallback: it collects the boundary points curve by curve,
         # which does not give them in loop order when curves run against the loop direction (e.g.
-        # faces split by a port box), and then returns a wrong or zero normal - this put vertical
-        # end faces into the horizontal (_xy) group and horizontal slivers into the vertical (_z) one.
+        # faces split by a port box), and then returns a wrong or zero normal.
         try:
             umin, umax = gmsh.model.getParametrizationBounds(2, s)
             exact = np.array(gmsh.model.getNormal(s, [(umin[0] + umax[0]) / 2, (umin[1] + umax[1]) / 2]))
@@ -1377,11 +1494,46 @@ def create_model (excite_ports, settings):
         value = item[1]
         refined_cellsize_override_dict[layername]=value
 
-    # separate_z_group_for_metals setting 
-    z_thickness_factor = get_optional_setting (settings, "z_thickness_factor", 1)
+    # z_thickness_factor (side wall thickness of surface impedance conductors) was removed in 0.9.0
+    if get_optional_setting(settings, 'z_thickness_factor', 1) != 1:
+        print(f"WARNING: settings['z_thickness_factor'] was removed in gds2palace 0.9.0 and is ignored "
+              f"(full metal thickness on all faces). Results differ from earlier versions that used it. "
+              f"For accurate conductor loss, use settings['conductor_model'].")
 
-    # metal layers are modeled as surface for EM by default
-    filled_metals = get_optional_setting(settings, 'filled_metals', False)
+    # conductor_model:
+    #   'surface'           (default) surface impedance on all conductor faces: fastest, peak Q of top metal coils (2-8 um traces) 18-30 % high
+    #   'solve_inside'      conductors meshed as volumes: Q a few percent low at a 2 um mesh
+    #   'solve_inside_skin' volumes with thin layers along all faces (skin effect): about half the error of 'solve_inside',
+    #                       at 1.4-2x its unknowns
+    # (filled, skin layers) for each of CONDUCTOR_MODELS
+    conductor_presets = {'surface': (False, False), 'solve_inside': (True, False), 'solve_inside_skin': (True, True)}
+    conductor_model = get_optional_setting(settings, 'conductor_model', None)
+    if conductor_model is not None and conductor_model not in conductor_presets:
+        print(f"ERROR: settings['conductor_model'] must be 'surface', 'solve_inside' or 'solve_inside_skin', not {conductor_model!r}")
+        exit(1)
+    if 'skin_layers' in settings:
+        print("ERROR: settings['skin_layers'] was replaced by settings['conductor_model'] = 'solve_inside_skin'")
+        exit(1)
+    # filled_metals, the setting before conductor_model: True = 'solve_inside', False = 'surface'
+    if 'filled_metals' in settings:
+        legacy_filled = settings['filled_metals']
+        if legacy_filled is None:
+            legacy_filled = False
+        if legacy_filled not in (True, False):
+            print(f"ERROR: settings['filled_metals'] = {legacy_filled!r} is not supported, use settings['conductor_model'] "
+                  f"= 'surface', 'solve_inside' or 'solve_inside_skin'")
+            exit(1)
+        legacy_model = 'solve_inside' if legacy_filled else 'surface'
+        if conductor_model is not None and conductor_model != legacy_model:
+            print(f"ERROR: settings['filled_metals'] = {legacy_filled} contradicts settings['conductor_model'] = "
+                  f"'{conductor_model}', remove filled_metals")
+            exit(1)
+        if conductor_model is None:
+            print(f"Note: settings['filled_metals'] = {legacy_filled} is the same as settings['conductor_model'] = '{legacy_model}'")
+            conductor_model = legacy_model
+    if conductor_model is None:
+        conductor_model = 'surface'
+    filled_metals, skin_layers = conductor_presets[conductor_model]
 
     # solver choice
     elmer = get_optional_setting(settings, 'elmer', False)
@@ -1399,6 +1551,13 @@ def create_model (excite_ports, settings):
     # Paraview visualization, existing behavior below), EM needs volume ONLY (no
     # redundant surface-impedance BC on the same faces as the bulk-conductivity domain).
     filled_metals_em = filled_metals and not elmer_thermal
+
+    # names of the conductor layers meshed as volumes in an EM model (all others: surface impedance)
+    filled_layers = set()
+    if filled_metals_em:
+        filled_layers = {metal.name for metal in metals_list.metals if metal.is_metal}
+    # thin layers along all faces of filled conductors (skin effect), see add_conductor_skin_cores(); not for thermal
+    skin_layers = skin_layers and filled_metals_em
 
     # scale via conductivity (thermal: heat conductivity) by the fill factor of merged via arrays
     fill_factor_correction = get_optional_setting(settings, 'fill_factor_correction', False)
@@ -1504,7 +1663,7 @@ def create_model (excite_ports, settings):
         elif metal.is_sheet: # sheet layer for resistor etc
             metal_sheet_dict[metal.name] = []
         else:
-            if filled_metals_em:
+            if metal.name in filled_layers:
                 # EM volume-conductor mode: solid bulk-conductivity domain only,
                 # no surface-impedance BC on the same faces
                 metal_volume_dict[metal.name]=[]
@@ -1543,6 +1702,11 @@ def create_model (excite_ports, settings):
     print('Adding metal tags ...')
     # add as volume
     metal_dimtags_created_3D, sheetlayer_dimtags, via_fill_factor_by_tag = add_metal_volumes (allpolygons, metals_list)
+
+    if skin_layers:
+        # thin layers along all conductor faces: nested core volumes, split from the conductors by fragment() below
+        depths_by_layer, notes_by_layer = skin_layer_depths(metals_list, materials_list, fmax, unit)
+        metal_dimtags_created_3D.extend(add_conductor_skin_cores(allpolygons, metals_list, depths_by_layer, notes_by_layer))
 
 
     if elmer_thermal:
@@ -1625,7 +1789,7 @@ def create_model (excite_ports, settings):
 
 
     # restore names with possibly new tag numbers
-    if filled_metals_em:
+    if filled_layers:
         # EM volume-conductor mode: if a via and a regular conductor geometrically
         # overlap (e.g. a via drawn to extend slightly into its pad, for a
         # watertight boolean), fragment() above produces a shared piece that
@@ -1634,11 +1798,10 @@ def create_model (excite_ports, settings):
         # conductor's name always overwrites a via's for any such shared region
         # (the conductor wins the overlap, matching regular circuit-design intent
         # of a via making contact into, not displacing, the conductor above/below it).
-        via_indices, other_indices = [], []
+        other_indices, filled_indices = [], []
         for n, (dim, original_tag) in enumerate(geom_dimtags):
-            layer = metals_list.getbylayername(original_volume_names_dict[original_tag])
-            (via_indices if (layer is not None and layer.is_via) else other_indices).append(n)
-        name_restore_order = via_indices + other_indices
+            (filled_indices if original_volume_names_dict[original_tag] in filled_layers else other_indices).append(n)
+        name_restore_order = other_indices + filled_indices
     else:
         name_restore_order = range(len(geom_dimtags))
 
@@ -1853,7 +2016,7 @@ def create_model (excite_ports, settings):
                 vertical_faces = [t for loop in surfaceloops for t in loop if is_vertical_surface(t)]
                 if vertical_faces:
                     via_surface_dict.setdefault(name, []).append([vertical_faces])
-            elif filled_metals_em and via_metal is not None and via_metal.is_metal:
+            elif via_metal is not None and via_metal.is_metal and name in filled_layers:
                 # volumized regular conductor gets no surface physical group (pure
                 # domain conductor, like a via above), but mesh refinement near its
                 # edges should still work - collect boundary curves the same way the
@@ -1959,9 +2122,9 @@ def create_model (excite_ports, settings):
             for surfaces in surfaces_list:
                 i=i+1
 
-                # we want to separate surfaces into planar (xy) and vertical (z)
-                new_tags_planar = []
-                new_tags_vertical = []
+                # all faces of this conductor body (top, bottom and side walls) share one group:
+                # they get the same conductivity and thickness
+                new_tags = []
 
                 all_tags = surfaces[0]
                 for tag in all_tags:
@@ -1970,10 +2133,7 @@ def create_model (excite_ports, settings):
                         # surface - see port_surface_tags comment above
                         continue
 
-                    if is_vertical_surface(tag):
-                        new_tags_vertical.append(tag)
-                    else:
-                        new_tags_planar.append(tag)
+                    new_tags.append(tag)
 
                     # we should not have this in list
                     if tag not in already_assigned_tags:
@@ -1984,23 +2144,12 @@ def create_model (excite_ports, settings):
                         print("   Make sure different 'conductor' layers never touch directly, use 'via' layer for connecting to metal layers!")
                         exit(101)
 
-                # we now have separate lists for xy and z surfaces
-
-                # xy in-plane
-                if len(new_tags_planar)>0:
-                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags_planar, tag=-1)
-                    group_name = f"{key}_{i}_xy"
-                    gmsh.model.setPhysicalName(2, phys_group, group_name)            
+                if len(new_tags)>0:
+                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags, tag=-1)
+                    group_name = f"{key}_{i}"
+                    gmsh.model.setPhysicalName(2, phys_group, group_name)
                     # store, used when creating solver config file
-                    physical_groups_2D.append({"layername":key+"_xy", "groupname":group_name, "grouptag":phys_group })
-
-                # z vertical
-                if len(new_tags_vertical)>0:
-                    phys_group = gmsh.model.addPhysicalGroup(2, new_tags_vertical, tag=-1)
-                    group_name = f"{key}_{i}_z"
-                    gmsh.model.setPhysicalName(2, phys_group, group_name)            
-                    # store, used when creating solver config file
-                    physical_groups_2D.append({"layername":key+"_z", "groupname":group_name, "grouptag":phys_group })
+                    physical_groups_2D.append({"layername":key, "groupname":group_name, "grouptag":phys_group })
 
                 # add for edge mesh refinement also
                 if key not in boundary_line_tags_dict.keys():
@@ -2343,12 +2492,7 @@ def create_model (excite_ports, settings):
 
     for item in physical_groups_2D:
         # items can be from surface of metal conductor
-        internal_layername, groupname, grouptag = item.values()
-        is_vertical = '_z' in internal_layername
-
-        # strip suffix _xy and _z
-        layername = internal_layername.replace('_xy','')
-        layername = layername.replace('_z','')
+        layername, groupname, grouptag = item.values()
 
         metal = metals_list.getbylayername(layername)
 
@@ -2385,11 +2529,7 @@ def create_model (excite_ports, settings):
 
                     # regular conductor
                     Palace_conductor['Conductivity'] = material.sigma
-                    # for regular metal, we apply an optional thickness factor to the vertical sheets
-                    if is_vertical:
-                        Palace_conductor['Thickness'] = metal.thickness * z_thickness_factor
-                    else:
-                        Palace_conductor['Thickness'] = metal.thickness 
+                    Palace_conductor['Thickness'] = metal.thickness
                     Palace_conductors.append(Palace_conductor)
 
                 elif metal.is_sheet:
@@ -2700,12 +2840,7 @@ def create_model (excite_ports, settings):
         # surfaces
         for item in physical_groups_2D:
             # items can be from surface of metal conductor
-            internal_layername, groupname, grouptag = item.values()
-            is_vertical = '_z' in internal_layername
-
-            # strip suffix _xy and _z
-            layername = internal_layername.replace('_xy','')
-            layername = layername.replace('_z','')
+            layername, groupname, grouptag = item.values()
 
             metal = metals_list.getbylayername(layername)
 
@@ -2737,10 +2872,7 @@ def create_model (excite_ports, settings):
                             Elmer_boundary = {}
                             Elmer_boundary['name'] = gmsh.model.getPhysicalName(2,grouptag)
                             Elmer_boundary['conductivity'] = material.sigma
-                            if '_z' in internal_layername:                        
-                                Elmer_boundary['thickness'] = metal.thickness * z_thickness_factor
-                            else:    
-                                Elmer_boundary['thickness'] = metal.thickness 
+                            Elmer_boundary['thickness'] = metal.thickness
                             Elmer_boundaries.append(Elmer_boundary)
 
                         elif metal.is_sheet:
@@ -3147,7 +3279,7 @@ def create_model (excite_ports, settings):
                 # Step 1: Get all physical volumes
                 volume_groups = [(dim, tag) for dim, tag in gmsh.model.getPhysicalGroups() if dim == 3]
 
-                if filled_metals_em:
+                if filled_layers:
                     # EM volume-conductor mode: don't hide conductor domains here -
                     # unlike vias/dielectric/airbox, these are the model's actual
                     # metal, and hiding them would leave nothing meaningful visible
@@ -3155,7 +3287,7 @@ def create_model (excite_ports, settings):
                     kept_volume_groups = []
                     for dim, tag in volume_groups:
                         layer = metals_list.getbylayername(gmsh.model.getPhysicalName(dim, tag))
-                        if layer is None or not layer.is_metal:
+                        if layer is None or layer.name not in filled_layers:
                             kept_volume_groups.append((dim, tag))
                     volume_groups = kept_volume_groups
 

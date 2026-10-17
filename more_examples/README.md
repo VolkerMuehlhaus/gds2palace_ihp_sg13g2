@@ -18,7 +18,7 @@ These are extra, more advanced gds2palace examples. Each one shows a specific fe
 
 | Example | What it shows |
 |---|---|
-| [`measured_vs_simulated/more_accurate_models_L6n2`](measured_vs_simulated/more_accurate_models_L6n2) | A 4-turn inductor, simulated L, Q and R compared to measurement. Steps through three model improvements: via array merging with `fill_factor_correction`, `filled_metals` (solid metal volumes) instead of surface impedance, and a conformal passivation stackup. Together they bring self-resonance and peak Q close to the measured values. Also tests a "passicut" stackup variant |
+| [`measured_vs_simulated/more_accurate_models_L6n2`](measured_vs_simulated/more_accurate_models_L6n2) | A 4-turn inductor, simulated L, Q and R compared to measurement. Steps through three model improvements: via array merging with `fill_factor_correction`, solid metal volumes (`conductor_model = 'solve_inside'`, then `filled_metals`) instead of surface impedance, and a conformal passivation stackup. Together they bring self-resonance and peak Q close to the measured values. Also tests a "passicut" stackup variant |
 | [`measured_vs_simulated/more_accurate_models_L6n2_v2`](measured_vs_simulated/more_accurate_models_L6n2_v2) | The same study, rerun with gds2palace 0.8.0 and its new default `complex_coarse_solve`: identical results, about 2x faster in total. Compares solve time, iterations and memory for every model |
 | [`measured_vs_simulated/more_accurate_models_L6n2_v3`](measured_vs_simulated/more_accurate_models_L6n2_v3) | The same study with a converged simulation boundary: a margin test (100 to 800 µm) shows that 100 µm underestimated L by 1.3 % and peak Q by 3.7 % for this coil without a ground frame. All models rerun with 400 µm; the best model is within 1 % in L and SRF and 3.3 % in peak Q of the measurement |
 
@@ -35,5 +35,11 @@ The [`mesh_convergence`](mesh_convergence) folder has a summary page with practi
 | [`mesh_convergence_balun_mim`](mesh_convergence/mesh_convergence_balun_mim) | 3-port balun for 17-22 GHz, with its MIM capacitors included |
 | [`mesh_convergence_mom_cmos5l`](mesh_convergence/mesh_convergence_mom_cmos5l) | MOM capacitor on the SG13CMOS5L stackup. Compares FEM order 2 and order 3 |
 | [`conformal_3D_passivation`](conformal_3D_passivation) | The same D-band balun as above, but with a conformal passivation stackup. Shows how much the passivation shape changes the result compared to the planar stackup |
+
+## Conductor model
+
+| Example | What it shows |
+|---|---|
+| [`conductor_models`](conductor_models) | Accuracy and cost of `settings['conductor_model']` = `'surface'`, `'solve_inside'` and `'solve_inside_skin'` on coils, baluns, straight lines and the measured L6n2 inductor: which one to use for which figure of merit |
 
 See the top-level [`README.md`](../README.md) for system requirements. The workflow builds Palace model files on any platform, but the Palace solver itself only runs on Linux.

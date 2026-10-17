@@ -1,0 +1,157 @@
+{
+    "Problem": {
+        "Type": "Driven",
+        "Verbose": 3,
+        "Output": "output/line_w4p5_L100_solve_inside_mesh2"
+    },
+    "Model": {
+        "Mesh": "line_w4p5_L100_solve_inside_mesh2.msh",
+        "L0": 1e-06,
+        "Refinement": {
+            "UniformLevels": 0,
+            "Tol": 0.01,
+            "MaxIts": 0,
+            "MaxSize": 2000000.0,
+            "Nonconformal": true,
+            "UpdateFraction": 0.7,
+            "SaveAdaptMesh": false
+        }
+    },
+    "Solver": {
+        "Linear": {
+            "Type": "Default",
+            "KSPType": "GMRES",
+            "Tol": 1e-06,
+            "MaxIts": 400,
+            "ComplexCoarseSolve": true
+        },
+        "Order": 2,
+        "Device": "CPU",
+        "Driven": {
+            "Samples": [
+                {
+                    "Type": "Point",
+                    "Freq": [
+                        0.01,
+                        1,
+                        5,
+                        10,
+                        20,
+                        30,
+                        50,
+                        75,
+                        100,
+                        150
+                    ],
+                    "SaveStep": 0
+                }
+            ],
+            "AdaptiveTol": 0.0
+        }
+    },
+    "Domains": {
+        "Materials": [
+            {
+                "Attributes": [
+                    1
+                ],
+                "Permittivity": 1.0,
+                "Conductivity": 30300000.0
+            },
+            {
+                "Attributes": [
+                    2
+                ],
+                "Permittivity": 4.1,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    3
+                ],
+                "Permittivity": 4.1,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    4
+                ],
+                "Permittivity": 1.0,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    5
+                ],
+                "Permittivity": 6.6,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    6
+                ],
+                "Permittivity": 4.1,
+                "Conductivity": 0.0
+            },
+            {
+                "Attributes": [
+                    7
+                ],
+                "Permittivity": 11.9,
+                "Conductivity": 5.0
+            },
+            {
+                "Attributes": [
+                    8
+                ],
+                "Permittivity": 11.9,
+                "Conductivity": 2.0
+            },
+            {
+                "Attributes": [
+                    9
+                ],
+                "Permittivity": 1.0
+            }
+        ],
+        "Postprocessing": {
+            "Energy": [],
+            "Probe": []
+        }
+    },
+    "Boundaries": {
+        "Conductivity": [],
+        "LumpedPort": [
+            {
+                "Index": 1,
+                "R": 50,
+                "Direction": "Z",
+                "Excitation": 1,
+                "Attributes": [
+                    11
+                ]
+            },
+            {
+                "Index": 2,
+                "R": 50,
+                "Direction": "Z",
+                "Excitation": 2,
+                "Attributes": [
+                    12
+                ]
+            }
+        ],
+        "Absorbing": {
+            "Attributes": [
+                13
+            ],
+            "Order": 2
+        },
+        "PEC": {
+            "Attributes": [
+                14,
+                10
+            ]
+        }
+    }
+}

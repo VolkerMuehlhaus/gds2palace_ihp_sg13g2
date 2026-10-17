@@ -89,7 +89,6 @@ settings['cells_per_wavelength'] = 10   # how many mesh cells per wavelength, mu
 
 settings['meshsize_max'] = 100  # microns, override cells_per_wavelength 
 settings['adaptive_mesh_iterations'] = 0
-settings['z_thickness_factor'] = 1  
 
 settings['no_gui'] = ('-no_gui' in sys.argv)  # check if no_gui specified on command line
 

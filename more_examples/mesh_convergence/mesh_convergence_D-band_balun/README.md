@@ -2,11 +2,12 @@
 
 This study asks a practical question for one specific layout: a compact edge-coupled balun for 140–170 GHz. How fine must the Palace mesh be before the results stop changing in ways a designer would care about? And are the "more accurate" options (finer mesh, higher FEM order, adaptive mesh refinement) worth their cost here?
 
-We answer this in three steps:
+We answer this in four steps:
 
 1. **Refine a uniform mesh** from 5 µm to 1 µm and watch which balun properties move.
 2. **Cross-check the finest result** with two independent routes (higher FEM order, adaptive mesh refinement), to know what "converged" means for this model.
 3. **Compare accuracy against cost**, and pick a working point.
+4. **Change the conductor model**: `'solve_inside'` and `'solve_inside_skin'` instead of the surface impedance used in steps 1–3.
 
 The findings apply to this balun, with this stackup, in this frequency range. Other structures can behave quite differently. The [overview page](../README.md) collects the other mesh studies.
 
@@ -91,11 +92,32 @@ For this balun:
 - **1 µm order 2 and 2 µm order 3 give practically the same answer.** For this model, the 1 µm uniform mesh gets there faster (7 min vs. 12 min) at the same memory.
 - **AMR reaches the same answer, at about 20× the time and 7× the memory** of the 1 µm run. The last iterations kept refining after the S-parameters had stopped changing much. For this model, it didn't pay off.
 
+## 4. Conductor model: surface, solve_inside, solve_inside_skin
+
+Steps 1–3 use the default surface impedance conductor model. Here the same balun runs with the conductors meshed as volumes: `settings['conductor_model'] = 'solve_inside'`, and `'solve_inside_skin'` with thin layers along the TopMetal1/TopMetal2 faces (0.08 and 0.21 µm deep for 200 GHz, the top of the sweep; Metal3–Metal5 are too thin for skin layers). The reference is `'solve_inside_skin'` at 1 µm.
+
+![Insertion loss and match for the three conductor models](results/plots/story_conductor_models.png)
+
+| Model | DOF | GMRES iterations per solve | Insertion loss in band | S11 null |
+|---|---:|---:|---:|---:|
+| `'solve_inside_skin'`, 1 µm (reference) | 1.66 M | 29 | 1.06–1.21 dB | 144 GHz |
+| `'solve_inside_skin'`, 2 µm | 0.74 M | 37 | 1.06–1.23 dB | 141 GHz |
+| `'solve_inside_skin'`, 3 µm | 0.49 M | 50 | 1.09–1.27 dB | 137 GHz |
+| `'solve_inside_skin'`, 5 µm | 0.34 M | 68 | 1.15–1.35 dB | 131 GHz |
+| `'solve_inside'`, 2 µm | 0.41 M | 32 | 1.19–1.36 dB | 138 GHz |
+| surface impedance, 1 µm | 0.67 M | | 0.96–1.08 dB | 146 GHz |
+| surface impedance, 2 µm | 0.34 M | | 1.00–1.15 dB | 141 GHz |
+
+- **For this balun, the mesh matters more than the conductor model.** With every conductor model, the response moves up by 3–5 GHz per refinement step, as in step 1. The 2 µm coupling gap sets the mesh, and skin layers don't change that. Amplitude and phase balance agree within about 0.1 dB and 1° between the models at the same mesh.
+- **The conductor model shifts the loss by about 0.1–0.15 dB.** `'solve_inside'` is about 0.15 dB too lossy at 2 µm, because the current near the conductor surface is under-resolved at these frequencies. `'solve_inside_skin'` at 2 µm is within 0.02 dB of the reference. The surface impedance model is about 0.1 dB more optimistic than the reference.
+- **Cost:** skin layers nearly double the unknowns at 2 µm (0.74 M instead of 0.41 M) and need a few more solver iterations per frequency (37 instead of 32), more so on coarse meshes (68 at 5 µm), where the thin layers make flat cells.
+
 ## Summary for this balun
 
 - **2 µm uniform mesh, order 2, is a good working point for design iterations.** It gets amplitude and phase balance right and finishes in about 3 minutes. Its main error is a frequency shift of the response of about 5 GHz (S11 null at 141 GHz instead of 146 GHz), which makes insertion loss look up to about 0.07 dB worse in the target band.
 - **For final numbers, run 1 µm once** (about 7 minutes here). This moves the result into the range where three independent methods agree.
 - **Mesh size mostly shifts this balun's response in frequency rather than changing its balance.** That is plausibly because the 2 µm coupling gap is under-resolved at coarse settings, but this study doesn't prove the cause.
+- **The conductor model shifts the insertion loss by about 0.1 dB.** `'solve_inside_skin'` at 2 µm is the accurate choice for loss.
 
 Again, these numbers belong to this layout. A structure with different feature sizes, frequency range or stackup needs its own check. Running one medium and one fine mesh and comparing them is the minimum.
 
@@ -110,10 +132,13 @@ mesh_convergence_D-band_balun/
 ├── palace_balun_mesh5.py … palace_balun_mesh1.py   # uniform mesh model scripts
 ├── palace_balun_mesh2_order3.py                    # 2 µm, order 3
 ├── palace_balun_amr5.py                            # AMR, 5 µm start, 5 iterations
+├── palace_balun_skin_mesh{5,3,2,1}.py              # 'solve_inside_skin' (step 4)
+├── palace_balun_filled_mesh2.py                    # 'solve_inside' (step 4)
 ├── palace_model/palace_balun_<name>_data/          # mesh, config and full Palace output per run
 └── results/
     ├── story_plots.py            # the story_*.png plots and numbers in this report
     ├── analyze_convergence.py    # detailed ΔS tables (CSV) and per-S-parameter overlays
+    ├── story_conductor_models.py # step 4 plot and numbers
     ├── delta_S_table.csv         # Max|ΔS| between successive runs, per S-parameter
     ├── delta_S_vs_finest.csv     # Max|ΔS| of every run vs. 1 µm, per S-parameter
     ├── snp/                      # Touchstone files, one per run (_raw = without port de-embedding;
