@@ -7,7 +7,7 @@ We answer this in three steps:
 1. **Refine a uniform mesh** from 5 µm to 1 µm and see how L and Q respond.
 2. **Cross-check the finest result** with adaptive mesh refinement (AMR), to know whether 1 µm is converged.
 3. **Try FEM order 1** as a fast alternative, and compare everything on accuracy vs. cost.
-4. **Change the conductor model**: filled metals with and without skin layers instead of the surface impedance used in steps 1–3.
+4. **Change the conductor model**: `'solve_inside'` and `'solve_inside_skin'` instead of the surface impedance used in steps 1–3.
 
 The findings apply to this inductor, with this stackup, in this frequency range. Other structures can behave quite differently. The [overview page](../README.md) collects the other mesh studies.
 
@@ -76,22 +76,22 @@ FEM order 1 uses simpler basis functions: about 5× fewer unknowns on the same m
 | 1 µm, order 2 | 5m 5s | (reference) | (reference) |
 | AMR, 2 iterations | 9m 54s | +0.1% | −0.05% |
 
-## 4. Conductor model: surface impedance vs. filled metals
+## 4. Conductor model: surface, solve_inside, solve_inside_skin
 
-Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the inductor with `settings['filled_metals'] = True` (conductors as volumes), with and without `settings['skin_layers'] = True` (thin layers along all conductor faces, about 0.16 and 0.41 µm deep in TopMetal2 for 50 GHz). The reference is the filled model with skin layers at 1 µm.
+Steps 1–3 use the default surface impedance conductor model, so they show how well the mesh converges *for that model*. Here we rerun the inductor with the conductors meshed as volumes: `settings['conductor_model'] = 'solve_inside'`, and `'solve_inside_skin'` with thin layers along all conductor faces (about 0.16 and 0.41 µm deep in TopMetal2 for 50 GHz). The reference is `'solve_inside_skin'` at 1 µm.
 
-![R and Q for surface impedance and filled metals](results/plots/story_conductor_models.png)
+![R and Q for the three conductor models](results/plots/story_conductor_models.png)
 
 | Model | DOF | R at 1 GHz | L at 10 GHz | Peak Q (27 GHz) |
 |---|---:|---:|---:|---:|
-| filled + skin layers, 1 µm (reference) | 2.38 M | 2.27 Ω | 0.782 nH | 17.1 |
-| filled + skin layers, 2 µm | 1.05 M | −0.3% | −0.2% | −2.6% |
-| filled + skin layers, 5 µm | 0.38 M | −0.6% | −1.3% | −4.1% |
-| filled, 2 µm (no skin layers) | 0.50 M | −0.4% | −0.4% | −8.0% |
+| `'solve_inside_skin'`, 1 µm (reference) | 2.38 M | 2.27 Ω | 0.782 nH | 17.1 |
+| `'solve_inside_skin'`, 2 µm | 1.05 M | −0.3% | −0.2% | −2.6% |
+| `'solve_inside_skin'`, 5 µm | 0.38 M | −0.6% | −1.3% | −4.1% |
+| `'solve_inside'`, 2 µm | 0.50 M | −0.4% | −0.4% | −8.0% |
 | surface impedance, 1 µm | 0.88 M | −28% | −0.9% | +26% |
 
-- **The conductor model changes Q far more than the mesh does.** The surface model's resistance is 28% low already at 1 GHz. It gives the side walls the same surface impedance as top and bottom, so at low frequency the 5 µm wide, 3 µm thick trace conducts roughly as if it were 8 µm wide (see "Limits of conductor loss calculation" in the user's guide). Its peak Q is 26% higher than the filled models, which all agree within a few percent. The mesh study in steps 1–3 converges, but to the surface model's answer.
-- **Skin layers make a coarse filled mesh good.** Without them, the filled 2 µm model is 8% low in Q, because the current near the surface is under-resolved at 20–40 GHz. With skin layers, even the 5 µm mesh is within 4%, at fewer unknowns than the surface model at 1 µm.
+- **The conductor model changes Q far more than the mesh does.** The surface model's resistance is 28% low already at 1 GHz. It gives the side walls the same surface impedance as top and bottom, so at low frequency the 5 µm wide, 3 µm thick trace conducts roughly as if it were 8 µm wide (see "Limits of conductor loss calculation" in the user's guide). Its peak Q is 26% higher than the volume models, which all agree within a few percent. The mesh study in steps 1–3 converges, but to the surface model's answer.
+- **Skin layers make a coarse mesh good.** `'solve_inside'` at 2 µm is 8% low in Q, because the current near the surface is under-resolved at 20–40 GHz. With `'solve_inside_skin'`, even the 5 µm mesh is within 4%, at fewer unknowns than the surface model at 1 µm.
 - **The reference is not proven converged.** From 2 to 1 µm, Q still moves 2.6%, more than from 3 to 2 µm (0.3%). The finer mesh along the surface probably resolves the current crowding between the turns better. The true Q may be a few percent above 17.1.
 
 ## Summary for this inductor
@@ -99,7 +99,7 @@ Steps 1–3 use the default surface impedance conductor model, so they show how 
 - **For inductance alone, a 5 µm order-2 mesh is enough** (within 1%, under a minute).
 - **For Q, use 2 µm** (within 2%, about 2 minutes) during design, and **1 µm for final numbers**. Here, 1 µm agrees with AMR within a fraction of a percent.
 - **Don't use order 1 for L or Q of this inductor.** Refining the mesh reduces its error, but even at 1 µm it is larger than that of a 5 µm order-2 run that costs about the same.
-- **For Q, the conductor model matters more than the mesh.** The default surface impedance gives 26% higher Q than filled metals. Filled metals with skin layers at 3–5 µm get within 3–4% of the finest filled result at a few hundred thousand unknowns.
+- **For Q, the conductor model matters more than the mesh.** The default surface impedance gives 26% higher Q than the volume models. `'solve_inside_skin'` at 3–5 µm gets within 3–4% of its finest result at a few hundred thousand unknowns.
 
 These numbers belong to this layout. A differential inductor, tighter spacing or a different frequency range can shift them. Running one medium and one fine mesh and comparing Q is the minimum check.
 
@@ -111,8 +111,8 @@ mesh_convergence_inductor/
 ├── palace_ind_frame_mesh{5,3,2,1}.py            # uniform mesh, order 2
 ├── palace_ind_frame_mesh{3,2,1}_order1.py       # uniform mesh, order 1
 ├── palace_ind_frame_amr2.py                     # AMR, 5 µm start, 2 iterations
-├── palace_ind_frame_skin_mesh{5,3,2,1}.py       # filled metals + skin layers (step 4)
-├── palace_ind_frame_filled_mesh2.py             # filled metals, no skin layers (step 4)
+├── palace_ind_frame_skin_mesh{5,3,2,1}.py       # 'solve_inside_skin' (step 4)
+├── palace_ind_frame_filled_mesh2.py             # 'solve_inside' (step 4)
 ├── palace_model/palace_ind_frame_<name>_data/   # mesh, config and full Palace output per run
 └── results/
     ├── story_plots.py                # the story_*.png plots and numbers in this report

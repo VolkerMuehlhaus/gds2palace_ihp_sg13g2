@@ -1,5 +1,7 @@
 # Stackup and Conductor Model Study: L6n2 Inductor vs. Measurement (IHP SG13G2)
 
+> **Note:** this study was written before gds2palace 0.9.0. Its setting `filled_metals = True` is now `conductor_model = 'solve_inside'`. For the current results, see the [v3 study](../more_accurate_models_L6n2_v3/README.md) and the [conductor model study](../../conductor_models/README.md).
+
 ![(model)](results/plots/visualize_pointingvector.png)
 
 This study looks for the best possible model with highest accuracy for an inductor example, including comparison to measured data. It evaluates the effect of three potential error sources:
@@ -75,7 +77,7 @@ Simulations above used the **surface impedance sheet** conductor loss model, whe
 
 In the User's Guide, there is a detailed analysis on the limitations of that surface sheet loss model. Here in this study, we investigate the benefit of using a new **filled metal volume mesh ** option for such cases.
 
-    settings['filled_metals'] = True
+    settings['conductor_model'] = 'solve_inside'   # before gds2palace 0.9.0: settings['filled_metals'] = True
 
 **Be aware that this is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. You would need to mesh into skin effect then, which is numerically expensive. Both loss models have their use cases.**
 

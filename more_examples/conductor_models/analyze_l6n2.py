@@ -13,9 +13,9 @@ import study_data as D
 
 V3 = os.path.join(D.HERE, '..', 'measured_vs_simulated', 'more_accurate_models_L6n2_v3')
 MEAS = os.path.join(V3, 'meas_L5_6n2_THRU_deemb.S2P')
-V3_RUNS = [('v3 study: filled, 2 um', 'L6n2_with_ports_2um_passi3D.s2p'),
-           ('v3 study: filled, 1 um', 'L6n2_with_ports_1um_passi3D.s2p')]
-MODELS = [('surface', 'l6n2_surface_mesh2'), ("'auto'", 'l6n2_auto_mesh2'), ('solve_inside', 'l6n2_solve_inside_mesh2')]
+V3_RUNS = [("v3 study: 'solve_inside', 2 um", 'L6n2_with_ports_2um_passi3D.s2p'),
+           ("v3 study: 'solve_inside', 1 um", 'L6n2_with_ports_1um_passi3D.s2p')]
+MODELS = [('surface', 'l6n2_surface_mesh2'), ('solve_inside', 'l6n2_solve_inside_mesh2')]
 
 
 def merits(ntw):

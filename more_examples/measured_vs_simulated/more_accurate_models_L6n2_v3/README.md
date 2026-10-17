@@ -5,7 +5,7 @@
 **Abstract.** A 4-turn inductor in IHP SG13G2 is simulated with AWS Palace in 11 model variants and compared to its measured differential L, Q and SRF.
 Four model details decide the accuracy: 
 - corrected via resistance in merged via arrays
-- filled (volume) metals
+- conductors meshed as volumes (`conductor_model = 'solve_inside'`)
 - conformal passivation over TopMetal2 and 
 - simulation margin large enough for a coil without ground frame.
 
@@ -14,14 +14,14 @@ With all four, the best model is within 1 % in L and SRF and 3.3 % in peak Q of 
 ## Contents
 
 - [Simulation boundary: margin around the layout](#simulation-boundary-margin-around-the-layout)
-- [Conductors model: surface vs. filled volumes](#conductors-model-surface-vs-filled-volumes-mesh-inside)
+- [Conductor model: surface vs. solve_inside](#conductor-model-surface-vs-solve_inside)
 - [Over-estimate of via cross section due to via array merging](#over-estimate-of-via-cross-section-due-to-via-array-merging)
 - [True conformal passivation](#true-conformal-passivation)
 - [The details of this study](#the-details-of-this-study)
 - [0. Layout](#0-layout)
 - [1. Margin: how far the absorbing boundary must be](#1-margin-how-far-the-absorbing-boundary-must-be)
 - [2. Via array merging and effective via array cross section](#2-via-array-merging-and-effective-via-array-cross-section)
-- [3. Conductor loss: surface impedance vs. filled volumes](#3-conductor-loss-surface-impedance-vs-filled-volumes)
+- [3. Conductor loss: surface vs. solve_inside](#3-conductor-loss-surface-vs-solve_inside)
 - [4. Conformal passivation over TopMetal2](#4-conformal-passivation-over-topmetal2)
 - [5. Cheaper model for TopMetal2 dielectrics](#5-cheaper-model-for-topmetal2-dielectrics)
 - [6. Cheaper model, revisited](#6-cheaper-model-revisited)
@@ -38,8 +38,8 @@ The model was then changed: the metal frame was removed, to be more consistent w
 
 This version 3 of the study adds a margin check and uses a converged margin of 400 µm for all models.
 
-## Conductors model: surface vs. filled volumes ("mesh inside")
-In the User's Guide, there is a detailed analysis on the limitations of the "surface impedance sheet" loss model that gds2palace uses for modelling conductor layers. Here, we investigate the benefit of using a volume mesh ("solve inside") with conductivity for such cases. Be aware that this is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. Both loss models have their use cases.
+## Conductor model: surface vs. solve_inside
+In the User's Guide, there is a detailed analysis on the limitations of the "surface impedance sheet" loss model that gds2palace uses for modelling conductor layers. Here, we investigate the benefit of meshing the conductors as volumes with their conductivity (`conductor_model = 'solve_inside'`) for such cases. At high frequency, where the skin depth is much smaller than the mesh cells, `'solve_inside'` overestimates the loss. `'solve_inside_skin'` adds thin layers along the conductor faces for that case, see the [conductor model study](../../conductor_models/README.md). For L6n2, with peak Q at 5 GHz, both build the same model.
 
 ## Over-estimate of via cross section due to via array merging
 In most models, we want to merge via arrays into bigger blocks, to speed up simulation. Leaving all individual vias would be more accurate, causing much more complex mesh and increase simulation time. Via array merging replaces the individual vias by their outer bounding box, and here's the problem: the effective total cross section is now much larger than before, so this under-estimates the resulting via resistance. Only a minor error in many models, because the relative impact of via resistance is small. However, in this model investigated here, it does show up in results, and we will use an option in gds2palace to restore the correct via resistance by applying a correction factor internally.
@@ -73,7 +73,7 @@ Different from the initial version of this study, the **common ground plane** fo
 
 `settings['margin']` sets how far the dielectrics and the substrate extend beyond the layout before the air box (`settings['air_around']`, kept at 50 µm here) and the absorbing boundary. With a Metal1 ground frame around the inductor, the return currents and much of the field stay inside the frame. Without a frame, as here, the magnetic near field of the coil reaches out by about its own diameter, and an absorbing boundary inside that region both truncates the field (lower L) and absorbs energy (lower Q).
 
-The most accurate practical model of this study (conformal passivation, filled metals, 2 µm mesh, section 4) was simulated with margins of 100, 200, 400 and 800 µm:
+The most accurate practical model of this study (conformal passivation, `'solve_inside'`, 2 µm mesh, section 4) was simulated with margins of 100, 200, 400 and 800 µm:
 
 ![(margin)](results/plots/margin.png)
 
@@ -124,22 +124,22 @@ Internally, gds2palace groups correction factors in buckets where the value agre
 
 
 
-## 3. Conductor loss: surface impedance vs. filled volumes
+## 3. Conductor loss: surface vs. solve_inside
 Simulations above used the **surface impedance sheet** conductor loss model, where the conductor is represented by a hollow volume with surface impedance mapped to all sides of that conductor shell. Skin effect and a low frequency limit resulting from "thickness" are built into each surface. Until September 2026, there was no other option for conductor layer loss modelling in gds2palace.
 
-In the User's Guide, there is a detailed analysis on the limitations of that surface sheet loss model. Here in this study, we investigate the benefit of using a **filled metal volume mesh** option for such cases.
+In the User's Guide, there is a detailed analysis on the limitations of that surface sheet loss model. Here in this study, we investigate the benefit of meshing the conductors as volumes (**`'solve_inside'`**) for such cases.
 
-    settings['filled_metals'] = True
+    settings['conductor_model'] = 'solve_inside'   # before gds2palace 0.9.0: settings['filled_metals'] = True
 
-**Be aware that this is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. You would need to mesh into skin effect then, which is numerically expensive. Both loss models have their use cases.**
+At high frequency, where the skin depth is much smaller than the mesh cells, `'solve_inside'` overestimates the loss. `'solve_inside_skin'` adds thin layers along the conductor faces for that case, see the [conductor model study](../../conductor_models/README.md). For L6n2, with peak Q at 5 GHz, both build the same model.
 
-The next plot compares the two different conductor loss models. Blue is the measured baseline, red is the surface loss model and purple is the volume mesh ("fill inside") model. Both models use refined_cellsize=2 µm with via array merging plus fill factor correction.
+The next plot compares the two different conductor loss models. Blue is the measured baseline, red is the surface loss model and purple is the `'solve_inside'` model. Both models use refined_cellsize=2 µm with via array merging plus fill factor correction.
 
 ![(via_merge)](results/plots/surface_vs_filled.png)
 
-Series resistance for the "filled" volume mesh model (purple) is now closer to the measured values across the entire frequency band. Q factor has changed from optimistic (predicted peak Q too large for surface model) to pessimistic for the filled volume mesh, and the SRF is lower than measurement, as before. Series L is very robust, as before, and agrees well except for the SRF difference.
+Series resistance for the `'solve_inside'` model (purple) is now closer to the measured values across the entire frequency band. Q factor has changed from optimistic (predicted peak Q too large for surface model) to pessimistic for the `'solve_inside'` model, and the SRF is lower than measurement, as before. Series L is very robust, as before, and agrees well except for the SRF difference.
 
-Volume meshing of filled conductors means more mesh cells and more memory. The solve time is still shorter here, mostly because the adaptive sweep needed fewer solves for this model (10 instead of 12):
+Meshing the conductors as volumes means more mesh cells and more memory. The solve time is still shorter here, mostly because the adaptive sweep needed fewer solves for this model (10 instead of 12):
 
 | Via array handling | Conductor model | Mesh | DOF | Mesh elements | Solve time | Peak RAM |
 |---|---|---:|---:|---:|---:|---:|
@@ -198,7 +198,7 @@ In mesh preview, you can find two more groups: the cover above TopMetal2 shapes 
 
 Simulation results agree nicely with measurement on SRF now (10.89 GHz, -1.6 %), and the higher SRF also brings the peak Q factor closer to measurement (15.22, -4.6 %). It is indeed a combination of multiple improvements to the model that enabled this more accurate result:
 - correction factor for effective cross section in via array merging
-- volume meshing with filled conductor at these low frequencies (no surface mesh here)
+- conductors meshed as volumes (`'solve_inside'`) at these low frequencies
 - more accurate modelling of conformal coating above TopMetal2
 - a margin large enough that the absorbing boundary does not touch the coil's near field
 
@@ -280,7 +280,7 @@ If we are striving for most accurate results, regardless of simulation "cost", w
 
 - via array merging with correction factor, to get effective cross section right
 - conformal passivation stackup, to get the true sidewall coverage above TopMetal2
-- filled metals with volume meshing in this rather low frequency case
+- conductors meshed as volumes (`'solve_inside'`) in this rather low frequency case
 - small refined_cellsize to make sure field resolution can capture skin effect properly
 - a margin that keeps the absorbing boundary out of the coil's near field
 
@@ -299,7 +299,7 @@ This is still a feasible simulation on a machine with 64 GB RAM or more, and too
 
 If you like the field and mesh plots in this study: they were all created using the built-in field viewer in setupEM, based on simulation model data with just one `fdump` frequency. That's enough for visualization, simulating fast.
 
- **Be aware that "filled metals" with volume mesh is not a universal solution, because it becomes inaccurate when skin effect is much smaller than mesh cell size. Both loss models have their use cases.**
+ At high frequency, where the skin depth is much smaller than the mesh cells, `'solve_inside'` overestimates the loss. `'solve_inside_skin'` adds thin layers along the conductor faces for that case, see the [conductor model study](../../conductor_models/README.md). For L6n2, with peak Q at 5 GHz, both build the same model.
 
 ## 8. Solver setting: complex coarse solve
 
@@ -320,4 +320,4 @@ All models with a 400 µm margin, differential values, relative to the measureme
 | Volume, 2 µm, conformal | -0.9 % | -4.6 % | -1.6 % | 22m 39s |
 | **Volume, 1 µm, conformal** | **-0.9 %** | **-3.3 %** | **-1.0 %** | 32m 53s |
 
-The most accurate model (1 µm, conformal passivation, filled metals, via merging with correction, 400 µm margin) is within 1 % in L and SRF and 3.3 % in peak Q of the measurement. The cheaper PassiCut model comes close at less than half the run time.
+The most accurate model (1 µm, conformal passivation, `'solve_inside'`, via merging with correction, 400 µm margin) is within 1 % in L and SRF and 3.3 % in peak Q of the measurement. The cheaper PassiCut model comes close at less than half the run time.

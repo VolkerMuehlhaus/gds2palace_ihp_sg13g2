@@ -244,7 +244,7 @@ quick sanity check of port setup or layout, not for a number you'd report;
 see the [mesh convergence studies](../more_examples/mesh_convergence/README.md)
 for real order-1-vs-2 error data on five actual structures.
 
-### Surface impedance or filled metals? Which conductor model should I use?
+### Which conductor model should I use: surface, solve_inside or solve_inside_skin?
 
 One setting chooses how conductors are modeled:
 
@@ -253,8 +253,6 @@ settings['conductor_model'] = 'surface'            # default: surface impedance 
 settings['conductor_model'] = 'solve_inside'       # conductors meshed as volumes
 settings['conductor_model'] = 'solve_inside_skin'  # volumes + thin layers along the faces for the skin effect
 ```
-
-The names follow HFSS: "Solve Inside" meshes the inside of a conductor.
 
 | | `'surface'` | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|
@@ -279,6 +277,11 @@ one face only (Metal1-Metal5 ground planes, MIM capacitor plates). On a
 given layout, these can add up or cancel, so its loss error is hard to
 predict.
 
+Earlier results with the surface model stay valid for inductance, coupling,
+resonances, match and balance. Only where Q or loss sets a design decision,
+e.g. VCO phase noise or LNA noise figure, is it worth rerunning a model with
+`'solve_inside'` or `'solve_inside_skin'`.
+
 What the errors mean for typical designs (2 µm mesh; reference
 `'solve_inside_skin'` at 1 µm; for the line, R' against a 2D calculation and the
 attenuation against the most accurate run, with skin layers also in the Metal1
@@ -292,7 +295,7 @@ ground plane):
 | TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) | attenuation (dB/mm), line resistance R' | up to 0.09 dB/mm too lossy (+9…+39 %); R' +21…+41 % | up to 0.03 dB/mm too lossy (+8 %); R' up to +11 % | within 0.01 dB/mm (+1 %); R' -0.5…+6.4 % |
 | any structure | inductance, coupling, SRF, match, amplitude and phase balance | all three models within about 1 % of each other | | |
 
-- **The surface model's loss error has no fixed sign.** It gives too little loss in thick conductors (coils on TopMetal1/TopMetal2) and too much in thin layers that carry current on one face (Metal1-Metal5 ground planes, MIM capacitor plates). On the MIM-loaded balun of the mesh convergence studies, both errors cancelled to 0.02 dB. So a surface model result is not even a bound for the loss.
+- **The surface model's loss error has no fixed sign.** It gives too little loss in thick conductors (coils on TopMetal1/TopMetal2) and too much in thin layers that carry current on one face (Metal1-Metal5 ground planes, MIM capacitor plates). On the MIM-loaded balun of the mesh convergence studies, both errors cancelled to 0.02 dB. So a surface model result is neither an upper nor a lower bound for the loss.
 - **Loss errors in dB hide the relative error.** 0.05 dB on a balun with 1.2 dB insertion loss is 4 % of its loss, 0.1 dB on 1.1 dB is 9 %. At a PA output, 0.1 dB is 2.3 % of the output power.
 - **The reference is converged FEM, not measurement.** Against measurement, the stackup matters as much as the conductor model: in the L6n2 inductor study (`more_examples/measured_vs_simulated/more_accurate_models_L6n2_v3`), filled metals at 2 µm with the planar stackup gave peak Q -8.4 % and SRF -9.0 %, with conformal passivation over TopMetal2 Q -4.6 % and SRF -1.6 %, and at 1 µm Q -3.3 % and SRF -1.0 %.
 
@@ -305,53 +308,32 @@ every conductor model: where traces are about 2 µm apart,
 Where they are wider (5 µm in the spiral inductor), `'solve_inside_skin'` at
 5 µm was within 4 % in Q.
 
-**Expert details.** `conductor_model` is a preset for two settings, which
-can also be given directly (they then override the preset):
+**Scripts from earlier versions.** Before gds2palace 0.9.0, the setting was
+`settings['filled_metals']`. It still works: `True` is the same as
+`'solve_inside'`, `False` the same as `'surface'`, and the model script prints
+a note. Don't give both settings with different meanings: the script stops
+with an error.
 
-```python
-settings['filled_metals'] = False    # 'surface'
-settings['filled_metals'] = True     # 'solve_inside' (all conductor layers as volumes)
-settings['filled_metals'] = 'auto'   # only layers thinner than refined_cellsize as volumes
-settings['skin_layers'] = True       # 'solve_inside_skin' together with filled_metals = True
-```
+**How the skin layers are placed.** `'solve_inside_skin'` adds thin layers
+along all faces of the conductors, so that the mesh resolves the skin effect
+without a fine mesh along the surface. There is nothing to set; these are the
+rules:
 
-`filled_metals = 'auto'` fills only the layers that are meshed about one cell
-thick anyway (with `refined_cellsize` 2 in SG13G2: Metal1-Metal5, MIM and
-Activ), at about the cost of the surface model. It fixes the thin-layer error,
-e.g. the series resistance of the MIM capacitor `palace_rfcmim.py` at 10 MHz is
-0.85 Ω with `'auto'`, 0.87 Ω with all metals filled and 1.88 Ω with surface
-impedance. But it leaves coils on TopMetal1/TopMetal2 as surface impedance, so
-their Q is as high as with `'surface'`, and on a MIM-loaded balun it was the
-least accurate model (0.24 dB too optimistic). Use it only when you know where
-the current flows.
-
-`skin_layers` adds thin layers along all faces of filled conductors, so that
-the mesh resolves the skin effect without a fine mesh along the surface.
-Besides `True` (automatic depths), it takes fixed depths:
-
-```python
-settings['skin_layers'] = [0.1, 0.25]                  # fixed depths (drawing units), eligible layers
-settings['skin_layers'] = {'TopMetal2': True,          # per layer: automatic ...
-                           'TopMetal1': [0.1, 0.25]}   # ... or fixed depths
-```
-
-Depths are measured from the surface inward; `[0.1, 0.25]` gives a 0.1 µm and
-a 0.15 µm layer at every face, plus a core. The rules, in this order:
-
-1. Only filled layers are split (`filled_metals` True or `'auto'`); vias,
-   sheet layers and PEC layers never.
-2. With `True` or a list, two kinds of layers are skipped; a layer named in
-   the dict is split anyway: conductivity above 1e8 S/m (a stand-in for a
-   perfect conductor, e.g. SUBGND in older stackups), and layers thinner than
-   4 skin depths at the highest frequency (they gain little, but their very
-   thin skin layers cost much solver effort; in SG13G2 Metal1-Metal5 up to
-   about 1 THz, TopMetal1 below about 35 GHz, TopMetal2 below about 15 GHz).
-3. `True` uses 0.4 and 1 skin depth at the highest simulation frequency (the
-   largest of `fstop`, `fpoint`, `fdump`), from each layer's conductivity, e.g.
-   0.094 and 0.236 µm for TopMetal2 at 150 GHz.
+1. The depths are 0.4 and 1 skin depth at the highest simulation frequency
+   (the largest of `fstop`, `fpoint`, `fdump`), from each layer's
+   conductivity, e.g. 0.094 and 0.236 µm for TopMetal2 at 150 GHz.
+2. Layers thinner than 4 skin depths at the highest frequency get no skin
+   layers. They gain little, but their very thin skin layers cost much solver
+   effort. In SG13G2 these are Metal1-Metal5 up to about 1 THz, TopMetal1
+   below about 35 GHz and TopMetal2 below about 15 GHz. So at low GHz
+   frequencies, `'solve_inside_skin'` builds the same model as `'solve_inside'`.
+3. Vias, sheet layers, PEC layers and layers with a conductivity above
+   1e8 S/m (a stand-in for a perfect conductor, e.g. SUBGND in older
+   stackups) get no skin layers.
 4. A depth is only used if a core of at least 1/3 of the layer thickness
-   remains. The model script prints the depths used per layer, or why a
-   layer got none.
+   remains.
+
+The model script prints the depths used per layer, or why a layer got none.
 
 See also "Accuracy at high frequency" in the [user's
 guide](userguide_md_format/gds2palace_workflow_userguide.md#accuracy-at-high-frequency).

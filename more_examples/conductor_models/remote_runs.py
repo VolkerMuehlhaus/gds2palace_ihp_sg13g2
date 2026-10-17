@@ -8,9 +8,9 @@
   python remote_runs.py status    show progress.log
   python remote_runs.py collect   copy run.log, palace.json, port-S.csv and config.json of finished runs to results/
 
-The run order is fixed: one structure after another, and within a structure surface, auto, solve_inside,
+The run order is fixed: one structure after another, and within a structure surface, solve_inside,
 solve_inside_skin, coarse solve_inside_skin, so that the models of one structure run back to back under the same
-thermal conditions. The 2:1 balun is not run again: its four 2 um runs were made on the same machine under the same
+thermal conditions. The 2:1 balun is not run again: its 2 um runs were made on the same machine under the same
 conditions before this study (copied into results/ by collect_balun2x1()).
 """
 import io
@@ -25,11 +25,10 @@ HOST = 'hpz2'
 REMOTE = 'palace_runs/conductor_models'
 SIF = '~/palace_018.sif'
 NP = 16
-ORDER = ['surface', 'auto', 'solve_inside_mesh', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh3', 'solve_inside_skin_mesh5']
+ORDER = ['surface', 'solve_inside_mesh', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh3', 'solve_inside_skin_mesh5']
 FOLDERS = ['inductor', 'lines', 'l6n2', 'transformer', 'mim_balun', 'dband_balun']
 BALUN2X1_ARCHIVE = os.path.join(HERE, '..', '..', 'test_data', 'filled_vs_surface', 'results_hpz2_16')
 BALUN2X1_NAMES = {'balun2x1_surface_mesh2': 'balun2x1_edgecoupled_do200_w8_s2_mesh2',
-                  'balun2x1_auto_mesh2': 'balun2x1_edgecoupled_do200_w8_s2_auto_mesh2',
                   'balun2x1_solve_inside_mesh2': 'balun2x1_edgecoupled_do200_w8_s2_balanced_mesh2',
                   'balun2x1_solve_inside_skin_mesh2': 'balun2x1_edgecoupled_do200_w8_s2_accurate_mesh2'}
 

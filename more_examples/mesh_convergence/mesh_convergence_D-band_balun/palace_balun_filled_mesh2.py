@@ -40,7 +40,7 @@ settings['refined_cellsize_override'] = [['Metal3', 5.0]]
 settings['order'] = 2
 settings['boundary'] = ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
 settings['air_around'] = 50.0
-settings['filled_metals'] = True  # conductors as volumes, no skin layers
+settings['conductor_model'] = 'solve_inside'  # conductors as volumes, no skin layers
 settings['no_gui'] = True
 
 # ===================== port definitions =======================

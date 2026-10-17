@@ -12,8 +12,6 @@ Models (conductor model, refined_cellsize):
   solve_inside_mesh2       'solve_inside', 2 um
   solve_inside_skin_mesh2  'solve_inside_skin', 2 um
   solve_inside_skin_mesh5  'solve_inside_skin', 5 um (widths of 10 and 20 um only: the cell must not exceed the trace)
-filled_metals = 'auto' is not run: with an ideal ground, TopMetal2 is the only conductor, and 'auto' keeps it as
-surface impedance, the same model as 'surface'.
 
 Reference data in reference/ (from the gds2palace filled_vs_surface study): filled metals at refined_cellsize 0.25 um
 (converged, *_fill025) and the same lines with ideal conductors (*_pec2), which give the losses outside the conductor.

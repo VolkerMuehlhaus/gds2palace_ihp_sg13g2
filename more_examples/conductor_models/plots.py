@@ -1,7 +1,7 @@
 """Figures of the conductor model study README (results/plots/*.png). Run after analyze.py (palace venv):
     python plots.py
 Colors: categorical slots 1-4 of the reference palette in fixed order (surface blue, solve_inside orange,
-solve_inside_skin aqua, 'auto' yellow), each with its own line style and marker; the reference is ink.
+solve_inside_skin aqua), each with its own line style and marker; the reference is ink.
 """
 import json
 import os
@@ -24,7 +24,6 @@ STYLE = {   # model label: (color, line style, marker)
     'surface': ('#2a78d6', '-', 'o'),
     'solve_inside': ('#eb6834', '--', 's'),
     'solve_inside_skin': ('#1baf7a', '-', 'D'),
-    "'auto'": ('#eda100', ':', 'v'),
     'solve_inside_skin, 3 um': ('#1baf7a', ':', 'D'),
     'solve_inside_skin, 5 um': ('#1baf7a', ':', 'D'),
 }
@@ -87,7 +86,7 @@ def fig_accuracy_vs_cost(S):
         style(ax, title)
         ax.legend(fontsize=8, frameon=False, loc='best')
     handles = [plt.Line2D([], [], color=STYLE[m][0], marker='o', linestyle='', markersize=8, label=m)
-               for m in ('surface', "'auto'", 'solve_inside', 'solve_inside_skin')]
+               for m in ('surface', 'solve_inside', 'solve_inside_skin')]
     handles.append(plt.Line2D([], [], color=STYLE['solve_inside_skin'][0], marker='o', markerfacecolor='white',
                               linestyle='', markersize=8, label='solve_inside_skin, coarser mesh'))
     fig.legend(handles=handles, loc='upper center', ncol=5, frameon=False, fontsize=9)

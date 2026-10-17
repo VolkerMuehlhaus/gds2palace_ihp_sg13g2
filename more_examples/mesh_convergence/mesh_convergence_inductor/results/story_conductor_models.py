@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. filled metals
-(settings['filled_metals'] = True) with and without settings['skin_layers'] = True.
+"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. conductors meshed as
+volumes: settings['conductor_model'] = 'solve_inside' and 'solve_inside_skin'.
 
 Writes results/plots/story_conductor_models.png (R and Q vs. frequency) and prints the numbers quoted in README.md.
-Reference for all errors: filled metals + skin layers, 1 um mesh. DOF from the Palace output of each run.
+Reference for all errors: 'solve_inside_skin', 1 um mesh. DOF from the Palace output of each run.
 """
 import os
 import numpy as np
@@ -15,12 +15,12 @@ import story_plots as S
 
 RUNS = [  # label, Touchstone file, DOF, color, line style
     ("surface impedance, 1 µm", "ind_frame_mesh1.s2p", 881044, S.BLUE, "-"),
-    ("filled, 2 µm", "ind_frame_filled_mesh2.s2p", 504076, S.ORANGE, "--"),
-    ("filled + skin layers, 5 µm", "ind_frame_skin_mesh5.s2p", 382260, S.AQUA, ":"),
-    ("filled + skin layers, 2 µm", "ind_frame_skin_mesh2.s2p", 1052830, S.AQUA, "--"),
-    ("filled + skin layers, 1 µm", "ind_frame_skin_mesh1.s2p", 2375210, S.INK, "-"),
+    ("solve_inside, 2 µm", "ind_frame_filled_mesh2.s2p", 504076, S.ORANGE, "--"),
+    ("solve_inside_skin, 5 µm", "ind_frame_skin_mesh5.s2p", 382260, S.AQUA, ":"),
+    ("solve_inside_skin, 2 µm", "ind_frame_skin_mesh2.s2p", 1052830, S.AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "ind_frame_skin_mesh1.s2p", 2375210, S.INK, "-"),
 ]
-TABLE = RUNS + [("filled + skin layers, 3 µm", "ind_frame_skin_mesh3.s2p", 692654, None, None),
+TABLE = RUNS + [("solve_inside_skin, 3 µm", "ind_frame_skin_mesh3.s2p", 692654, None, None),
                 ("surface impedance, 2 µm", "ind_frame_mesh2.s2p", 429096, None, None),
                 ("surface impedance, 5 µm", "ind_frame_mesh5.s2p", 161484, None, None)]
 REFERENCE = "ind_frame_skin_mesh1.s2p"

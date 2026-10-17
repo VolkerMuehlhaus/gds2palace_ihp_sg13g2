@@ -16,7 +16,7 @@ import skrf as rf
 import study_data as D
 
 HERE = D.HERE
-MODELS = [('surface', 'surface_mesh2'), ("'auto'", 'auto_mesh2'), ('solve_inside', 'solve_inside_mesh2'),
+MODELS = [('surface', 'surface_mesh2'), ('solve_inside', 'solve_inside_mesh2'),
           ('solve_inside_skin', 'solve_inside_skin_mesh2'), ('solve_inside_skin, 3 um', 'solve_inside_skin_mesh3'),
           ('solve_inside_skin, 5 um', 'solve_inside_skin_mesh5')]
 

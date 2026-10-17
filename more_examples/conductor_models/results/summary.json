@@ -107,27 +107,6 @@
     "d peak Qs (%)": 21.364373569297502
    },
    {
-    "model": "'auto'",
-    "name": "transformer_auto_mesh2",
-    "unknowns": 321664,
-    "minutes": 4.190083333333333,
-    "peak_gb": 5.7,
-    "its_per_solve": 30.14814814814815,
-    "solves": 27,
-    "Lp at 30 GHz": 0.7523786319368674,
-    "d Lp at 30 GHz (%)": -0.027956453101563028,
-    "k at 30 GHz": 0.714793754376758,
-    "d k at 30 GHz (%)": 0.7367068953689992,
-    "Qp at 30 GHz": 12.01305602938252,
-    "d Qp at 30 GHz (%)": 27.134571083368787,
-    "Qs at 30 GHz": 11.064053707105188,
-    "d Qs at 30 GHz (%)": 21.27618100888393,
-    "peak Qp": 12.205364678484075,
-    "d peak Qp (%)": 28.76438382443627,
-    "peak Qs": 11.778641795104711,
-    "d peak Qs (%)": 23.24692251824938
-   },
-   {
     "model": "solve_inside",
     "name": "transformer_solve_inside_mesh2",
     "unknowns": 371626,
@@ -201,25 +180,6 @@
     "d peak |Sdd21| (dB)": 0.15755556682084926
    },
    {
-    "model": "'auto'",
-    "name": "balun2x1_auto_mesh2",
-    "unknowns": 905274,
-    "minutes": 9.705166666666665,
-    "peak_gb": 13.2,
-    "its_per_solve": 27.157894736842106,
-    "solves": 19,
-    "Lp at 10 GHz": 1.1755086551122453,
-    "d Lp at 10 GHz (%)": -0.6035906521610235,
-    "k at 10 GHz": 0.6732170775356248,
-    "d k at 10 GHz (%)": 1.3694173132839715,
-    "peak Qp": 19.1033098773758,
-    "d peak Qp (%)": 23.519214698367197,
-    "peak Qs": 14.250129459920718,
-    "d peak Qs (%)": 19.428119753580898,
-    "peak |Sdd21| (dB)": -1.2175828458072055,
-    "d peak |Sdd21| (dB)": 0.162819898283189
-   },
-   {
     "model": "solve_inside",
     "name": "balun2x1_solve_inside_mesh2",
     "unknowns": 1016742,
@@ -285,21 +245,6 @@
     "largest IL difference (dB)": -0.06252941396497058
    },
    {
-    "model": "'auto'",
-    "name": "dband_balun_auto_mesh2",
-    "unknowns": 360744,
-    "minutes": 2.22795,
-    "peak_gb": 5.6,
-    "its_per_solve": 31.53846153846154,
-    "solves": 13,
-    "IL min (dB)": 0.9812791860337212,
-    "IL max (dB)": 1.1381765138323827,
-    "S11 null (GHz)": 142.0,
-    "max |amp. imbalance| (dB)": 0.1716178906600247,
-    "max |phase imbalance| (deg)": 9.938130460692548,
-    "largest IL difference (dB)": -0.07965685556469981
-   },
-   {
     "model": "solve_inside",
     "name": "dband_balun_solve_inside_mesh2",
     "unknowns": 408116,
@@ -353,20 +298,6 @@
     "worst |Sss11| (dB)": -15.861827300201082,
     "match null (GHz)": 18.1,
     "largest IL difference (dB)": -0.024722575135945224
-   },
-   {
-    "model": "'auto'",
-    "name": "mim_balun_auto_mesh2",
-    "unknowns": 1007928,
-    "minutes": 12.761616666666667,
-    "peak_gb": 13.9,
-    "its_per_solve": 30.53846153846154,
-    "solves": 13,
-    "IL min (dB)": 0.9706041601202258,
-    "IL max (dB)": 1.0750717313535134,
-    "worst |Sss11| (dB)": -16.58070245029276,
-    "match null (GHz)": 18.2,
-    "largest IL difference (dB)": -0.23974320158356255
    },
    {
     "model": "solve_inside",
@@ -1556,7 +1487,7 @@
   },
   "runs": [
    {
-    "model": "v3 study: filled, 2 um",
+    "model": "v3 study: 'solve_inside', 2 um",
     "L at 1 GHz (nH)": 4.9637864421708695,
     "peak Q": 15.22148713595021,
     "SRF (GHz)": 10.8940716745817,
@@ -1565,7 +1496,7 @@
     "d SRF vs. measured (%)": -1.5869417540502417
    },
    {
-    "model": "v3 study: filled, 1 um",
+    "model": "v3 study: 'solve_inside', 1 um",
     "L at 1 GHz (nH)": 4.963992146454736,
     "peak Q": 15.431941991558205,
     "SRF (GHz)": 10.960137182940798,
@@ -1587,21 +1518,6 @@
     "d L at 1 GHz vs. measured (%)": -1.8591833346080833,
     "d peak Q vs. measured (%)": 25.012595474891587,
     "d SRF vs. measured (%)": -1.3413908584922751
-   },
-   {
-    "model": "'auto'",
-    "name": "l6n2_auto_mesh2",
-    "L at 1 GHz (nH)": 4.915743869076934,
-    "peak Q": 19.94789326280816,
-    "SRF (GHz)": 10.92125352527814,
-    "unknowns": 1298770,
-    "minutes": 19.8907,
-    "peak_gb": 18.6,
-    "its_per_solve": 35.166666666666664,
-    "solves": 12,
-    "d L at 1 GHz vs. measured (%)": -1.8591832871258318,
-    "d peak Q vs. measured (%)": 25.012595475917276,
-    "d SRF vs. measured (%)": -1.3413908585055645
    },
    {
     "model": "solve_inside",

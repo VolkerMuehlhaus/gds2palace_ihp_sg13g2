@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. filled metals
-(settings['filled_metals'] = True or 'auto') with and without settings['skin_layers'] = True.
+"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. conductors meshed as
+volumes: settings['conductor_model'] = 'solve_inside' and 'solve_inside_skin'.
 
 Writes results/plots/story_conductor_models.png (primary Q and |Sdd21| vs. frequency) and prints the numbers quoted
-in README.md. Reference: filled metals + skin layers, 1 um mesh. DOF from the Palace output of each run.
+in README.md. Reference: 'solve_inside_skin', 1 um mesh. DOF from the Palace output of each run.
 """
 import os
 import matplotlib
@@ -14,15 +14,13 @@ import story_plots as S
 
 RUNS = [  # label, Touchstone file, DOF, color, line style
     ("surface impedance, 1 µm", "balun2x1_mesh1.s4p", 1672974, S.BLUE, "-"),
-    ("filled 'auto', 2 µm", "balun2x1_auto_mesh2.s4p", 905274, S.BLUE, "--"),
-    ("filled, 2 µm", "balun2x1_filled_mesh2.s4p", 1016742, S.ORANGE, "--"),
-    ("filled + skin layers, 2 µm", "balun2x1_skin_mesh2.s4p", 1678800, S.AQUA, "--"),
-    ("filled + skin layers, 1 µm", "balun2x1_skin_mesh1.s4p", 3737648, S.INK, "-"),
+    ("solve_inside, 2 µm", "balun2x1_filled_mesh2.s4p", 1016742, S.ORANGE, "--"),
+    ("solve_inside_skin, 2 µm", "balun2x1_skin_mesh2.s4p", 1678800, S.AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "balun2x1_skin_mesh1.s4p", 3737648, S.INK, "-"),
 ]
-TABLE = RUNS[-1:] + [("filled + skin layers, 2 µm", "balun2x1_skin_mesh2.s4p", 1678800, None, None),
-                     ("filled + skin layers, 5 µm", "balun2x1_skin_mesh5.s4p", 598420, None, None),
-                     ("filled, 2 µm", "balun2x1_filled_mesh2.s4p", 1016742, None, None),
-                     ("filled 'auto', 2 µm", "balun2x1_auto_mesh2.s4p", 905274, None, None),
+TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "balun2x1_skin_mesh2.s4p", 1678800, None, None),
+                     ("solve_inside_skin, 5 µm", "balun2x1_skin_mesh5.s4p", 598420, None, None),
+                     ("solve_inside, 2 µm", "balun2x1_filled_mesh2.s4p", 1016742, None, None),
                      ("surface impedance, 1 µm", "balun2x1_mesh1.s4p", 1672974, None, None),
                      ("surface impedance, 2 µm", "balun2x1_mesh2.s4p", 843390, None, None)]
 REFERENCE = "balun2x1_skin_mesh1.s4p"

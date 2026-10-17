@@ -18,13 +18,16 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.17.0"
+__version__ = "1.18.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
 
 # Palace linear solver settings this version understands (checked by setupEM)
 PALACE_LINEAR_SOLVER_SETTINGS = ("complex_coarse_solve", "solver_maxits", "solver_tol")
+
+# values of settings['conductor_model'] this version understands (checked by setupEM)
+CONDUCTOR_MODELS = ("surface", "solve_inside", "solve_inside_skin")
 
 import os
 import sys
@@ -623,65 +626,46 @@ def add_metal_volumes (allpolygons, metals_list, meshseed=0):
     
 
 
-def skin_layer_depths (skin_layers, metals_list, materials_list, fmax, unit):
-    """Depths of the skin layers per conductor layer, from settings['skin_layers'].
+def skin_layer_depths (metals_list, materials_list, fmax, unit):
+    """Depths of the skin layers per conductor layer, for settings['conductor_model'] = 'solve_inside_skin':
+    about 0.4 and 1 skin depth at the highest frequency.
 
     Args:
-        skin_layers: True (all conductor layers, depths from the skin depth at fmax), a list of depths
-            (all conductor layers), or a dict {layername: True or list of depths} (only these layers).
-            Depths are measured from the conductor surface inward, in drawing units.
         metals_list, materials_list: from stackup reader
         fmax (float): highest simulation frequency in Hz
         unit (float): drawing unit in m
 
     Returns:
         dict {layername: sorted list of depths}, only layers that get at least one skin layer, and
-        dict {layername: note}, why a requested layer gets fewer or no skin layers (printed by
-        add_conductor_skin_cores() if the layer has polygons)
+        dict {layername: note}, why a layer gets fewer or no skin layers (printed by
+        add_conductor_skin_cores() if the layer has polygons). Depths are measured from the conductor
+        surface inward, in drawing units.
     """
-    if isinstance(skin_layers, dict):
-        requested = dict(skin_layers)
-        for layername in requested:
-            if metals_list.getbylayername(layername) is None:
-                print(f'WARNING: skin_layers: layer "{layername}" is not in the stackup, ignored')
-    else:
-        requested = {metal.name: skin_layers for metal in metals_list.metals}
-
     depths_by_layer, notes_by_layer = {}, {}
     for metal in metals_list.metals:
-        if metal.name not in requested or not metal.is_metal or metal.thickness <= 0:
+        if not metal.is_metal or metal.thickness <= 0:
             continue
         if _is_pec_material(metal.material):
             continue
         material = materials_list.get_by_name(metal.material)
-        if not isinstance(skin_layers, dict) and material is not None and material.sigma > 1e8:
+        if material is not None and material.sigma > 1e8:
             # above any real metal (silver: 6.3e7 S/m at 20 C, CRC Handbook): a stand-in for a perfect conductor,
             # e.g. a ground plane, whose skin layers would be nanometres thin and only add badly shaped cells.
-            # Still possible by naming the layer in a dict.
             notes_by_layer[metal.name] = f'conductivity {material.sigma:.3g} S/m is a perfect conductor stand-in'
             continue
-        delta = None
-        if material is not None and material.sigma > 0 and fmax > 0:
-            delta = 1 / math.sqrt(math.pi * fmax * 4e-7 * math.pi * material.sigma) / unit   # skin depth at fmax
-        if not isinstance(skin_layers, dict) and delta is not None and metal.thickness < 4 * delta:
+        if material is None or material.sigma <= 0 or fmax <= 0:
+            continue
+        delta = 1 / math.sqrt(math.pi * fmax * 4e-7 * math.pi * material.sigma) / unit   # skin depth at fmax
+        if metal.thickness < 4 * delta:
             # thinner than 4 skin depths at fmax: thin layers (in SG13G2 Metal1-Metal5 up to about 1 THz) gain little,
             # but their very thin skin layers (e.g. 0.09 um) cost much solver effort. Metal1 ground plane of
             # palace_line_viaport.py (100 GHz): R' about 1 % better at 2.6 x run time; D-band balun with skin layers in
             # Metal3-Metal5 (200 GHz): same result (Max|dS| 0.002), 55 instead of 37 GMRES iterations, 1.7 x run time.
-            # Still possible by naming the layer in a dict.
             notes_by_layer[metal.name] = (f'thickness {metal.thickness:g} is less than 4 skin depths at the highest '
                                           f'frequency ({delta:.3g})')
             continue
-        value = requested[metal.name]
-        if value is True:
-            # auto: about 0.4 and 1 skin depth at the highest frequency (tested: TopMetal2, 0.1 / 0.25 um up to 150 GHz)
-            if delta is None:
-                continue
-            depths = [round(0.4 * delta, 3), round(delta, 3)]
-        elif value is False or value is None:
-            continue
-        else:
-            depths = [float(d) for d in value]
+        # tested: TopMetal2, 0.1 / 0.25 um up to 150 GHz
+        depths = [round(0.4 * delta, 3), round(delta, 3)]
         # a core of at least a third of the thickness must remain; skip depths below the geometry tolerance
         usable = sorted({d for d in depths if 0.005 <= d <= metal.thickness / 3})
         if usable:
@@ -1516,25 +1500,40 @@ def create_model (excite_ports, settings):
               f"(full metal thickness on all faces). Results differ from earlier versions that used it. "
               f"For accurate conductor loss, use settings['conductor_model'].")
 
-    # conductor_model: one designer-level choice that presets the expert settings filled_metals and skin_layers
+    # conductor_model:
     #   'surface'           (default) surface impedance on all conductor faces: fastest, peak Q of top metal coils (2-8 um traces) 18-30 % high
-    #   'solve_inside'      filled_metals = True: conductors as volumes, Q a few percent low at a 2 um mesh
-    #   'solve_inside_skin' filled_metals = True + skin_layers = True: about half the error of 'solve_inside', at 1.4-2x its unknowns
-    # filled_metals / skin_layers given explicitly in the settings override the preset.
-    conductor_model = get_optional_setting(settings, 'conductor_model', 'surface')
+    #   'solve_inside'      conductors meshed as volumes: Q a few percent low at a 2 um mesh
+    #   'solve_inside_skin' volumes with thin layers along all faces (skin effect): about half the error of 'solve_inside',
+    #                       at 1.4-2x its unknowns
+    # (filled, skin layers) for each of CONDUCTOR_MODELS
     conductor_presets = {'surface': (False, False), 'solve_inside': (True, False), 'solve_inside_skin': (True, True)}
-    if conductor_model not in conductor_presets:
+    conductor_model = get_optional_setting(settings, 'conductor_model', None)
+    if conductor_model is not None and conductor_model not in conductor_presets:
         print(f"ERROR: settings['conductor_model'] must be 'surface', 'solve_inside' or 'solve_inside_skin', not {conductor_model!r}")
         exit(1)
-    preset_filled, preset_skin = conductor_presets[conductor_model]
-    overridden = [key for key in ('filled_metals', 'skin_layers') if key in settings]
-    if 'conductor_model' in settings and overridden:
-        print(f"Note: conductor_model = '{conductor_model}', overridden by settings {', '.join(overridden)}")
-
-    # metal layers are modeled as surface for EM by default; True: all conductor layers as volumes;
-    # 'auto': only conductor layers thinner than their refined_cellsize as volumes (see filled_layers below)
-    filled_metals_setting = get_optional_setting(settings, 'filled_metals', preset_filled)
-    filled_metals = filled_metals_setting is True
+    if 'skin_layers' in settings:
+        print("ERROR: settings['skin_layers'] was replaced by settings['conductor_model'] = 'solve_inside_skin'")
+        exit(1)
+    # filled_metals, the setting before conductor_model: True = 'solve_inside', False = 'surface'
+    if 'filled_metals' in settings:
+        legacy_filled = settings['filled_metals']
+        if legacy_filled is None:
+            legacy_filled = False
+        if legacy_filled not in (True, False):
+            print(f"ERROR: settings['filled_metals'] = {legacy_filled!r} is not supported, use settings['conductor_model'] "
+                  f"= 'surface', 'solve_inside' or 'solve_inside_skin'")
+            exit(1)
+        legacy_model = 'solve_inside' if legacy_filled else 'surface'
+        if conductor_model is not None and conductor_model != legacy_model:
+            print(f"ERROR: settings['filled_metals'] = {legacy_filled} contradicts settings['conductor_model'] = "
+                  f"'{conductor_model}', remove filled_metals")
+            exit(1)
+        if conductor_model is None:
+            print(f"Note: settings['filled_metals'] = {legacy_filled} is the same as settings['conductor_model'] = '{legacy_model}'")
+            conductor_model = legacy_model
+    if conductor_model is None:
+        conductor_model = 'surface'
+    filled_metals, skin_layers = conductor_presets[conductor_model]
 
     # solver choice
     elmer = get_optional_setting(settings, 'elmer', False)
@@ -1555,28 +1554,10 @@ def create_model (excite_ports, settings):
 
     # names of the conductor layers meshed as volumes in an EM model (all others: surface impedance)
     filled_layers = set()
-    if not elmer_thermal:
-        if filled_metals_setting == 'auto':
-            # a layer thinner than its mesh cell size is meshed only about one cell thick anyway, so a volume costs
-            # little; and a thin layer that carries current on one face only (e.g. a Metal1-Metal5 ground plane) gets up
-            # to twice its loss in the surface model (both faces share the thickness). Independent of the frequency range.
-            for metal in metals_list.metals:
-                if metal.is_metal and metal.thickness > 0 and not _is_pec_material(metal.material):
-                    if metal.thickness < refined_cellsize_override_dict.get(metal.name, refined_cellsize):
-                        filled_layers.add(metal.name)
-            print(f"filled_metals = 'auto': conductor layers thinner than refined_cellsize meshed as volumes: "
-                  f"{', '.join(m.name for m in metals_list.metals if m.name in filled_layers) or 'none'}")
-        elif filled_metals_setting not in (True, False, None):
-            print(f"ERROR: settings['filled_metals'] must be True, False or 'auto', not {filled_metals_setting!r}")
-            exit(1)
-        elif filled_metals_em:
-            filled_layers = {metal.name for metal in metals_list.metals if metal.is_metal}
-
-    # thin conductor layers along all faces of filled conductors (skin effect), see add_conductor_skin_cores()
-    skin_layers = get_optional_setting(settings, 'skin_layers', preset_skin)
-    if skin_layers and not filled_layers:
-        print("Note: settings['skin_layers'] only applies to filled metals (filled_metals = True or 'auto'), ignored.")
-        skin_layers = False
+    if filled_metals_em:
+        filled_layers = {metal.name for metal in metals_list.metals if metal.is_metal}
+    # thin layers along all faces of filled conductors (skin effect), see add_conductor_skin_cores(); not for thermal
+    skin_layers = skin_layers and filled_metals_em
 
     # scale via conductivity (thermal: heat conductivity) by the fill factor of merged via arrays
     fill_factor_correction = get_optional_setting(settings, 'fill_factor_correction', False)
@@ -1724,10 +1705,7 @@ def create_model (excite_ports, settings):
 
     if skin_layers:
         # thin layers along all conductor faces: nested core volumes, split from the conductors by fragment() below
-        depths_by_layer, notes_by_layer = skin_layer_depths(skin_layers, metals_list, materials_list, fmax, unit)
-        # only filled conductors can be split (with filled_metals = 'auto', the others are hollow surface impedance bodies)
-        depths_by_layer = {k: v for k, v in depths_by_layer.items() if k in filled_layers}
-        notes_by_layer = {k: v for k, v in notes_by_layer.items() if k in filled_layers}
+        depths_by_layer, notes_by_layer = skin_layer_depths(metals_list, materials_list, fmax, unit)
         metal_dimtags_created_3D.extend(add_conductor_skin_cores(allpolygons, metals_list, depths_by_layer, notes_by_layer))
 
 
@@ -1820,8 +1798,6 @@ def create_model (excite_ports, settings):
         # conductor's name always overwrites a via's for any such shared region
         # (the conductor wins the overlap, matching regular circuit-design intent
         # of a via making contact into, not displacing, the conductor above/below it).
-        # (only filled conductors are moved behind the vias: with filled_metals = 'auto', the order between vias
-        # and surface impedance conductors stays as without filled metals)
         other_indices, filled_indices = [], []
         for n, (dim, original_tag) in enumerate(geom_dimtags):
             (filled_indices if original_volume_names_dict[original_tag] in filled_layers else other_indices).append(n)

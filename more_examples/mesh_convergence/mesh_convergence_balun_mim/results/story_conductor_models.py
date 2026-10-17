@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. filled metals
-(settings['filled_metals'] = True or 'auto') with and without settings['skin_layers'] = True.
+"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. conductors meshed as
+volumes: settings['conductor_model'] = 'solve_inside' and 'solve_inside_skin'.
 
 Writes results/plots/story_conductor_models.png (insertion loss and input match vs. frequency) and prints the numbers
-quoted in README.md. Reference: filled metals + skin layers, 1 um mesh. DOF from the Palace output of each run.
+quoted in README.md. Reference: 'solve_inside_skin', 1 um mesh. DOF from the Palace output of each run.
 """
 import os
 import numpy as np
@@ -18,15 +18,13 @@ ORANGE = "#eb6834"
 AQUA = "#1baf7a"
 RUNS = [  # label, Touchstone file, DOF, color, line style
     ("surface impedance, 1 µm", "trans_100diff_to_80se_ports_mesh1.s3p", 1951380, BLUE, "-"),
-    ("filled 'auto', 2 µm", "trans_100diff_to_80se_ports_auto_mesh2.s3p", 1007928, BLUE, "--"),
-    ("filled, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1150620, ORANGE, "--"),
-    ("filled + skin layers, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1657992, AQUA, "--"),
-    ("filled + skin layers, 1 µm", "trans_100diff_to_80se_ports_skin_mesh1.s3p", 3629376, S.INK, "-"),
+    ("solve_inside, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1150620, ORANGE, "--"),
+    ("solve_inside_skin, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1657992, AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "trans_100diff_to_80se_ports_skin_mesh1.s3p", 3629376, S.INK, "-"),
 ]
-TABLE = RUNS[-1:] + [("filled + skin layers, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1657992, None, None),
-                     ("filled + skin layers, 3 µm", "trans_100diff_to_80se_ports_skin_mesh3.s3p", 1143524, None, None),
-                     ("filled, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1150620, None, None),
-                     ("filled 'auto', 2 µm", "trans_100diff_to_80se_ports_auto_mesh2.s3p", 1007928, None, None),
+TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1657992, None, None),
+                     ("solve_inside_skin, 3 µm", "trans_100diff_to_80se_ports_skin_mesh3.s3p", 1143524, None, None),
+                     ("solve_inside, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1150620, None, None),
                      ("surface impedance, 1 µm", "trans_100diff_to_80se_ports_mesh1.s3p", 1951380, None, None),
                      ("surface impedance, 2 µm", "trans_100diff_to_80se_ports_mesh2.s3p", 948860, None, None)]
 REFERENCE = "trans_100diff_to_80se_ports_skin_mesh1.s3p"

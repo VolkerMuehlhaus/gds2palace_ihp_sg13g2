@@ -18,7 +18,6 @@ Reference: `mesh_convergence_transformer/results/snp/transformer_skin_mesh1.s5p`
 | model | unknowns | minutes | peak_gb | its_per_solve | solves | Lp at 30 GHz | d Lp at 30 GHz (%) | k at 30 GHz | d k at 30 GHz (%) | Qp at 30 GHz | d Qp at 30 GHz (%) | Qs at 30 GHz | d Qs at 30 GHz (%) | peak Qp | d peak Qp (%) | peak Qs | d peak Qs (%) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | surface | 0.31 M | 3.6 | 5.6 | 25.3 | 27 | 0.751 | -0.2 | 0.715 | +0.7 | 12.1 | +28.0 | 11 | +20.5 | 12.3 | +29.3 | 11.6 | +21.4 |
-| 'auto' | 0.32 M | 4.2 | 5.7 | 30.1 | 27 | 0.752 | -0.0 | 0.715 | +0.7 | 12 | +27.1 | 11.1 | +21.3 | 12.2 | +28.8 | 11.8 | +23.2 |
 | solve_inside | 0.37 M | 5.3 | 6.2 | 30.4 | 29 | 0.755 | +0.3 | 0.714 | +0.6 | 9.08 | -3.9 | 8.67 | -4.9 | 9.15 | -3.5 | 9.2 | -3.7 |
 | solve_inside_skin | 0.69 M | 10.0 | 10.7 | 31.1 | 27 | 0.754 | +0.2 | 0.713 | +0.6 | 9.21 | -2.5 | 8.85 | -3.0 | 9.26 | -2.4 | 9.32 | -2.4 |
 
@@ -29,7 +28,6 @@ Reference: `mesh_convergence_balun2x1/results/snp/balun2x1_skin_mesh1.s4p`: Lp a
 | model | unknowns | minutes | peak_gb | its_per_solve | solves | Lp at 10 GHz | d Lp at 10 GHz (%) | k at 10 GHz | d k at 10 GHz (%) | peak Qp | d peak Qp (%) | peak Qs | d peak Qs (%) | peak |Sdd21| (dB) | d peak |Sdd21| (dB) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | surface | 0.84 M | 7.2 | 12.3 | 20.8 | 19 | 1.17 | -0.7 | 0.673 | +1.4 | 18.9 | +21.9 | 14 | +17.7 | -1.22 | +0.16 |
-| 'auto' | 0.91 M | 9.7 | 13.2 | 27.2 | 19 | 1.18 | -0.6 | 0.673 | +1.4 | 19.1 | +23.5 | 14.3 | +19.4 | -1.22 | +0.16 |
 | solve_inside | 1.02 M | 12.1 | 14.8 | 27.1 | 21 | 1.18 | +0.0 | 0.666 | +0.3 | 14.6 | -5.4 | 11.1 | -6.7 | -1.41 | -0.03 |
 | solve_inside_skin | 1.68 M | 21.7 | 24.4 | 27.3 | 21 | 1.18 | +0.0 | 0.666 | +0.3 | 15.2 | -1.8 | 11.7 | -1.9 | -1.36 | +0.02 |
 
@@ -40,7 +38,6 @@ Reference: `mesh_convergence_D-band_balun/results/snp/balun_skin_mesh1.s3p`: IL 
 | model | unknowns | minutes | peak_gb | its_per_solve | solves | IL min (dB) | IL max (dB) | S11 null (GHz) | max |amp. imbalance| (dB) | max |phase imbalance| (deg) | largest IL difference (dB) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | surface | 0.34 M | 1.6 | 5.3 | 23 | 13 | 0.999 | 1.15 | 142 | 0.174 | 9.95 | -0.06 |
-| 'auto' | 0.36 M | 2.2 | 5.6 | 31.5 | 13 | 0.981 | 1.14 | 142 | 0.172 | 9.94 | -0.08 |
 | solve_inside | 0.41 M | 2.6 | 6.1 | 32 | 13 | 1.19 | 1.36 | 138 | 0.0763 | 9.51 | +0.15 |
 | solve_inside_skin | 0.74 M | 5.5 | 10.8 | 37.4 | 13 | 1.06 | 1.23 | 141 | 0.148 | 10 | +0.02 |
 
@@ -51,7 +48,6 @@ Reference: `mesh_convergence_balun_mim/results/snp/trans_100diff_to_80se_ports_s
 | model | unknowns | minutes | peak_gb | its_per_solve | solves | IL min (dB) | IL max (dB) | worst |Sss11| (dB) | match null (GHz) | largest IL difference (dB) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | surface | 0.95 M | 12.5 | 12.9 | 22.5 | 13 | 1.18 | 1.31 | -15.9 | 18.1 | -0.02 |
-| 'auto' | 1.01 M | 12.8 | 13.9 | 30.5 | 13 | 0.971 | 1.08 | -16.6 | 18.2 | -0.24 |
 | solve_inside | 1.15 M | 15.6 | 15.9 | 30.6 | 13 | 1.26 | 1.37 | -16.3 | 18.2 | +0.09 |
 | solve_inside_skin | 1.66 M | 19.0 | 22.5 | 31.4 | 13 | 1.22 | 1.33 | -16.6 | 18.3 | +0.05 |
 | solve_inside_skin, 3 um | 1.14 M | 13.4 | 16.1 | 37.9 | 13 | 1.24 | 1.36 | -16 | 18.1 | +0.08 |
@@ -97,9 +93,8 @@ Measured: L at 1 GHz (nH) 5.009, peak Q 15.96, SRF (GHz) 11.07
 
 | model | L at 1 GHz (nH) | peak Q | SRF (GHz) | d L at 1 GHz vs. measured (%) | d peak Q vs. measured (%) | d SRF vs. measured (%) | unknowns | minutes | peak_gb | its_per_solve | solves |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| v3 study: filled, 2 um | 4.96 | 15.2 | 10.9 | -0.9 | -4.6 | -1.6 |  |  |  |  |  |
-| v3 study: filled, 1 um | 4.96 | 15.4 | 11 | -0.9 | -3.3 | -1.0 |  |  |  |  |  |
+| v3 study: 'solve_inside', 2 um | 4.96 | 15.2 | 10.9 | -0.9 | -4.6 | -1.6 |  |  |  |  |  |
+| v3 study: 'solve_inside', 1 um | 4.96 | 15.4 | 11 | -0.9 | -3.3 | -1.0 |  |  |  |  |  |
 | surface | 4.92 | 19.9 | 10.9 | -1.9 | +25.0 | -1.3 | 1.30 M | 19.7 | 18.6 | 35.2 | 12 |
-| 'auto' | 4.92 | 19.9 | 10.9 | -1.9 | +25.0 | -1.3 | 1.30 M | 19.9 | 18.6 | 35.2 | 12 |
 | solve_inside | 4.96 | 15.2 | 10.9 | -0.9 | -4.6 | -1.6 | 1.50 M | 22.9 | 22.2 | 40.2 | 12 |
 

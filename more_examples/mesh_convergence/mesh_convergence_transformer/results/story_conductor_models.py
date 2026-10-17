@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. filled metals
-(settings['filled_metals'] = True or 'auto') with and without settings['skin_layers'] = True.
+"""Plot and numbers for README.md section "Conductor model": surface impedance (the mesh study above) vs. conductors meshed as
+volumes: settings['conductor_model'] = 'solve_inside' and 'solve_inside_skin'.
 
 Writes results/plots/story_conductor_models.png (primary and secondary Q vs. frequency, 30 GHz marked) and prints the
-numbers quoted in README.md. Reference: filled metals + skin layers, 1 um mesh. DOF from the Palace output of each run.
+numbers quoted in README.md. Reference: 'solve_inside_skin', 1 um mesh. DOF from the Palace output of each run.
 """
 import os
 import matplotlib
@@ -14,16 +14,14 @@ import story_plots as S
 
 RUNS = [  # label, Touchstone file, DOF, color, line style
     ("surface impedance, 1 µm", "transformer_mesh1um.s5p", 576114, S.BLUE, "-"),
-    ("filled 'auto', 2 µm", "transformer_auto_mesh2.s5p", 321664, S.BLUE, "--"),
-    ("filled, 2 µm", "transformer_filled_mesh2.s5p", 371626, S.ORANGE, "--"),
-    ("filled + skin layers, 2 µm", "transformer_skin_mesh2.s5p", 686496, S.AQUA, "--"),
-    ("filled + skin layers, 1 µm", "transformer_skin_mesh1.s5p", 1461740, S.INK, "-"),
+    ("solve_inside, 2 µm", "transformer_filled_mesh2.s5p", 371626, S.ORANGE, "--"),
+    ("solve_inside_skin, 2 µm", "transformer_skin_mesh2.s5p", 686496, S.AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "transformer_skin_mesh1.s5p", 1461740, S.INK, "-"),
 ]
-TABLE = RUNS[-1:] + [("filled + skin layers, 2 µm", "transformer_skin_mesh2.s5p", 686496, None, None),
-                     ("filled + skin layers, 4 µm", "transformer_skin_mesh4.s5p", 352338, None, None),
-                     ("filled + skin layers for 50 GHz, 2 µm", "transformer_skin50_mesh2.s5p", 674028, None, None),
-                     ("filled, 2 µm", "transformer_filled_mesh2.s5p", 371626, None, None),
-                     ("filled 'auto', 2 µm", "transformer_auto_mesh2.s5p", 321664, None, None),
+TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "transformer_skin_mesh2.s5p", 686496, None, None),
+                     ("solve_inside_skin, 4 µm", "transformer_skin_mesh4.s5p", 352338, None, None),
+                     ("solve_inside_skin, layers for 50 GHz, 2 µm", "transformer_skin50_mesh2.s5p", 674028, None, None),
+                     ("solve_inside, 2 µm", "transformer_filled_mesh2.s5p", 371626, None, None),
                      ("surface impedance, 1 µm", "transformer_mesh1um.s5p", 576114, None, None),
                      ("surface impedance, 2 µm", "transformer_mesh2um.s5p", 312234, None, None)]
 REFERENCE = "transformer_skin_mesh1.s5p"

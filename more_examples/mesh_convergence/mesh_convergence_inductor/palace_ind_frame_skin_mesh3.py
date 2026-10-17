@@ -65,8 +65,7 @@ settings['meshsize_max'] = 70  # microns, override cells_per_wavelength
 settings['adaptive_mesh_iterations'] = 0  # Palace adative mesh iterations
 
 settings['order'] = 2  # order of FEM basis functions
-settings['filled_metals'] = True  # conductors as volumes
-settings['skin_layers'] = True  # thin layers along all conductor faces (automatic depths)
+settings['conductor_model'] = 'solve_inside_skin'  # conductors as volumes, thin layers along all faces
 
 # settings['no_gui'] = True  # create files without showing 3D model
 settings['no_gui'] = ('nogui' in sys.argv)  # check if nogui specified on command line, then create files without showing 3D model
