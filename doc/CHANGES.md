@@ -2,12 +2,10 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 20 October-2026
-**Palace 0.18.1 container image**  
-A pre-built Apptainer image for Palace 0.18.1 is now available: `apptainer pull palace_0181.sif oras://ghcr.io/volkermuehlhaus/palace_0181:latest`. It is compiled for a common processor level (`x86_64_v3`, AVX2), so it runs on all Intel processors since 2013 and all AMD processors since 2017. The Linux and Windows install scripts now download this image by default; `--palace-version 016` still gives the 0.16 image. The generated `run_palace` script now calls `apptainer -q`, which hides Apptainer's info messages.
+## 18 October-2026
 
-**Documentation**  
-[`building-palace-apptainer.md`](building-palace-apptainer.md) and [`building-palace-spack.md`](building-palace-spack.md) are rewritten for end users: simple steps for Palace 0.18.1, an explanation of each tool, and a table of problems and solutions. Both end with technical notes for AI agents. The Apptainer guide explains how to build an image that runs on other computers: without a fix for libCEED, which always compiles for the build computer's processor, a self-built image can stop with `Illegal instruction` on other computers.
+**Fixes**  
+Mesh refinement along the conductor edges sampled every edge with 200 points, whatever its length. The mesh size is computed from the distance to these points, so on edges longer than about 100 times `refined_cellsize` the mesh was coarser than requested: in two of the mesh convergence examples (MIM-loaded balun, 2:1 balun), up to 1.4-1.7 times `refined_cellsize` along 27-51 % of the edge length at `refined_cellsize` 2. The points are now at most `refined_cellsize`/2 apart on every edge, and short edges no longer get 200 points each. The number of mesh cells changes by 1-3 % in these examples, and meshing takes about as long as before (D-band balun: 27 % faster).
 
 ## 17 October-2026
 

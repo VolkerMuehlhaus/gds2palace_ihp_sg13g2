@@ -3028,31 +3028,58 @@ def create_model (excite_ports, settings):
                 int: next index
             """
             # resample along boundaries, i.e. place points along the boundaries
-            gmsh.model.mesh.field.add("Distance", i)
-            gmsh.model.mesh.field.setNumbers(i, "CurvesList", boundary_line_tags) 
-            gmsh.model.mesh.field.setNumber(i, "Sampling", 200)
+            # The gmsh Distance field measures the distance to points sampled along each curve, with the
+            # same number of points ("Sampling") on every curve of the field. Between two samples the
+            # distance is overestimated by up to half the sample spacing, so a long curve with too few
+            # samples gets a coarser mesh than requested. Space the samples at most refined_cellsize/2
+            # apart (r/4 would cost about 20% more meshing time).
+            # Each Distance field costs one search per mesh size evaluation, so use one field, sampled
+            # for the longest curve. Only if that gives too many points (many curves and a few long
+            # ones, short curves are then heavily oversampled), split the curves into a short and a
+            # long group with the fewest points in total.
+            max_spacing = refined_cellsize_value / 2
+            max_points = 5e6
+            curves = sorted(set(boundary_line_tags))  # each curve is listed once per adjacent face
+            if len(curves) == 0:
+                return i
+            sampling_of = {curve: max(2, math.ceil(gmsh.model.occ.getMass(1, curve) / max_spacing) + 1) for curve in curves}
+            curves.sort(key=lambda curve: sampling_of[curve])
+            n = len(curves)
+            max_sampling = sampling_of[curves[-1]]
+            if n * max_sampling <= max_points:
+                curves_by_sampling = {max_sampling: curves}
+            else:
+                # short group curves[:k] sampled for curves[k-1], long group sampled for the longest curve
+                k = min(range(1, n), key=lambda k: k * sampling_of[curves[k-1]] + (n - k) * max_sampling)
+                curves_by_sampling = {sampling_of[curves[k-1]]: curves[:k]}
+                curves_by_sampling.setdefault(max_sampling, []).extend(curves[k:])
 
-            i = i + 1
-            # We then define a `Threshold' field, which uses the return value of the
-            # `Distance' field 1 in order to define a simple change in element size
-            # depending on the computed distances
-            #
-            # SizeMax -                     /------------------
-            #                              /
-            #                             /
-            #                            /
-            # SizeMin -o----------------/
-            #          |                |    |
-            #        Point         DistMin  DistMax
-            gmsh.model.mesh.field.add("Threshold", i)
-            gmsh.model.mesh.field.setNumber(i, "InField", i-1)  # number of this field definition
-            gmsh.model.mesh.field.setNumber(i, "SizeMin", refined_cellsize_value)
-            gmsh.model.mesh.field.setNumber(i, "SizeMax", max_cellsize_air)
-            gmsh.model.mesh.field.setNumber(i, "DistMin", 0)
-            gmsh.model.mesh.field.setNumber(i, "DistMax", max_cellsize_air)
+            for sampling, curves in sorted(curves_by_sampling.items()):
+                gmsh.model.mesh.field.add("Distance", i)
+                gmsh.model.mesh.field.setNumbers(i, "CurvesList", curves)
+                gmsh.model.mesh.field.setNumber(i, "Sampling", sampling)
 
-            fields_list.append(i)
-            i = i + 1
+                i = i + 1
+                # We then define a `Threshold' field, which uses the return value of the
+                # `Distance' field 1 in order to define a simple change in element size
+                # depending on the computed distances
+                #
+                # SizeMax -                     /------------------
+                #                              /
+                #                             /
+                #                            /
+                # SizeMin -o----------------/
+                #          |                |    |
+                #        Point         DistMin  DistMax
+                gmsh.model.mesh.field.add("Threshold", i)
+                gmsh.model.mesh.field.setNumber(i, "InField", i-1)  # number of this field definition
+                gmsh.model.mesh.field.setNumber(i, "SizeMin", refined_cellsize_value)
+                gmsh.model.mesh.field.setNumber(i, "SizeMax", max_cellsize_air)
+                gmsh.model.mesh.field.setNumber(i, "DistMin", 0)
+                gmsh.model.mesh.field.setNumber(i, "DistMax", max_cellsize_air)
+
+                fields_list.append(i)
+                i = i + 1
             return i
 
 
