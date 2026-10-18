@@ -3,6 +3,7 @@
 This is an (incomplete) list of changes and new features.
 
 ## 18 October-2026
+gds2palace 0.9.1
 
 **Fixes**  
 Mesh refinement along the conductor edges sampled every edge with 200 points, whatever its length. The mesh size is computed from the distance to these points, so on edges longer than about 100 times `refined_cellsize` the mesh was coarser than requested: in two of the mesh convergence examples (MIM-loaded balun, 2:1 balun), up to 1.4-1.7 times `refined_cellsize` along 27-51 % of the edge length at `refined_cellsize` 2. The points are now at most `refined_cellsize`/2 apart on every edge, and short edges no longer get 200 points each. The number of mesh cells changes by 1-3 % in these examples, and meshing takes about as long as before (D-band balun: 27 % faster).
