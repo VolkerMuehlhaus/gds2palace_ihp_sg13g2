@@ -388,16 +388,18 @@ def _process_datafile(found_filename):
         with open(port_info_filename, "r") as f:
             port_info_data = json.load(f)
 
-        # Extract all Z0 values
-        Z0_values = [port["Z0"] for port in port_info_data.get("ports", []) if "Z0" in port]
+        # Extract all Z0 values, in port number order (the order of the S-matrix)
+        ports_with_Z0 = sorted((port for port in port_info_data.get("ports", []) if "Z0" in port),
+                               key=lambda port: port.get("portnumber", 0))
+        Z0_values = [port["Z0"] for port in ports_with_Z0]
         print("Port Z0 values found:", Z0_values)
 
-        Z0_string = str(Z0_values[0])
-        for Z in Z0_values:
-            if Z != Z0_values[0]:
-                Z0_string = Z0_string + ' ' + str(Z)
-        # If string is filled, we have a Z0 parameter for Touchstone header line. 
-        # For mixed port impedance, we have multiple values there
+        # Touchstone option line: one value if all ports have the same Z0, otherwise one value
+        # per port, in port order (before, ports with the same Z0 as port 1 were left out)
+        if all(Z == Z0_values[0] for Z in Z0_values):
+            Z0_string = str(Z0_values[0])
+        else:
+            Z0_string = ' '.join(str(Z) for Z in Z0_values)
         port_info_available = True
         print("Port impedance for Touchstone header: ", Z0_string)
 
