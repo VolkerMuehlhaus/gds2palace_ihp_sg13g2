@@ -148,8 +148,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "(default: %%USERPROFILE%%\\scripts)")
     p.add_argument("--wsl-venv-dir", default=None,
                     help="Helper venv location INSIDE WSL, a Linux path (default: ~/venv/palace)")
-    p.add_argument("--palace-version", default="016",
-                    help="Palace container tag to pull inside WSL (default: 016)")
+    p.add_argument("--palace-version", default="0181",
+                    help="Palace container tag to pull inside WSL (default: 0181)")
     p.add_argument("--np", default=None,
                     help="Default core count baked into run_palace inside WSL "
                          "(default: number of CPU cores in WSL, minimum 4)")

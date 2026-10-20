@@ -1,32 +1,55 @@
-# Building Palace Natively with Spack
+# Installing Palace directly on your computer with Spack
 
-This is a step-by-step guide for installing [Palace](https://github.com/awslabs/palace), the
-AWS Center for Quantum Computing's finite element solver for computational electromagnetics,
-directly on your machine using [Spack](https://spack.io/), so it's available as a normal
-`palace` command on your `PATH`.
+[Palace](https://github.com/awslabs/palace) is the EM solver that runs the models created by
+gds2palace. This guide shows how to install Palace directly on a Linux computer, so that you
+can start it with the command `palace`, like any other program.
 
-This compiles Palace and its dependencies from source via Spack — budget real time for a
-from-scratch build, though if you've built Palace with Spack on this machine before, cached
-dependencies make it much faster.[^cached]
+Installing takes one to three hours, because Palace and all its libraries are compiled from
+source code.
 
-Spack installs everything under a long, hash-named path you'd never want to type or put in a
-script, for example:
+**Is this the right guide for you?** There is a simpler alternative: a ready-made container
+image, which you only download. See [building-palace-apptainer.md](building-palace-apptainer.md).
 
-```
-/home/volker/spack/opt/spack/linux-zen4/palace-0.16.0-yzannz2n3633nninwhv6kuug6pjqybpk/bin/palace
-```
+| | Direct install (this guide) | Container image |
+|---|---|---|
+| Time to set up | 1 to 3 hours | a few minutes (download) |
+| Speed | fastest on this computer | can be a little slower on new processors |
+| Copy to other computers | no | yes, one file |
+| Extra program needed | no | Apptainer |
 
-This guide's Step 3 sets up a **Spack view** — a directory of symlinks Spack maintains at a
-short, fixed, readable path (e.g. `~/palace-current/bin/palace`) that always points at the
-current install. Once it's set up, add that `bin/` directory to `PATH` and just run
-`palace ...`, without ever seeing the underlying path.
+## A few words about the tools
 
-Every command below uses literal values (today's release, `0.17.0`) so you can copy and
-paste each step as-is; see the [Appendix](#appendix) for what changes for a future release.
+**Spack.** Palace needs about 70 other software libraries. Spack is a tool that downloads
+and compiles Palace and all these libraries, in the right versions and in the right order.
 
-## Prerequisites
+**Package list.** Spack keeps a list of all software it can build, with all known versions.
+When Palace releases a new version, the list gets an update a few days or weeks later.
 
-You need **Spack** on your `PATH`.
+**Environment.** A Spack environment is a folder with a recipe file named `spack.yaml`. The
+recipe says what to install. You can keep it and use it again later, e.g. for the next
+Palace version.
+
+**View.** Spack installs each program in a folder with a long, unreadable name, for example
+`~/spack/opt/spack/linux-zen4/palace-0.18.1-yzannz2n3633nninwhv6kuug6pjqybpk/bin/palace`.
+A view is a folder with a short name, e.g. `~/palace-current`, that always points to the
+current installation. You then use `~/palace-current/bin/palace` instead of the long path.
+
+**Processor.** Spack compiles for the exact processor of your computer. This makes Palace as
+fast as possible on it. It also means that you can't copy the installation to a computer
+with a different processor: it may stop there with the error `Illegal instruction`. For
+other computers, use the container image.
+
+## Before you start
+
+You need:
+
+- Linux. On Windows: WSL2 (install "Ubuntu 24.04 LTS" from the Microsoft Store and work in
+  the Ubuntu window).
+- One to three hours of build time. More processor cores make it faster.
+- Several GB of free disk space.
+- An internet connection.
+
+### Install Spack
 
 ```bash
 git clone --depth 1 https://github.com/spack/spack.git ~/spack
@@ -34,33 +57,38 @@ source ~/spack/share/spack/setup-env.sh
 spack --version
 ```
 
-Add the `source` line to your `~/.bashrc` (or shell equivalent) so `spack` stays on your
-`PATH` in future sessions.
+The `source` line makes the `spack` command available in this terminal window. To have it
+in every new window, add that line to the end of the file `~/.bashrc`.
 
-## Step 1: Set up a Spack environment directory
+## Step 1: Update the package list and check the Palace version
+
+```bash
+spack repo update
+spack versions --safe palace
+```
+
+The first command updates Spack's package list. The second shows the Palace versions that
+Spack knows. Look for `0.18.1` in the list.
+
+If `0.18.1` is missing, switch the package list to the newest state and check again:
+
+```bash
+spack repo update --branch develop builtin
+spack versions --safe palace
+```
+
+## Step 2: Create a folder for the environment
 
 ```bash
 mkdir -p ~/palace-native
 cd ~/palace-native
 ```
 
-A Spack *environment* is a directory with a `spack.yaml` describing what to install — it gives
-you a reusable, version-controlled recipe and, via Step 3, the readable-link view.[^environment]
+Run all following steps in this folder.
 
-## Step 2: Check Spack's package database for your target version
+## Step 3: Write the recipe
 
-```bash
-spack versions palace
-```
-
-Look for `0.17.0` in the output. This list only updates when someone submits a new
-`version()` entry to Spack's package repository, which can lag a few weeks behind a new
-Palace tag.
-
-- If `0.17.0` **is** listed, use **Step 3a** below.
-- If it's **not** listed, use **Step 3b** instead.
-
-## Step 3a: Write `spack.yaml` (version already known to Spack)
+Copy this whole block into the terminal:
 
 ```bash
 cat > spack.yaml <<'EOF'
@@ -68,65 +96,29 @@ spack:
   concretizer:
     unify: true
   specs:
-    - palace@0.17.0
+    - palace@0.18.1
   view: ~/palace-current
 EOF
 ```
 
-Continue to Step 4.
+What the lines mean:
 
-## Step 3b: Write `spack.yaml` (version not yet known to Spack)
+- `palace@0.18.1`: the Palace version to install.
+- `view: ~/palace-current`: the short folder name that points to the installation.
 
-Pin the git tag directly instead of the plain version — this works because Palace's Spack
-package already points at its GitHub repo, so Spack can fetch and build a tag it doesn't have
-a formal `version()` entry for yet:
-
-```bash
-cat > spack.yaml <<'EOF'
-spack:
-  concretizer:
-    unify: true
-  specs:
-    - palace@git.v0.17.0=0.17.0
-  view: ~/palace-current
-EOF
-```
-
-This is identical to Step 3a's `spack.yaml` except for the version line. Continue to Step 4.
-
-The `view: ~/palace-current` line is the piece that creates the readable link: Spack will
-maintain a merged directory of symlinks there (`bin/`, `lib/`, `share/`, ...) that always
-resolve to the real, hash-named install — refreshed automatically every time you install or
-update inside this environment.
-
-## Step 4: Concretize and install
+## Step 4: Install
 
 ```bash
 spack -e . concretize
 spack -e . install
 ```
 
-`concretize` resolves and prints the full dependency graph — packages marked `[+]` are already
-installed elsewhere on your system and will be reused, not rebuilt. `install` then builds
-whatever's missing and updates the `~/palace-current` view.
+- `concretize` plans the installation: it chooses all libraries and their versions and
+  prints the list. Packages marked `[+]` are already installed and are used again.
+- `install` downloads and compiles everything that is missing. This is the long step. If
+  you installed Palace with Spack before, it can be much faster.
 
-This can take anywhere from well under a minute to **1–3+ hours** on a machine with nothing
-cached, since Palace's dependency chain includes MFEM, libCEED, Hypre, PETSc, SLEPc, OpenBLAS,
-OpenMPI, SuperLU_DIST, and more, all built from source.
-
-## Step 5: Verify the install
-
-**Check the version:**
-
-```bash
-~/palace-current/bin/palace --version
-```
-
-This should print a `Palace version:` line and a schema version. If you used Step 3b's
-git-tag workaround, the printed version is a commit hash (matching the `v0.17.0` tag) rather
-than the plain version string — that's expected.
-
-**Put it on your `PATH`** so you can just type `palace` instead of the full view path:
+## Step 5: Make the `palace` command available
 
 ```bash
 echo 'export PATH="$HOME/palace-current/bin:$PATH"' >> ~/.bashrc
@@ -134,136 +126,142 @@ source ~/.bashrc
 palace --version
 ```
 
-**Run a bundled example end-to-end** — e.g. the `rings` magnetostatic example — to confirm the
-solve actually works, not just that the binary starts. Fetch its two input files first, since
-Spack doesn't install them for you:[^schema]
+The first line adds the view's `bin` folder to your `PATH`, the list of folders where Linux
+looks for programs. The last line prints `Palace version: 0dc74cd`. The code `0dc74cd`
+stands for version 0.18.1.
+
+## Step 6: Test with a small example
+
+Palace comes with example models. This downloads the `rings` example and runs it:
 
 ```bash
-mkdir -p /tmp/palace-smoketest/mesh && cd /tmp/palace-smoketest
-wget -q -O rings.json \
-  "https://raw.githubusercontent.com/awslabs/palace/v0.17.0/examples/rings/rings.json"
-wget -q -O mesh/rings.msh \
-  "https://raw.githubusercontent.com/awslabs/palace/v0.17.0/examples/rings/mesh/rings.msh"
-```
-
-Then run it:
-
-```bash
+mkdir -p ~/palace-test/mesh && cd ~/palace-test
+curl -fsSL -o rings.json \
+  "https://raw.githubusercontent.com/awslabs/palace/v0.18.1/examples/rings/rings.json"
+curl -fsSL -o mesh/rings.msh \
+  "https://raw.githubusercontent.com/awslabs/palace/v0.18.1/examples/rings/mesh/rings.msh"
 palace rings.json
 ```
 
-A successful run prints an "Elapsed Time Report" and writes result files under `postpro/`
-(e.g. `postpro/terminal-M.csv` for the extracted inductance matrix).
+The run takes a few seconds. At the end, Palace prints an "Elapsed Time Report". The result
+is in the file `postpro/terminal-M.csv`.
 
-**For multi-process (MPI) runs**, use the `palace` wrapper script's own `--np` flag rather
-than wrapping it in your own `mpirun` — the wrapper already calls `mpirun` internally, so an
-outer `mpirun` double-nests MPI and aborts:
+Now run it on 2 processor cores:
 
 ```bash
-palace --np 2 rings.json
+palace -np 2 rings.json
 ```
 
-## Troubleshooting
+Palace now prints `Running with 2 MPI processes` near the start. The result must be the same
+as before.
 
-**"Error: Could not locate MPI launcher, try specifying a value for --launcher"** — Palace needs
-an MPI implementation on `PATH` at runtime. Spack's `palace` package normally pulls in its own
-MPI provider (OpenMPI) as a dependency, so this is uncommon with the Step 1–5 workflow above;
-it's more likely if you built or moved Palace outside of a Spack view. If you hit it, install
-OpenMPI system-wide:
+## Use Palace with gds2palace
+
+gds2palace creates the model files, and Palace solves them. The gds2palace repository has a
+small script for this, [`scripts/run_palace`](../scripts/run_palace). Change it so that it
+uses your installation:
 
 ```bash
-sudo apt install openmpi-bin libopenmpi-dev
+#!/bin/bash
+palace -np 8 $1
 ```
 
-## Using this build with the gds2palace workflow
+`-np 8` is the number of processor cores Palace uses. Set it to the number of cores you want
+to use. The other scripts, such as `combine_snp` for the conversion to Touchstone files, are
+described in [`scripts/README.md`](../scripts/README.md).
 
-The [gds2palace](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2) workflow for IHP
-SG13G2 generates the `.msh`/`config.json` model files that this Palace build simulates — it
-doesn't care how Palace was installed. Point the repo's `scripts/run_palace` wrapper at this
-build[^wrapper] and see
-[`scripts/README.md`](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/scripts/README.md)
-for the rest of the launch/postprocessing scripts (`combine_snp` for Touchstone conversion,
-`palace_summary.py` for a results summary).
+## Install another Palace version
 
-## Appendix
+Change `palace@0.18.1` in Step 3 to the version you want, and repeat Steps 4 to 6. The view
+`~/palace-current` then points to the new version.
 
-### What to adjust for a future release
+- If Spack doesn't know the version yet (Step 1), you can take it directly from Palace's
+  source code on GitHub. For example, for 0.17.0: `palace@git.v0.17.0=0.17.0`.
+- To keep several versions side by side, give each one its own environment folder and its
+  own view, e.g. `view: ~/palace-0.17.0`.
 
-| Value | Current example | Appears in | When to change it |
-|---|---|---|---|
-| Palace version | `0.17.0` (tag form: `v0.17.0`) | Steps 2, 3a/3b, 5 | Every new Palace release you want to build. |
-| Step 3a vs. 3b | 3b (git-tag workaround) | Step 3 | Determined by the `spack versions palace` check in Step 2 — use 3a once your target version is listed directly. |
-| View path | `~/palace-current` | Step 3a/3b, all of Step 5 | Anytime — any path works. Keeping the same name across versions (as here) means upgrading in place just means re-running Step 4 with a new version in `spack.yaml`; use a version-specific name instead (e.g. `~/palace-0.17.0`) if you want several versions installed side by side. |
-| Environment directory | `~/palace-native` | Step 1 | Anytime — any location works; reusing the same one is fine across versions. |
+## Problems and solutions
 
-Everything else in this guide (the `spack.yaml` structure, the `concretize`/`install`
-commands, the verification steps) should stay the same across Palace releases.
+| Problem | Solution |
+|---|---|
+| Spack doesn't know `0.18.1` | Update the package list, see Step 1. |
+| `Could not locate MPI launcher` | Palace can't find `mpirun`. Use Palace from the view (Step 5). If the error stays, install OpenMPI: `sudo apt install openmpi-bin libopenmpi-dev`. |
+| Palace stops with an MPI error when you use `mpirun` | Don't put `mpirun` in front of `palace`. Use `palace -np 4` instead: `palace` already starts `mpirun` itself. |
+| `Illegal instruction` on another computer | A direct install only runs on computers with the same kind of processor. Use the container image there. |
+| An example from the Palace website gives configuration errors | Take the example from the same version as your installation (`v0.18.1` in the links above). Newer examples may use options that older versions don't know. |
 
-### If you already installed Palace without a view
+## If you installed Palace without a view
 
-Steps 1–5 use a Spack *environment* with a `view:` key, which is what creates the
-`~/palace-current` shortcut for you automatically. If Palace was instead already installed a
-different way — for example with a plain `spack install palace@0.17.0` and no environment —
-you can still get convenient access to it, using either of the two options below.
+If you installed Palace with a plain `spack install palace@0.18.1`, without an environment,
+there is no `~/palace-current` folder. There are two ways to use it anyway.
 
-#### Option 1: Create your own permanent shortcut
-
-This gives you a shortcut similar to the view used above, but — unlike that view — it won't
-update itself. If you reinstall or upgrade Palace later, you'll need to redo these steps.
-
-1. Find where Spack actually put Palace:
-
-   ```bash
-   PALACE_PREFIX=$(spack location -i palace@0.17.0)
-   ```
-
-   (If it was installed using the git-tag workaround from Step 3b, use this instead:
-   `PALACE_PREFIX=$(spack location -i palace@git.v0.17.0=0.17.0)`)
-
-2. Make sure you have a personal folder for shortcuts like this, and that it's on your
-   `PATH`. Many systems already set this up for `~/bin`; if `palace --version` at the end of
-   this section doesn't work, run:
-
-   ```bash
-   mkdir -p ~/bin
-   echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-
-3. Create the shortcut. Palace ships as two files that need to stay together — the `palace`
-   command itself, and the real program it runs behind the scenes — so link both into your
-   shortcuts folder:
-
-   ```bash
-   ln -sf "$PALACE_PREFIX/bin/palace" ~/bin/palace
-   ln -sf "$PALACE_PREFIX/bin/palace-x86_64.bin" ~/bin/palace-x86_64.bin
-   ```
-
-4. Confirm it works:
-
-   ```bash
-   palace --version
-   ```
-
-#### Option 2: Use Palace for just this terminal session
-
-If you don't need a permanent shortcut — just a one-off session where `palace` works as a
-command — Spack can add it to your `PATH` temporarily:
+**For the current terminal window only:**
 
 ```bash
-spack load palace@0.17.0
+spack load palace@0.18.1
 ```
 
-Two things to know about this option:
+This only works if you ran the `source ~/spack/share/spack/setup-env.sh` line in that
+window. If you see an error about "shell support", that line is missing.
 
-- It only lasts for your *current* terminal session. Close the terminal, or open a new one,
-  and you'll need to run it again.
-- It only works if you've *sourced* Spack's shell setup script in that terminal — the
-  `source .../setup-env.sh` line from the Prerequisites step. Simply having `spack` available
-  as a command is not enough; if you see an error mentioning "shell support", that's what's
-  missing.
+**Permanently, with your own links:**
 
-[^cached]: Dependencies already cached from a previous Spack build on this machine are reused, not recompiled — that's why this can also finish in well under a minute.
-[^environment]: A bare `spack install palace` works too, but doesn't give you a reusable recipe file or the view set up in Step 3.
-[^schema]: Use the example from the matching release tag (`v0.17.0` below), not from a newer checkout like `main` — Palace's config schema evolves between releases, and a newer example may use options your build doesn't recognize.
-[^wrapper]: e.g. `~/palace-current/bin/palace -np 8 $1`, or simply `palace -np 8 $1` once it's on your `PATH` per Step 5.
+```bash
+PALACE_PREFIX=$(spack location -i palace@0.18.1)
+mkdir -p ~/bin
+ln -sf "$PALACE_PREFIX/bin/palace" ~/bin/palace
+ln -sf "$PALACE_PREFIX/bin/palace-x86_64.bin" ~/bin/palace-x86_64.bin
+palace --version
+```
+
+Palace consists of two files that belong together: the `palace` command, and the program
+`palace-x86_64.bin` that it starts. Both need a link. If `palace --version` doesn't work,
+`~/bin` is not in your `PATH` yet: add it with
+`echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc`, then `source ~/.bashrc`. These links
+don't update themselves: after a new installation, create them again.
+
+## For AI agents: technical notes
+
+This section is for AI coding agents that install Palace or debug an installation for a
+user. It records the facts behind the steps above.
+
+**Status (2026-10-20).** Palace 0.18.1 has been in spack-packages since PR #4447 ("palace:
+add v0.18.1 and update dependencies", merged 2026-10-13, merge commit `51d819e`). The tag
+`v0.18.1` is commit `0dc74cdf8c36c58b69b21c4a06e816048ec0b83f`, and `palace --version` prints
+its short hash. This native install has not been tested end-to-end with 0.18.1. The same
+package recipe has built and run in the Apptainer image, see
+[building-palace-apptainer.md](building-palace-apptainer.md#for-ai-agents-technical-notes).
+
+**Package repo.** Spack 1.x keeps the builtin package repo as a separate git clone under
+`~/.spack/package_repos/<hash>/`. `spack repo list` shows the path, and
+`spack config blame repos` shows which branch is configured (e.g. `branch: develop` in
+`~/.spack/repos.yaml`). Depending on that configuration, `spack repo update` may stay on a
+release branch that predates 0.18.1. `spack repo update --branch develop builtin` switches
+to `develop` and writes that to the config; `--commit 51d819e6a45961329b49cf5cb8ef1e170980b5ed`
+pins the verified state instead. Whether plain `spack repo update` is enough was not tested.
+`spack versions --safe palace` lists only versions in the local package recipe;
+`spack versions palace` also lists remote tags, which says nothing about whether the recipe
+can build them. Before you change a user's package repo, tell them: it affects all their
+Spack builds.
+
+**Older or unknown versions.** `palace@git.vX.Y.Z=X.Y.Z` builds a git tag that has no
+`version()` entry. This worked for 0.17.0. 0.18.0 and newer need the newer MFEM and
+METIS/ParMETIS recipes from spack-packages #4000 and #4447, so update the package repo
+for those rather than use the git-tag form.
+
+**Processor target.** A native install compiles for the host (e.g. `linux-zen4`), and
+libCEED adds `-march=native` itself. That is intended here. Never copy a native install to
+another machine, and never build a container from it: use the Apptainer guide, which pins
+`target=x86_64_v3` and patches libCEED.
+
+**MPI.** The `palace` script is a wrapper that runs `mpirun -n N palace-<arch>.bin`.
+`palace -np N` sets the number of processes. Wrapping `palace` in an outer `mpirun` nests
+MPI and aborts. The `Could not locate MPI launcher` error means the wrapper finds no
+`mpirun` in `PATH`. Spack's OpenMPI is in the view's `bin`, so this usually means Palace
+runs from outside the view.
+
+**Practical points.** Run `spack -e . install` in the background with a log file; it takes
+1 to 3 hours from scratch. Take the `rings` example from the Palace tag that matches the
+installed version (`git -C /path/to/palace show v0.18.1:examples/rings/rings.json` from a
+local checkout works too). `palace_summary.py` in [`scripts/`](../scripts/README.md)
+summarizes Palace runs of gds2palace models.

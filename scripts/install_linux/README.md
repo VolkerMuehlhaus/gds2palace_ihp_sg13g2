@@ -37,9 +37,9 @@ If you do **not have working `sudo` access**, please ask your system administrat
 ## AWS Palace solver
 By default, this installation script also installs the Palace solver using an Apptainer container image.  
 
-The script installs [Apptainer](https://apptainer.org/) via the Apptainer PPA (`sudo add-apt-repository ppa:apptainer/ppa`, on apt-based distros), then runs `apptainer pull` on a **prebuilt container image published by this repo's maintainer** at `oras://ghcr.io/volkermuehlhaus/palace_016:latest`  
+The script installs [Apptainer](https://apptainer.org/) via the Apptainer PPA (`sudo add-apt-repository ppa:apptainer/ppa`, on apt-based distros), then runs `apptainer pull` on a **prebuilt container image published by this repo's maintainer** at `oras://ghcr.io/volkermuehlhaus/palace_0181:latest`  
 
-This container image is saved to `~/palace_016.sif` (exact name depends on Palace version) and reused on every re-run. It is not an official AWS Palace release artifact, since Palace's own CI doesn't publish a pullable image. 
+This container image is saved to `~/palace_0181.sif` (exact name depends on Palace version) and reused on every re-run. It is not an official AWS Palace release artifact, since Palace's own CI doesn't publish a pullable image. 
 
 If you wish to build a container image yourself, see [`doc/building-palace-apptainer.md`](../../doc/building-palace-apptainer.md) 
 
