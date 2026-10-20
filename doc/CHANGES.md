@@ -8,6 +8,8 @@ gds2palace 0.9.1
 **New features**  
 A pre-built Apptainer image for Palace 0.18.1 is now available: `apptainer pull palace_0181.sif oras://ghcr.io/volkermuehlhaus/palace_0181:latest`. It is compiled for a common processor level (`x86_64_v3`, AVX2), so it runs on all Intel processors since 2013 and all AMD processors since 2017. The Linux and Windows install scripts now download this image by default; `--palace-version 016` still gives the 0.16 image. The generated `run_palace` script now calls `apptainer -q`, which hides Apptainer's info messages.
 
+The latest IHP stackup files (`SG13G2_FEM_200um.xml`, `SG13G2_FEM_200um_passi3D.xml`, `SG13CMOS5L_200um.xml`) are now installed with the pip package, so a model no longer needs a copy of the repository. `utilities.get_stackup_path('SG13G2_FEM_200um.xml')` returns the full path of one; `utilities.get_stackup_path()` without an argument prints the stackup folder and the available files. Legacy stackups are not included.
+
 **Fixes**  
 For very long polygon edges, mesh refinement along the conductor edges is more robust now.
 

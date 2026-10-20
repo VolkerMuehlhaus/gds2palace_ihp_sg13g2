@@ -27,6 +27,15 @@ Changelog = "https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/
 [tool.setuptools.dynamic]
 version = {attr = "gds2palace.__version__"}
 
-[tool.setuptools.packages.find]
-where = ["workflow"]
-include = ["gds2palace*"]
+# The latest IHP stackup files ship inside the wheel as gds2palace.stackups,
+# mapped from XML_stackup/latest/IHP so there is only one copy in the repo.
+# Find them with gds2palace.utilities.get_stackup_path().
+[tool.setuptools]
+packages = ["gds2palace", "gds2palace.stackups"]
+
+[tool.setuptools.package-dir]
+"gds2palace" = "workflow/gds2palace"
+"gds2palace.stackups" = "XML_stackup/latest/IHP"
+
+[tool.setuptools.package-data]
+"gds2palace.stackups" = ["*.xml", "README.md"]

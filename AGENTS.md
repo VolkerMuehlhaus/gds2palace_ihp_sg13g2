@@ -48,11 +48,16 @@ This file is at the root of the repository
 are relative to that root.
 
 **If the user only installed the package** (`pip install gds2palace`), the
-documentation, examples and stackup files are not on their disk. Read them on
+documentation and examples are not on their disk. Read them on
 GitHub (prefix the paths below with
 `https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/`), or
 suggest cloning the repository. The user needs at least one XML stackup file
-from [`XML_stackup/`](XML_stackup/) for any model.
+for any model. The latest IHP stackups from
+[`XML_stackup/latest/IHP/`](XML_stackup/latest/IHP/) ship with the package
+(gds2palace 0.9.1 and newer): `utilities.get_stackup_path('SG13G2_FEM_200um.xml')`
+returns the full path of one, and `utilities.get_stackup_path()` without an
+argument prints the folder and the available files. Legacy stackups are not
+included.
 
 To see the installed version and code: `pip show gds2palace`; the package
 source is in the `gds2palace` folder of the venv's `site-packages`. In a
@@ -180,7 +185,7 @@ from gds2palace import *     # stackup_reader, gds_reader, simulation_setup, uti
 
 # ---------- input files ----------
 gds_filename = "my_layout.gds"           # ASK
-XML_filename = "SG13G2_FEM_200um.xml"    # from XML_stackup/latest/IHP/, copied next to the script
+XML_filename = utilities.get_stackup_path("SG13G2_FEM_200um.xml")   # ships with gds2palace; or a path to the user's own copy
 cellname = ""                            # "" = first top-level cell
 merge_polygon_size = 0                   # via array merging distance in um, 0 = off (see below)
 
