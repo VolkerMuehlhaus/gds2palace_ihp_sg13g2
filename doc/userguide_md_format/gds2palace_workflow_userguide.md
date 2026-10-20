@@ -170,10 +170,10 @@ To actually simulate the model created by gds2palace, you need to have AWS Palac
 
 For development of gds2palace, Palace was installed using the Singularity/Apptainer installation method. This was rather simple and straightforward, even with no knowledge about container usage. A step-by-step guide can be found here: [building-palace-apptainer.md](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/doc/building-palace-apptainer.md)
 
-A pre-built container image for the last officially released Palace version (0.16) is also available, if you'd rather not build anything yourself. To download it into your current directory:  
+A pre-built container image for Palace 0.18.1 is also available, if you'd rather not build anything yourself. It runs on all Intel processors since 2013 and all AMD processors since 2017. To download it into your current directory:  
 
 ```
-$ apptainer pull palace_016.sif oras://ghcr.io/volkermuehlhaus/palace_016:latest
+$ apptainer pull palace_0181.sif oras://ghcr.io/volkermuehlhaus/palace_0181:latest
 ```
 
 ### Installing the Palace solver using spack package manager 

@@ -1,77 +1,43 @@
-# Building a Palace Apptainer Container
+# Installing Palace as an Apptainer container
 
-This is a step-by-step guide for building your own [Apptainer](https://apptainer.org/)
-(formerly Singularity) container image of [Palace](https://github.com/awslabs/palace), the
-AWS Center for Quantum Computing's finite element solver for computational
-electromagnetics.
+[Palace](https://github.com/awslabs/palace) is the EM solver that runs the models created by
+gds2palace. This guide shows how to get Palace as a **container image**: one single file
+that holds Palace together with all the libraries it needs.
 
-Palace's own CI builds container images too, but it does not publish anything you can just
-`apptainer pull` — its build artifacts go to a private AWS registry. So getting your own
-Apptainer image means building it yourself from source via [Spack](https://spack.io/),
-which compiles Palace and every dependency (MFEM, libCEED, Hypre, PETSc, SLEPc, OpenBLAS,
-OpenMPI, SuperLU_DIST, ...) from scratch. Budget **1–3+ hours** and a few GB of disk space.
-This guide covers a CPU-only build using Palace's default solver variants (SuperLU_DIST +
-SLEPc), the most common setup for sharing a working Palace environment with others.
+There are two ways:
 
-The walkthrough below uses real, literal values (`0.17.0`, the newest release this guide's
-git-tag workaround has been confirmed to build) so you can copy and paste each step as-is.
-Building a different release just means replacing `0.17.0` (and its tag form, `v0.17.0`)
-wherever it appears — see the [Appendix](#appendix) for exactly where, and for a
-shell-variable version of these same commands if you expect to repeat this often.
+- **Download a ready-made image.** This takes a few minutes. It is the right choice for most
+  users.
+- **Build the image yourself.** This takes one to three hours. You need it only for a Palace
+  version or setting that is not available as a download.
 
-> [!NOTE]
-> Palace `0.18.0` and `0.18.1` need one extra step: Spack's `palace` package has known them
-> since [spack/spack-packages#4447](https://github.com/spack/spack-packages/pull/4447)
-> (merged 2026-10-13), but the package repo bundled in the `spack: "1.2"` container image is
-> older. See [Building 0.18.x](#building-018x-newer-than-the-images-package-repo) below.
+## A few words about the tools
 
-## Faster alternative: a prebuilt container image
+**Container image.** Palace needs about 70 other software libraries to run. A container
+image packs Palace and all these libraries into one file, ending in `.sif`. You can copy
+this file to another computer and run it there. Nothing else needs to be installed, except
+Apptainer.
 
-Building from source (below) compiles Palace `0.17.0`, an officially released version that
-Spack's package database doesn't have a formal `version()` entry for yet, so this guide
-builds it via the git-tag workaround in Step 3b. If you'd rather start from an
-already-packaged release instead of building anything yourself, a prebuilt Apptainer image
-for Palace **0.16** is published on GitHub Container Registry:
+**Apptainer.** This is the program that runs container images (and builds them). Its older
+name is Singularity. It runs on Linux. On Windows, it runs in WSL2, a Linux system that runs
+inside Windows.
 
-```bash
-apptainer pull palace_016.sif oras://ghcr.io/volkermuehlhaus/palace_016:latest
-```
+**Spack.** This is a tool that downloads and compiles scientific software, here Palace and
+all its libraries. You only need Spack if you build the image yourself.
 
-This replaces Steps 1–4 entirely — skip straight to [Step 5](#step-5-verify-the-image) to verify
-it, substituting `palace_016.sif` for `~/palace_0.17.0.sif` in the commands there. Check
-[github.com/users/VolkerMuehlhaus/packages/container/package/palace_016](https://github.com/users/VolkerMuehlhaus/packages/container/package/palace_016)
-for whether a newer prebuilt image has been published since.
+## Before you start
 
-## Prerequisites
+### Windows only: install WSL2
 
-### Windows
+Palace and Apptainer run on Linux only. On Windows:
 
-Palace and Apptainer are Linux-only. On Windows, install the Windows Subsystem for Linux (WSL2)
-first — open the Microsoft Store, install "Ubuntu 24.04 LTS", then open it (the `wsl` command,
-or the Ubuntu app) and follow the rest of this guide unchanged from inside that Ubuntu shell.
-
-### Linux (native or WSL2)
-
-You need two tools on your `PATH`: **Spack** (to resolve and drive the build) and
-**Apptainer** (to produce the final `.sif` image). Docker/Podman are *not* required for this
-approach.
-
-### Install Spack
-
-```bash
-git clone --depth 1 https://github.com/spack/spack.git ~/spack
-source ~/spack/share/spack/setup-env.sh
-spack --version
-```
-
-Add the `source` line to your `~/.bashrc` (or shell equivalent) so `spack` stays on your
-`PATH` in future sessions. Any reasonably recent Spack works here — this clones the current
-`develop` branch, and you don't need to check out a specific release just to run Spack.[^spackver]
+1. Open the Microsoft Store and install "Ubuntu 24.04 LTS".
+2. Start the Ubuntu app (or type `wsl` in a command window).
+3. Do all following steps in this Ubuntu window.
 
 ### Install Apptainer
 
-On Ubuntu/Debian, the [Apptainer PPA](https://apptainer.org/docs/admin/main/installation.html)
-has the most current release:
+On Ubuntu, type:
 
 ```bash
 sudo add-apt-repository -y ppa:apptainer/ppa
@@ -80,229 +46,67 @@ sudo apt install -y apptainer
 apptainer --version
 ```
 
-For other distributions/macOS, see the
-[official installation guide](https://apptainer.org/docs/admin/main/installation.html).
-Apptainer 1.4+ can build unprivileged (no root) on most modern Linux kernels via user
-namespaces; the steps below note the fallback if your system needs it.
+The last command prints the installed version. For other Linux systems, see the
+[Apptainer installation guide](https://apptainer.org/docs/admin/main/installation.html).
 
-## Step 1: Set up a build directory
-
-This directory holds only the build *recipe* (a few small text files) — the multi-GB
-dependency build happens in an ephemeral container, not on your local disk directly.
+## The easy way: download the ready-made image
 
 ```bash
-mkdir -p ~/palace-containers/apptainer
-cd ~/palace-containers/apptainer
+apptainer pull ~/palace_0181.sif oras://ghcr.io/volkermuehlhaus/palace_0181:latest
 ```
 
-## Step 2: Check Spack's package database for your target version
+This downloads Palace 0.18.1 (about 310 MB) into your home folder. The image runs on all
+Intel processors since 2013 (Haswell) and all AMD processors since 2017 (Zen). Continue with
+[Test the image](#test-the-image) and then
+[Use the image with gds2palace](#use-the-image-with-gds2palace).
+
+## Build the image yourself
+
+### Why your own build needs extra care
+
+A compiler can make a program faster by using special instructions of the processor it
+runs on. Newer processors have more of these instructions. Spack uses this by default: it
+compiles for the exact processor of the computer that does the build.
+
+That is fine as long as the image runs on the same computer. On another computer with an
+older or different processor, the program stops with the error `Illegal instruction`. The
+recipe below avoids this. It tells Spack to compile for a common level that all processors
+since 2013 understand. This level is called `x86_64_v3`.
+
+### What you need
+
+- Linux, or WSL2 on Windows, with Apptainer installed (see above).
+- One to three hours of build time. More processor cores make it faster.
+- Several GB of free disk space for temporary build files.
+- An internet connection. The build downloads the source code of all libraries.
+
+### Install Spack
+
+Spack writes the build file for Apptainer. The compiling itself happens later inside
+Apptainer.
 
 ```bash
-spack versions palace
+git clone --depth 1 https://github.com/spack/spack.git ~/spack
+source ~/spack/share/spack/setup-env.sh
+spack --version
 ```
 
-Look for `0.17.0` in the output. This list only updates when someone submits a new
-`version()` entry to Spack's package repository, which can lag a few weeks behind a new
-Palace tag.
+The `source` line makes the `spack` command available in this terminal window. To have it
+in every new window, add that line to the end of the file `~/.bashrc`.
 
-- If `0.17.0` **is** listed, use **Step 3a** below.
-- If it's **not** listed, use **Step 3b** instead.
-
-## Step 3a: Write `spack.yaml` (version already known to Spack)
+### Step 1: Create a folder for the build
 
 ```bash
-cat > spack.yaml <<'EOF'
-spack:
-  concretizer:
-    unify: true
-  packages:
-    all:
-      require:
-      - "target=x86_64_v3"
-  container:
-    format: singularity
-    images:
-      os: "ubuntu:24.04"
-      spack: "1.2"
-  specs:
-    - palace@0.17.0
-EOF
+mkdir -p ~/palace-build
+cd ~/palace-build
 ```
 
-Continue to Step 4.
+This folder holds only a few small text files. Run all following steps in this folder.
 
-## Step 3b: Write `spack.yaml` (version not yet known to Spack)
+### Step 2: Write the recipe
 
-Pin the git tag directly instead of the plain version — this works because Palace's Spack
-package already points at its GitHub repo, so Spack can fetch and build a tag it doesn't have
-a formal `version()` entry for yet:
-
-```bash
-cat > spack.yaml <<'EOF'
-spack:
-  concretizer:
-    unify: true
-  packages:
-    all:
-      require:
-      - "target=x86_64_v3"
-  container:
-    format: singularity
-    images:
-      os: "ubuntu:24.04"
-      spack: "1.2"
-  specs:
-    - palace@git.v0.17.0=0.17.0
-EOF
-```
-
-This is identical to Step 3a's `spack.yaml` except for the last line. Continue to Step 4.
-
-### A portable image: the `target=` line and the libCEED fix
-
-Spack compiles every package for the CPU it detects on the build machine, e.g. `zen4` on a
-current AMD Ryzen. Without the `packages:` block above, the image contains AVX-512 code and
-stops with `Illegal instruction` on CPUs that lack it, e.g. many Intel CPUs. With
-`target=x86_64_v3`, everything is compiled for the generic AVX2 level, which runs on every
-Intel CPU since Haswell (2013) and every AMD CPU since Zen 1 (2017).
-
-- For truly any 64-bit x86 CPU, use `target=x86_64` instead (somewhat slower solver kernels).
-- For an image that only ever runs on the build machine, remove the `packages:` block and
-  skip the libCEED fix below.
-- OpenBLAS is not affected either way: Spack builds it with `dynamic_dispatch` by default, so
-  it selects its kernels for the actual CPU at runtime. OpenMPI and zlib-ng also contain a
-  few AVX-512 functions, but only call them after checking the CPU at runtime.
-
-> [!IMPORTANT]
-> **The `target=` line alone is not enough: libCEED needs a fix in Step 4.** Spack's
-> `libceed` package lets libCEED's own Makefile add `-march=native`, which overrides Spack's
-> target flags. An image built without the fix crashes on CPUs without AVX-512 (e.g. AMD
-> Zen 2/3) as soon as the solve starts, with `exited on signal 4 (Illegal instruction)`.
-> After `spack -e . containerize > palace.def` in Step 4, find the `%post` block in the first
-> (`Stage: build`) section and insert this right after `. /opt/spack/share/spack/setup-env.sh`
-> (after the repo update, if you use the [0.18.x section](#building-018x-newer-than-the-images-package-repo)):
->
-> ```bash
->   LIBCEED_PKG=$(find /root/.spack/package_repos -path '*/packages/libceed/package.py' | head -1)
->   sed -i 's/"OPT=%s $(MARCHFLAG)/"MARCHFLAG=", &/' "$LIBCEED_PKG"
->   grep -q '"MARCHFLAG=", "OPT=%s $(MARCHFLAG)' "$LIBCEED_PKG" || \
->     { echo "ERROR: libceed package.py patch did not apply"; exit 1; }
-> ```
->
-> This passes an empty `MARCHFLAG` to libCEED's `make`, so only Spack's target flags are
-> left. The check stops the build if the recipe has changed and the patch no longer applies.
-> Check the result in Step 5.
-
-Both variants pin `spack: "1.2"` — the Spack release baked into the container's build
-environment. This is unrelated to which Palace version you're building, so you generally
-won't need to change it; see the [Appendix](#appendix) if you ever do.
-
-## Step 4: Generate the container definition and build
-
-```bash
-spack -e . containerize > palace.def
-apptainer build ~/palace_0.17.0.sif palace.def
-```
-
-`spack -e .` reads the `spack.yaml` from the current directory and emits a Singularity
-definition file describing a two-stage build: a throwaway stage that concretizes and
-compiles every package, and a slim final stage that copies over just the installed software.
-`apptainer build` then executes that definition and produces `~/palace_0.17.0.sif`.
-
-This step is the long one (the dependency compilation happens here). If it fails with a
-permission/privilege error instead of a build error, retry with:
-
-```bash
-apptainer build --fakeroot ~/palace_0.17.0.sif palace.def
-```
-
-and only as a last resort:
-
-```bash
-sudo apptainer build ~/palace_0.17.0.sif palace.def
-```
-
-## Step 5: Verify the image
-
-**Check the version:**
-
-```bash
-apptainer exec ~/palace_0.17.0.sif palace --version
-```
-
-This should print a `Palace version:` line and a schema version. If you used Step 3b's
-git-tag workaround, the printed version is a commit hash (matching the `v0.17.0` tag) rather
-than the plain version string — that's expected.
-
-**Check the CPU target** (should list only `linux-x86_64_v3`, not e.g. `linux-zen4`):
-
-```bash
-apptainer exec ~/palace_0.17.0.sif ls /opt/software
-```
-
-The folder name only shows the target Spack asked for, not the flags a package's own build
-system added. Check libCEED's compile flags too (must not contain `-march=native`):
-
-```bash
-apptainer exec ~/palace_0.17.0.sif sh -c \
-  'zcat /opt/software/linux-*/libceed-*/.spack/spack-build-out.txt.gz | grep -m1 "^CFLAGS"'
-```
-
-**Run a bundled example end-to-end** — e.g. the `rings` magnetostatic example — to confirm the
-solve actually works, not just that the binary starts. Fetch its two input files first, since
-they aren't inside the container image itself:[^schema]
-
-```bash
-mkdir -p /tmp/palace-smoketest/mesh && cd /tmp/palace-smoketest
-curl -fsSL -o rings.json \
-  "https://raw.githubusercontent.com/awslabs/palace/v0.17.0/examples/rings/rings.json"
-curl -fsSL -o mesh/rings.msh \
-  "https://raw.githubusercontent.com/awslabs/palace/v0.17.0/examples/rings/mesh/rings.msh"
-```
-
-Then run it:
-
-```bash
-apptainer exec ~/palace_0.17.0.sif palace rings.json
-```
-
-A successful run prints an "Elapsed Time Report" and writes result files under `postpro/`
-(e.g. `postpro/terminal-M.csv` for the extracted inductance matrix).
-
-**For multi-process (MPI) runs**, call the underlying binary directly rather than the
-`palace` wrapper script — `palace` already invokes its own internal `mpirun -n 1`, so
-wrapping it in an outer `mpirun` double-nests MPI and aborts:
-
-```bash
-apptainer exec ~/palace_0.17.0.sif mpirun -n 2 palace-x86_64.bin rings.json
-```
-
-## Using this build with the gds2palace workflow
-
-The [gds2palace](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2) workflow for IHP
-SG13G2 generates the `.msh`/`config.json` model files that this container simulates — it
-doesn't care how Palace was installed. Point the repo's `scripts/run_palace` wrapper at this
-image, e.g.:
-
-```bash
-#!/bin/bash
-apptainer exec ~/palace_0.17.0.sif palace -np 8 $1
-```
-
-See [`scripts/README.md`](https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2/blob/main/scripts/README.md)
-for the rest of the launch/postprocessing scripts (`combine_snp` for Touchstone conversion,
-`palace_summary.py` for a results summary).
-
-## Building 0.18.x (newer than the image's package repo)
-
-The `spack: "1.2"` container image comes with a copy of Spack's package repo
-(spack-packages, release branch from 2026-06) that does not know Palace `0.18.0` or `0.18.1`
-yet, nor the newer MFEM version they need. Spack's package repo has had both since
-[spack/spack-packages#4447](https://github.com/spack/spack-packages/pull/4447). The fix is to
-update the bundled repo *inside* the container build, because that is where the dependency
-solve happens (`spack containerize` on the host only writes the recipe; it doesn't concretize).
-
-**Step 3:** as Step 3a, with the plain version:
+The recipe is a file named `spack.yaml`. It tells Spack what to build. Copy this whole block
+into the terminal:
 
 ```bash
 cat > spack.yaml <<'EOF'
@@ -323,32 +127,207 @@ spack:
 EOF
 ```
 
-**Step 4, modified:** generate the definition as usual, then edit it before Spack
-concretizes:
+What the lines mean:
+
+- `palace@0.18.1`: the Palace version to build.
+- `target=x86_64_v3`: compile for the common processor level, so that the image runs on
+  other computers too.
+- `os: "ubuntu:24.04"`: the Linux system inside the image.
+- `spack: "1.2"`: the Spack version that does the build inside the image.
+
+### Step 3: Create the build file and add two fixes
+
+First, Spack turns the recipe into a build file for Apptainer, named `palace.def`:
 
 ```bash
 spack -e . containerize > palace.def
 ```
 
-In the generated `palace.def`, find the `%post` block in the first (`Stage: build`) section and
-insert this right after `. /opt/spack/share/spack/setup-env.sh` and before `spack -e . concretize`:
+The build file needs two fixes before you can use it:
+
+1. **Newer package list.** Spack keeps a list of all software it can build. The list inside
+   Spack 1.2 is older than Palace 0.18.1. The first fix loads a newer list.
+2. **libCEED.** libCEED is one of the libraries Palace uses. Its build always compiles for
+   the processor of the build computer, even when the recipe says otherwise. Without this
+   fix, the image crashes on many other computers. The second fix corrects this.
+
+Copy this whole block into the terminal. It writes the fixes into a file and adds them to
+`palace.def` at the right place:
 
 ```bash
+cat > palace-fixes.sh <<'EOF'
+  # Fix 1: use a newer list of Spack packages that includes Palace 0.18.1
   BUILTIN_REPO=$(find /root/.spack/package_repos -maxdepth 5 -type d -name builtin | head -1)
   (cd "$BUILTIN_REPO" && \
     git fetch --depth 1 origin 51d819e6a45961329b49cf5cb8ef1e170980b5ed && \
     git reset --hard FETCH_HEAD)
+  # Fix 2: stop libCEED from compiling for the build machine's CPU only
+  LIBCEED_PKG=$(find "$BUILTIN_REPO" -path '*/packages/libceed/package.py' | head -1)
+  sed -i 's/"OPT=%s $(MARCHFLAG)/"MARCHFLAG=", &/' "$LIBCEED_PKG"
+  grep -q '"MARCHFLAG=", "OPT=%s $(MARCHFLAG)' "$LIBCEED_PKG" || \
+    { echo "ERROR: the libCEED fix did not apply"; exit 1; }
+EOF
+sed -i '/^  \. \/opt\/spack\/share\/spack\/setup-env\.sh$/r palace-fixes.sh' palace.def
+grep -c "Fix 1" palace.def
 ```
 
-`51d819e` is the spack-packages commit that merged `#4447`. A fixed commit keeps the build
-reproducible; `git fetch --depth 1 origin develop` instead gets the newest package versions.
+The last command must print `1`. If it prints `0`, the fixes were not added. See
+[For AI agents](#for-ai-agents-technical-notes) for where they belong.
 
-For a portable image, insert the [libCEED fix](#a-portable-image-the-target-line-and-the-libceed-fix)
-directly after this block: the repo update would otherwise undo it.
+### Step 4: Build the image
 
-Optionally, also add this check directly after `spack -e . concretize`. It stops the build
-within minutes, instead of after hours of compiling, if a package was still concretized for
-the build machine's CPU:
+```bash
+apptainer build ~/palace_0181.sif palace.def
+```
+
+This is the long step. Apptainer downloads a small Linux system, then compiles Palace and all
+its libraries inside it. At the end, it copies only the finished programs into the image
+file `~/palace_0181.sif`.
+
+If the build stops with an error about missing permissions, try again with:
+
+```bash
+apptainer build --fakeroot ~/palace_0181.sif palace.def
+```
+
+If that fails too, use `sudo apptainer build ...` as a last resort.
+
+## Test the image
+
+The commands below use `~/palace_0181.sif`. If your image file has a different name, use
+that name instead.
+
+**1. Check the version:**
+
+```bash
+apptainer exec ~/palace_0181.sif palace --version
+```
+
+This prints `Palace version: 0dc74cd`. The code `0dc74cd` stands for version 0.18.1.
+
+**2. Only for images you built yourself, check the processor level:**
+
+```bash
+apptainer exec ~/palace_0181.sif sh -c 'ls /opt/software; zcat /opt/software/linux-*/libceed-*/.spack/spack-build-out.txt.gz | grep -m1 "^CFLAGS"'
+```
+
+The first line of the output must be `linux-x86_64_v3`. The line starting with `CFLAGS` must
+not contain `-march=native`. If it does, fix 2 from Step 3 is missing, and the image will
+crash on other computers.
+
+**3. Run a small example.** Palace comes with example models. This downloads the `rings`
+example and runs it:
+
+```bash
+mkdir -p ~/palace-test/mesh && cd ~/palace-test
+curl -fsSL -o rings.json \
+  "https://raw.githubusercontent.com/awslabs/palace/v0.18.1/examples/rings/rings.json"
+curl -fsSL -o mesh/rings.msh \
+  "https://raw.githubusercontent.com/awslabs/palace/v0.18.1/examples/rings/mesh/rings.msh"
+apptainer exec ~/palace_0181.sif palace rings.json
+```
+
+The run takes a few seconds. At the end, Palace prints an "Elapsed Time Report". The result
+is in the file `postpro/terminal-M.csv`.
+
+**4. Run the example on 2 processor cores:**
+
+```bash
+apptainer exec ~/palace_0181.sif palace -np 2 rings.json
+```
+
+Palace now prints `Running with 2 MPI processes` near the start. The result must be the same
+as before.
+
+## Use the image with gds2palace
+
+gds2palace creates the model files. Palace in the container then solves them. The
+gds2palace repository has a small script for this, [`scripts/run_palace`](../scripts/run_palace).
+Change it so that it uses your image file:
+
+```bash
+#!/bin/bash
+apptainer -q exec ~/palace_0181.sif palace -np 8 $1
+```
+
+- `-np 8` is the number of processor cores Palace uses. Set it to the number of cores you
+  want to use.
+- `-q` (quiet) hides Apptainer's own info messages, such as the note that `gocryptfs` is not
+  installed. This note is harmless.
+
+The other scripts, such as `combine_snp` for the conversion to Touchstone files, are
+described in [`scripts/README.md`](../scripts/README.md).
+
+## Build another Palace version
+
+- **Newer version:** change `palace@0.18.1` in Step 2 to the new version. Check first if
+  Spack knows it, see [For AI agents](#for-ai-agents-technical-notes). Fix 1 in Step 3 may
+  need a newer package list, or may not be needed at all. Keep fix 2.
+- **Palace 0.17.0:** use `palace@git.v0.17.0=0.17.0` in Step 2. This tells Spack to take the
+  version directly from Palace's source code on GitHub. Fix 1 is not needed, fix 2 is.
+- **Only for your own computer:** if the image only ever runs on the computer that builds it,
+  remove the four `packages:` lines from Step 2 and skip fix 2. The image is then a bit
+  faster on this computer, but crashes on many others.
+
+## Problems and solutions
+
+| Problem | Solution |
+|---|---|
+| `Illegal instruction` (or `signal 4`) when Palace starts solving | The image was compiled for a newer processor. Use the downloaded image, or build again with `target=x86_64_v3` and fix 2. |
+| `INFO: gocryptfs not found` | Harmless. Hide it with `apptainer -q`. |
+| The build stops with a permission error | Use `apptainer build --fakeroot ...`. |
+| The build says the image file already exists | Delete the old `.sif` file, or use another file name. |
+| Palace stops with an MPI error when you use `mpirun` | Don't put `mpirun` in front of `palace`. Use `palace -np 4` instead: `palace` already starts `mpirun` itself. |
+| An example from the Palace website gives configuration errors | Take the example from the same version as your image (`v0.18.1` in the download links above). Newer examples may use options that older versions don't know. |
+
+## For AI agents: technical notes
+
+This section is for AI coding agents that build or debug the image for a user. It records
+the facts behind the steps above.
+
+**Verified state (2026-10-20).** Palace 0.18.1, git commit `0dc74cd`, built with the recipe
+and fixes above on an AMD Ryzen AI MAX+ PRO 395 (Spack target `zen4`). The image is 311 MB.
+It is published as `oras://ghcr.io/volkermuehlhaus/palace_0181:latest`, and the published
+file was checked by SHA-256 against the local build. `rings` gives the same
+`postpro/terminal-M.csv` with 1 and 2 MPI processes, both with the `palace` wrapper and with
+`mpirun -n 2 palace-x86_64.bin`.
+
+**Fix 1, package repo.** The `spack/ubuntu-noble:1.2` base image comes with
+spack-packages' `releases/v2026.06` branch. It has no `palace@0.18.x` and lacks the MFEM pin
+and METIS/ParMETIS variants it needs (spack-packages #4000, #4447). The fix checks out
+`51d819e6a45961329b49cf5cb8ef1e170980b5ed`, the merge commit of #4447 ("palace: add v0.18.1
+and update dependencies"), to keep the build reproducible. `git fetch --depth 1 origin
+develop` gives the newest packages instead. The fix must run inside the build stage's
+`%post`, before `spack -e . concretize`. `spack containerize` on the host only writes the
+template and does not concretize. Check whether a version is known with
+`spack versions --safe palace` against an up-to-date package repo, or by reading
+`repos/spack_repo/builtin/packages/palace/package.py` on spack-packages' `develop` branch.
+
+**Fix 2, libCEED.** For libCEED 0.13 and newer, Spack's `libceed` recipe passes
+`OPT=-O3 $(MARCHFLAG) ...` to make, and libCEED's Makefile sets `MARCHFLAG` to
+`-march=native` on x86. This flag comes after the `-march=x86-64-v3` that Spack's compiler
+wrapper injects, so it wins. The fix adds `MARCHFLAG=` (empty) to the make command line,
+which overrides the Makefile's `:=` assignments. It also removes `-march=native` from
+`CEED_CPU_JIT_OPT`. Without the fix, `libceed.so` had 2130 AVX-512 (`zmm`) instructions,
+and Palace crashed with `signal 4 (Illegal instruction)` on a Ryzen 9 without AVX-512 as
+soon as the solve started (the libCEED backend is `/cpu/self/xsmm/blocked`). With the fix,
+libCEED's `CFLAGS` are `-O3 -g -ffp-contract=fast -fopenmp-simd ...`, with no `-march`.
+The `grep` in the fix stops the build if the recipe changes and the `sed` no longer matches.
+
+**`target=` alone is not proof.** `/opt/software/linux-x86_64_v3` only shows the target
+Spack requested, not flags that a package's own build system adds. To verify a build, copy
+the ELF files out of the image (`apptainer exec IMG cat FILE > out`) and scan them on the host
+with `objdump -d --no-show-raw-insn FILE | grep -c '%zmm'`. The image has no `objdump`.
+Expected result for the verified image (406 ELF files): `zmm` only in OpenSSL `libcrypto`,
+`libgfortran`, OpenMPI `libmpi` and zlib-ng `libz`. All four select those code paths by
+runtime CPU detection. Palace, MFEM, libCEED, Hypre and PETSc use AVX2 (`ymm`) and no AVX-512.
+OpenBLAS is built with `dynamic_dispatch` (the default) and selects its kernels at runtime.
+Also grep every `/opt/software/*/*/.spack/spack-build-out.txt.gz` for `march=native`,
+`mtune=native` and `-mavx512` to find other packages with the same problem.
+
+**Early check during the build (optional).** Insert this after `spack -e . concretize` in
+`%post` to stop within minutes if a package was concretized for the build machine. Use an
+explicit `exit 1`: `%post` runs with `set -e`, which ignores a pipeline negated with `!`.
 
 ```bash
   spack -e . find -c --format '{target}' | sort | uniq -c
@@ -357,131 +336,21 @@ the build machine's CPU:
   fi
 ```
 
-Then build as usual:
+**Other practical points:**
 
-```bash
-apptainer build ~/palace_0.18.1.sif palace.def
-```
-
-Once a newer Spack container image ships a package repo with `0.18.1`, this section is no
-longer needed and `0.18.1` becomes just another value for Steps 1–5.
-
-This was verified on 2026-10-20 with the `target=x86_64_v3` setting and the
-[libCEED fix](#a-portable-image-the-target-line-and-the-libceed-fix) (build machine: AMD Ryzen AI MAX+ PRO 395, which Spack detects as `zen4`). The
-image is 311 MB.
-
-- `palace --version` reports `Palace version: 0dc74cd` (the `v0.18.1` tag commit).
-- `/opt/software` contains only `linux-x86_64_v3`, and libCEED's `CFLAGS` have no `-march`.
-- Of the 406 binaries and libraries in the image, only OpenSSL, libgfortran, OpenMPI and
-  zlib-ng contain AVX-512 instructions, all in functions they call only after checking the
-  CPU at runtime. Palace, MFEM, libCEED, Hypre and PETSc use AVX2 but no AVX-512.
-- The `rings` example (Step 5) gives the same `postpro/terminal-M.csv` with 1 and with
-  2 MPI processes.
-
-A build without the libCEED fix had 2130 AVX-512 instructions in `libceed.so` and crashed
-with `Illegal instruction` on an AMD Ryzen 9 without AVX-512.
-
-## Appendix
-
-### What to adjust for a future release
-
-| Value | Current example | Appears in | When to change it |
-|---|---|---|---|
-| Palace version | `0.17.0` (tag form: `v0.17.0`) | Steps 2, 3a/3b, 4, 5 | Every new Palace release you want to build. |
-| Step 3a vs. 3b | 3b (git-tag workaround) | Step 3 | Determined by the `spack versions palace` check in Step 2 — use 3a once your target version is listed directly. |
-| Base OS image | `ubuntu:24.04` | Step 3a/3b | Rarely — only if you need a different base OS. |
-| Output image path | `~/palace_0.17.0.sif` | Steps 4, 5 | Anytime — any path/filename works. |
-| Build directory | `~/palace-containers/apptainer` | Step 1 | Anytime — any location works; reusing the same one is fine across versions. |
-| CPU target | `target=x86_64_v3` | Step 3a/3b | `x86_64` for any 64-bit x86 CPU; remove the `packages:` block for a build-machine-only image. |
-| `spack: "1.2"` (inside `spack.yaml`) | `1.2` | Step 3a/3b | Rarely — only if you deliberately want a newer Spack release baked into the image; unrelated to the Palace version, so leave it alone by default. |
-
-Everything else in this guide (the `spack.yaml` structure, the `containerize`/`build`
-commands, the verification steps) should stay the same across Palace releases.
-
-### Alternative: using shell variables for repeat builds
-
-Everything above uses literal values so each command can be copied and run as-is. If you
-expect to build several Palace releases over time, it's more convenient to define the
-version once as a shell variable and let the rest of the commands reference it — that way,
-upgrading to a new release means changing one line instead of hunting through every command.
-The steps and their explanations are identical to the ones above; only the literal values are
-replaced by variable references (`$OUTPUT_SIF` etc.).
-
-Define these once per session, after Step 1:
-
-```bash
-PALACE_VERSION=0.17.0      # <-- the Palace release to build, e.g. from
-                            #     https://github.com/awslabs/palace/tags (no leading "v")
-OS_IMAGE="ubuntu:24.04"     # <-- base OS image for the container
-OUTPUT_SIF=~/palace_${PALACE_VERSION}.sif   # <-- where the finished image ends up
-```
-
-**Step 2** is unchanged — run `spack versions palace` and check whether `$PALACE_VERSION`
-appears in the output.
-
-**Step 3a** (version already known to Spack):
-
-```bash
-cat > spack.yaml <<EOF
-spack:
-  concretizer:
-    unify: true
-  packages:
-    all:
-      require:
-      - "target=x86_64_v3"
-  container:
-    format: singularity
-    images:
-      os: "${OS_IMAGE}"
-      spack: "1.2"
-  specs:
-    - palace@${PALACE_VERSION}
-EOF
-```
-
-**Step 3b** (version not yet known to Spack — the git-tag workaround):
-
-```bash
-cat > spack.yaml <<EOF
-spack:
-  concretizer:
-    unify: true
-  packages:
-    all:
-      require:
-      - "target=x86_64_v3"
-  container:
-    format: singularity
-    images:
-      os: "${OS_IMAGE}"
-      spack: "1.2"
-  specs:
-    - palace@git.v${PALACE_VERSION}=${PALACE_VERSION}
-EOF
-```
-
-**Step 4** (build):
-
-```bash
-spack -e . containerize > palace.def
-apptainer build "$OUTPUT_SIF" palace.def
-```
-
-**Step 5** (verify):
-
-```bash
-apptainer exec "$OUTPUT_SIF" palace --version
-
-mkdir -p /tmp/palace-smoketest/mesh && cd /tmp/palace-smoketest
-curl -fsSL -o rings.json \
-  "https://raw.githubusercontent.com/awslabs/palace/v${PALACE_VERSION}/examples/rings/rings.json"
-curl -fsSL -o mesh/rings.msh \
-  "https://raw.githubusercontent.com/awslabs/palace/v${PALACE_VERSION}/examples/rings/mesh/rings.msh"
-
-apptainer exec "$OUTPUT_SIF" palace rings.json
-apptainer exec "$OUTPUT_SIF" mpirun -n 2 palace-x86_64.bin rings.json
-```
-
-[^spackver]: This is the Spack you drive the build with. The container's own `spack.yaml` separately pins which Spack release gets baked inside the image (the `spack: "1.2"` line in Step 3) — that's unrelated and you generally won't need to touch it.
-[^schema]: Use the example from the matching release tag (`v0.17.0` above), not from a newer checkout like `main` — Palace's config schema evolves between releases, and a newer example may use options your build doesn't recognize. If you already have a matching Palace source checkout on hand (e.g. the one you built the container from), you can copy the files from there instead of downloading them: `git -C /path/to/palace/checkout show v0.17.0:examples/rings/rings.json > rings.json` and `cp -r /path/to/palace/checkout/examples/rings/mesh .`
+- The build takes 1 to 3 hours. Run it in the background with the output in a log file:
+  `apptainer build IMG palace.def > build.log 2>&1`.
+- `apptainer build` asks before it overwrites an existing image, which hangs an unattended
+  run. Build to a new file name.
+- The `rings` example files come from the Palace tag that matches the image, e.g. with
+  `git -C /path/to/palace show v0.18.1:examples/rings/rings.json` from a local checkout.
+- Don't nest MPI: the `palace` wrapper runs `mpirun` itself. Use `palace -np N`, or call
+  `mpirun -n N palace-x86_64.bin` directly.
+- `target=x86_64` instead of `x86_64_v3` gives an image for any 64-bit x86 processor, with
+  somewhat slower solver kernels. It has not been tested.
+- The fixed image was also tested on 2026-10-20 with a gds2palace model on the AMD Ryzen 9
+  without AVX-512 where the unfixed image had crashed.
+- Publishing to GHCR: `gh auth refresh -h github.com -s write:packages`, then
+  `gh auth token | apptainer registry login --username USER --password-stdin oras://ghcr.io`,
+  then `apptainer push IMG oras://ghcr.io/USER/NAME:TAG`. New packages are private: make them
+  public in the package settings on GitHub.
