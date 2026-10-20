@@ -17,6 +17,8 @@ Mesh refinement along the conductor edges sampled every edge with 200 points, wh
 
 `scripts/combine_extend_snp.py`: with different port impedances, the Touchstone option line now has one Z0 per port, in port order (ports with the same Z0 as port 1 were left out before).  
 
+New study [`amr_conformal`](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/amr_conformal/README.md) on the D-band balun: conformal vs. nonconformal AMR, `UpdateFraction`, and AMR at a single frequency followed by one full sweep on the saved mesh.
+
 ## 17 October-2026
 
 **Documentation**  
@@ -118,7 +120,7 @@ All mesh convergence studies in the more_examples folder were re-written complet
 
 Note that the new volume meshing option is **not** the recommended default for Palace: volume meshing requires more RAM and simulation time, and will become inaccurate at higher frequencies, unless you really mesh into skin effect. See the new [`more_accurate_models_L6n2`](../more_examples/measured_vs_simulated/more_accurate_models_L6n2) example for a comparison of conductor volume mesh against surface-impedance modeling at several mesh sizes, checked against measurement.
 
-`settings['adaptive_mesh_conformal']` is a new experimental option (default `False`) to use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement. From the testcases tried so far, this gave good convergence behaviour, with agressive increase in mesh cell count. For the D-band balun mesh convergence testcase, with only 2 iterations, this reached a similar result as the default non-conformal AMR after 4 iterations, with simulation time cut in half.
+`settings['adaptive_mesh_conformal']` is a new experimental option (default `False`) to use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement. With conformal refinement, the mesh grows faster per AMR pass. For the D-band balun mesh convergence testcase, conformal AMR after 2 refinements (2.05 M unknowns, 30 min) was as accurate as the default nonconformal AMR after 4 passes (1.68 M unknowns, 44 min). This was measured with the real-only coarse solve that gds2palace used until 30 September 2026: on the refined nonconformal meshes, GMRES needed about twice as many iterations per solve (about 105 instead of 55). With `complex_coarse_solve` (the default since then), both need 22-32 iterations, and both take 23 min. At the same number of unknowns, both give the same accuracy, see the study [`amr_conformal`](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/amr_conformal/README.md).
 
 **Bugfixes**  
 `combine_extend_snp.py` now handles a Palace run that was interrupted before finishing (e.g. terminated by setupEM's new memory-limit kill switch, or OOM-killed by the OS): a blank/truncated trailing CSV line, or Palace's own `"NULL"` placeholder for an excitation it never got to solve, previously either crashed with an `IndexError` or got silently written into the Touchstone output where it only surfaced later as an unhandled parse error in `scikit-rf`. Affected S-parameters are now written as `0.0 dB / 0 deg` instead, with a stdout warning and a comment line in the output Touchstone file listing exactly which parameters are unreliable, so a partial run degrades visibly instead of crashing or silently producing bad data.
