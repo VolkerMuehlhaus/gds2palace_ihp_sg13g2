@@ -2,6 +2,13 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 20 October-2026
+**Palace 0.18.1 container image**  
+A pre-built Apptainer image for Palace 0.18.1 is now available: `apptainer pull palace_0181.sif oras://ghcr.io/volkermuehlhaus/palace_0181:latest`. It is compiled for a common processor level (`x86_64_v3`, AVX2), so it runs on all Intel processors since 2013 and all AMD processors since 2017. The Linux and Windows install scripts now download this image by default; `--palace-version 016` still gives the 0.16 image. The generated `run_palace` script now calls `apptainer -q`, which hides Apptainer's info messages.
+
+**Documentation**  
+[`building-palace-apptainer.md`](building-palace-apptainer.md) and [`building-palace-spack.md`](building-palace-spack.md) are rewritten for end users: simple steps for Palace 0.18.1, an explanation of each tool, and a table of problems and solutions. Both end with technical notes for AI agents. The Apptainer guide explains how to build an image that runs on other computers: without a fix for libCEED, which always compiles for the build computer's processor, a self-built image can stop with `Illegal instruction` on other computers.
+
 ## 18 October-2026
 gds2palace 0.9.1
 
