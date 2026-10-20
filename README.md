@@ -88,7 +88,7 @@ The screenshot below shows a minimum configuration, which consists of the XML te
 
 ![Minimum files](./doc/png/minimum_files.png)
 
-If you install gds2palace as a Python module (pip install gds2palace), the gds2palace folder is located in the Python path and is not required in the model directory.
+If you install gds2palace as a Python module (pip install gds2palace), the gds2palace folder is located in the Python path and is not required in the model directory. The latest IHP stackup files from [XML_stackup/latest/IHP](XML_stackup/latest/IHP) are installed with the package: `utilities.get_stackup_path('SG13G2_FEM_200um.xml')` returns the full path of one, and `utilities.get_stackup_path()` prints the folder and the available files.
 
 # Running gds2palace
 

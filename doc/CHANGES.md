@@ -2,32 +2,49 @@
 
 This is an (incomplete) list of changes and new features.
 
-## 20 October-2026
-**Palace 0.18.1 container image**  
+## 18-20 October-2026
+gds2palace 0.9.1
+
+**New features**  
 A pre-built Apptainer image for Palace 0.18.1 is now available: `apptainer pull palace_0181.sif oras://ghcr.io/volkermuehlhaus/palace_0181:latest`. It is compiled for a common processor level (`x86_64_v3`, AVX2), so it runs on all Intel processors since 2013 and all AMD processors since 2017. The Linux and Windows install scripts now download this image by default; `--palace-version 016` still gives the 0.16 image. The generated `run_palace` script now calls `apptainer -q`, which hides Apptainer's info messages.
+
+The latest IHP stackup files (`SG13G2_FEM_200um.xml`, `SG13G2_FEM_200um_passi3D.xml`, `SG13CMOS5L_200um.xml`) are now installed with the pip package, so a model no longer needs a copy of the repository. `utilities.get_stackup_path('SG13G2_FEM_200um.xml')` returns the full path of one; `utilities.get_stackup_path()` without an argument prints the stackup folder and the available files. Legacy stackups are not included.
+
+**Fixes**  
+For very long polygon edges, mesh refinement along the conductor edges is more robust now.
+
+`scripts/combine_extend_snp.py`: with different port impedances, the Touchstone option line now has one Z0 per port, in port order (ports with the same Z0 as port 1 were left out before).  
 
 **Documentation**  
 [`building-palace-apptainer.md`](building-palace-apptainer.md) and [`building-palace-spack.md`](building-palace-spack.md) are rewritten for end users: simple steps for Palace 0.18.1, an explanation of each tool, and a table of problems and solutions. Both end with technical notes for AI agents. The Apptainer guide explains how to build an image that runs on other computers: without a fix for libCEED, which always compiles for the build computer's processor, a self-built image can stop with `Illegal instruction` on other computers.
 
-## 17 October-2026
+New study [`amr_conformal`](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/amr_conformal/README.md) on the D-band balun: conformal vs. nonconformal AMR, `UpdateFraction`, and AMR at a single frequency followed by one full sweep on the saved mesh.
 
-**Documentation**  
-Run times of the conductor models in the user's guide ("Choosing the conductor model") and the FAQ now come from the conductor model study, which ran all models on one machine, one run at a time: relative to `'surface'`, `'solve_inside'` takes 1.25-1.7x and `'solve_inside_skin'` 1.5-3.5x the run time on coils and baluns at a 2 µm mesh. The earlier values (0.7-2.7x and 1.5-4.7x) came from machines shared with other runs.
-
-## 15 October-2026
+## 15-17 October-2026
 gds2palace 0.9.0
 
 **New features**  
-`settings['conductor_model']` chooses the conductor model in one setting: `'surface'` (default, unchanged behavior), `'solve_inside'` (conductors as volumes, the former `filled_metals = True`) or `'solve_inside_skin'` (volumes with skin layers, new). It replaces `settings['filled_metals']`, see "API changes". Step 4 of each study in `more_examples/mesh_convergence` compares the three models on five SG13G2 structures: at a 2 µm mesh, the peak Q of coils on TopMetal1/TopMetal2 (2-8 µm traces) is 18-30 % too high with `'surface'`, 4-8 % too low with `'solve_inside'` and 2-3 % too low with `'solve_inside_skin'`, relative to `'solve_inside_skin'` at 1 µm.
+`settings['conductor_model']` chooses the conductor model in one setting: 
+- `'surface'` (default, unchanged behavior), 
+- `'solve_inside'` (conductors as volumes, the former `filled_metals = True`) or  
+- `'solve_inside_skin'` (volumes with skin layers, new).  
 
-`'solve_inside_skin'` splits each conductor into thin layers along all its faces plus a core, so that the mesh has thin cells next to the conductor surface (where the skin effect puts the current) while the cell size along the surface stays at `refined_cellsize`. For a single-turn TopMetal2 inductor with peak Q at 77 GHz, it is within 1.3 % of a converged filled model (`refined_cellsize` 0.125) from 10 to 100 GHz with `refined_cellsize` 2, at a ninth of the run time; without skin layers, `refined_cellsize` 2 overestimates the resistance by up to 9 % and underestimates peak Q by 8 %. The depths (0.4 and 1 skin depth at the highest frequency) are automatic. Layers thinner than 4 skin depths at the highest frequency (in SG13G2: Metal1-Metal5 up to about 1 THz) and perfect conductor stand-ins (conductivity above 1e8 S/m) get no skin layers. See "Accuracy at high frequency" in the user's guide, chapter "Conductor loss modelling".
+This replaces `settings['filled_metals']`, see "API changes".  
+
+`'solve_inside_skin'` splits each conductor into thin layers along all its faces plus a core, so that the mesh has thin cells next to the conductor surface (where the skin effect puts the current) while the cell size along the surface stays at `refined_cellsize`. See "Accuracy at high frequency" in the user's guide, chapter "Conductor loss modelling".
 
 New study [`more_examples/conductor_models`](../more_examples/conductor_models/README.md): accuracy and cost of the three conductor models on six SG13G2 structures and straight lines, against the most accurate earlier results and, for L6n2, the measurement.
+
+Each study in `more_examples/mesh_convergence` was extended, to cover the conductor model also. This compares the three models on five SG13G2 structures: at a 2 µm mesh, the peak Q of coils on TopMetal1/TopMetal2 (2-8 µm traces) is 18-30 % too high with `'surface'`, 4-8 % too low with `'solve_inside'` and 2-3 % too low with `'solve_inside_skin'`, relative to `'solve_inside_skin'` at 1 µm.
+
 
 **Documentation**  
 Chapter "Conductor loss modelling" of the user's guide: the `z_thickness_factor` section is removed (with the L2n0 and microstrip tests and the Palace code walk-through), and so is the section "Transmission line compared with openEMS and measurement", which compared it with the full side wall thickness; the setup of that line and its measurement is now described in chapter "Dielectric loss modelling", `conductor_model` is the recommended choice. New section "Choosing the conductor model" with the errors and run times of the three models, and a table of what the errors mean for typical designs (VCO phase noise, insertion loss of LNA input matches and baluns, MIM capacitor Q, line loss). The same tables are in the FAQ. The code examples no longer set `z_thickness_factor`.
 
 New section "Accuracy at high frequency" in chapter "Conductor loss modelling" of the user's guide. It also describes a limitation of the surface impedance model that was not documented: thin conductors that carry current on one face only, e.g. a Metal1-Metal5 ground plane under a line, get up to twice their real loss (line resistance of `palace_line_viaport.py` 21-41 % too high).
+
+Run times of the conductor models in the user's guide ("Choosing the conductor model") and the FAQ now come from the conductor model study, which ran all models on one machine, one run at a time: relative to `'surface'`, `'solve_inside'` takes 1.25-1.7x and `'solve_inside_skin'` 1.5-3.5x the run time on coils and baluns at a 2 µm mesh. The earlier values (0.7-2.7x and 1.5-4.7x) came from machines shared with other runs.
+
 
 **API changes**  
 `settings['filled_metals']` is replaced by `settings['conductor_model']`. Existing scripts keep working: `filled_metals = True` is the same as `conductor_model = 'solve_inside'`, `False` the same as `'surface'`, with the same results, and the model script prints a note. Giving both settings with different meanings stops with an error. setupEM writes `conductor_model` from its next version on.
@@ -110,7 +127,7 @@ All mesh convergence studies in the more_examples folder were re-written complet
 
 Note that the new volume meshing option is **not** the recommended default for Palace: volume meshing requires more RAM and simulation time, and will become inaccurate at higher frequencies, unless you really mesh into skin effect. See the new [`more_accurate_models_L6n2`](../more_examples/measured_vs_simulated/more_accurate_models_L6n2) example for a comparison of conductor volume mesh against surface-impedance modeling at several mesh sizes, checked against measurement.
 
-`settings['adaptive_mesh_conformal']` is a new experimental option (default `False`) to use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement. From the testcases tried so far, this gave good convergence behaviour, with agressive increase in mesh cell count. For the D-band balun mesh convergence testcase, with only 2 iterations, this reached a similar result as the default non-conformal AMR after 4 iterations, with simulation time cut in half.
+`settings['adaptive_mesh_conformal']` is a new experimental option (default `False`) to use conformal AMR mesh refinement instead of Palace's default nonconformal (hanging-node) refinement. With conformal refinement, the mesh grows faster per AMR pass. For the D-band balun mesh convergence testcase, conformal AMR after 2 refinements (2.05 M unknowns, 30 min) was as accurate as the default nonconformal AMR after 4 passes (1.68 M unknowns, 44 min). This was measured with the real-only coarse solve that gds2palace used until 30 September 2026: on the refined nonconformal meshes, GMRES needed about twice as many iterations per solve (about 105 instead of 55). With `complex_coarse_solve` (the default since then), both need 22-32 iterations, and both take 23 min. At the same number of unknowns, both give the same accuracy, see the study [`amr_conformal`](../more_examples/mesh_convergence/mesh_convergence_D-band_balun/amr_conformal/README.md).
 
 **Bugfixes**  
 `combine_extend_snp.py` now handles a Palace run that was interrupted before finishing (e.g. terminated by setupEM's new memory-limit kill switch, or OOM-killed by the OS): a blank/truncated trailing CSV line, or Palace's own `"NULL"` placeholder for an excitation it never got to solve, previously either crashed with an `IndexError` or got silently written into the Touchstone output where it only surfaced later as an unhandled parse error in `scikit-rf`. Affected S-parameters are now written as `0.0 dB / 0 deg` instead, with a stdout warning and a comment line in the output Touchstone file listing exactly which parameters are unreliable, so a partial run degrades visibly instead of crashing or silently producing bad data.

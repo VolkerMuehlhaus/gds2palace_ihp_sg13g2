@@ -21,7 +21,7 @@
 import os, tempfile, platform, sys, importlib
 from . import util_elmer 
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # ============================== filename and path  =================================
 
@@ -81,6 +81,52 @@ def create_sim_path (script_path, model_basename, dirname='palace_model'):
         sim_path = os.path.join(base_path, model_basename + '_data')
 
     return sim_path
+
+
+# ============================== stackup files  =================================
+
+def get_stackup_dir ():
+    """Folder with the latest IHP stackup files that ship with gds2palace
+    (SG13G2_FEM_200um.xml, SG13G2_FEM_200um_passi3D.xml, SG13CMOS5L_200um.xml).
+    Returns:
+        string: path of that folder, or None if it is not found
+    """
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [os.path.join(here, 'stackups'),                                 # pip installed package
+                  os.path.join(here, '..', '..', 'XML_stackup', 'latest', 'IHP')]  # git clone or editable install
+    for candidate in candidates:
+        if os.path.isdir(candidate):
+            return os.path.normpath(candidate)
+    return None
+
+
+def get_stackup_path (filename=None):
+    """Full path of a stackup file that ships with gds2palace, e.g.
+    XML_filename = utilities.get_stackup_path('SG13G2_FEM_200um.xml')
+    Without a filename, prints the stackup folder and the available files.
+    Args:
+        filename (string): stackup file name without path
+    Returns:
+        string: full path of the stackup file, or of the stackup folder if no filename is given
+    """
+
+    stackup_dir = get_stackup_dir()
+    if filename is None:
+        print(f"Stackup folder: {stackup_dir}")
+        if stackup_dir is not None:
+            for f in sorted(os.listdir(stackup_dir)):
+                if f.endswith('.xml'):
+                    print(f"  {f}")
+        return stackup_dir
+    if stackup_dir is not None:
+        path = os.path.join(stackup_dir, filename)
+        if os.path.isfile(path):
+            return path
+        available = sorted(f for f in os.listdir(stackup_dir) if f.endswith('.xml'))
+    else:
+        available = []
+    raise FileNotFoundError(f"Stackup file {filename} is not included with gds2palace, available files: {available}")
 
 
 def create_run_script (destination_path):

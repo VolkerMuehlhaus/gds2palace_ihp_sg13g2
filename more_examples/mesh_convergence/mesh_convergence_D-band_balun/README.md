@@ -125,6 +125,10 @@ Again, these numbers belong to this layout. A structure with different feature s
 
 All runs above use a planar stackup, where TopMetal2 is buried in a flat block of SiO2. The follow-up study [conformal_3D_passivation](../../conformal_3D_passivation/README.md) runs the same balun with a stackup where the dielectrics follow the metal step, as in the real process. This changes the capacitance between the closely spaced TopMetal2 lines, which, per step 1, is exactly what this model is sensitive to. That study compares both stackups at matched mesh sizes.
 
+## Follow-up: AMR settings
+
+The follow-up study [amr_conformal](amr_conformal/README.md) reruns AMR on this balun with conformal refinement, smaller `UpdateFraction` values, and AMR at 150 GHz only followed by one full sweep on that mesh. Conformal refinement gave the same accuracy as the default at the same number of unknowns. AMR at 150 GHz gave a mesh that holds over the whole 100–200 GHz band and reached the converged answer in about 60 % of the time of full-band AMR.
+
 ## Files
 
 ```
@@ -134,6 +138,7 @@ mesh_convergence_D-band_balun/
 ├── palace_balun_amr5.py                            # AMR, 5 µm start, 5 iterations
 ├── palace_balun_skin_mesh{5,3,2,1}.py              # 'solve_inside_skin' (step 4)
 ├── palace_balun_filled_mesh2.py                    # 'solve_inside' (step 4)
+├── amr_conformal/                                  # follow-up study: AMR settings, AMR at one frequency
 ├── palace_model/palace_balun_<name>_data/          # mesh, config and full Palace output per run
 └── results/
     ├── story_plots.py            # the story_*.png plots and numbers in this report
