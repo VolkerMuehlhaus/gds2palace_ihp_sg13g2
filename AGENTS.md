@@ -287,8 +287,9 @@ an unattended run seems to hang. Double-check key names against the source.
   `read_gds()`, or the port shapes are not read.
 - **Via port** (vertical): `from_layername` and `to_layername`, `direction='z'`
   or `'-z'`. Draw it as a **zero-width box** (a line) in GDSII: the port is a
-  vertical 2D sheet. A box with an area is turned into a sheet along its center
-  line.
+  vertical 2D sheet. A box with an area is turned into a sheet along its left
+  edge (xmin) if it is taller than wide, else along its bottom edge (ymin), not
+  along its center line.
 - **In-plane port**: `target_layername`, `direction='x'`, `'-x'`, `'y'` or
   `'-y'`. Draw it as a rectangle on that metal's level.
 - The sign of `direction` sets the polarity.
