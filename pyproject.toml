@@ -30,12 +30,18 @@ version = {attr = "gds2palace.__version__"}
 # The latest IHP stackup files ship inside the wheel as gds2palace.stackups,
 # mapped from XML_stackup/latest/IHP so there is only one copy in the repo.
 # Find them with gds2palace.utilities.get_stackup_path().
+# The result tools combine_extend_snp.py and palace_summary.py ship as gds2palace.scripts
+# (only these two from scripts/, which also holds shell scripts and build tools); they stay
+# in scripts/ because the Linux installer downloads them from there.
+# Find them with gds2palace.utilities.get_scripts_dir().
 [tool.setuptools]
 packages = ["gds2palace", "gds2palace.stackups"]
+py-modules = ["gds2palace.scripts.combine_extend_snp", "gds2palace.scripts.palace_summary"]
 
 [tool.setuptools.package-dir]
 "gds2palace" = "workflow/gds2palace"
 "gds2palace.stackups" = "XML_stackup/latest/IHP"
+"gds2palace.scripts" = "scripts"
 
 [tool.setuptools.package-data]
 "gds2palace.stackups" = ["*.xml", "README.md"]

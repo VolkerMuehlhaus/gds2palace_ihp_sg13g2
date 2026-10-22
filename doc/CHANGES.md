@@ -2,6 +2,12 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 22 October-2026
+gds2palace 0.9.2
+
+**New features**  
+The result tools `combine_extend_snp.py` (Palace results to Touchstone) and `palace_summary.py` (run summary: unknowns, run time, peak RAM, AMR error) are now installed with the pip package, as `gds2palace.scripts`: `python -m gds2palace.scripts.palace_summary <path>` and `python -m gds2palace.scripts.combine_extend_snp`. They need scikit-rf (`pip install scikit-rf`), which gds2palace does not install. `utilities.get_scripts_dir()` returns their folder. The files in `scripts/` are unchanged, so the Linux install script still downloads them from there.
+
 ## 18-20 October-2026
 gds2palace 0.9.1
 

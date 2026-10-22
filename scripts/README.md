@@ -51,6 +51,17 @@ The model base name for each run is auto-derived from its directory name, or you
 
 palace_summary.py exits with a nonzero status if any run has no results yet, so it can be chained after `run_palace` in a script to detect whether simulation(s) actually finished.
 
+## combine_extend_snp.py and palace_summary.py with the pip package
+
+From gds2palace 0.9.2 on, `pip install gds2palace` also installs these two scripts, so a computer without a copy of this repository has them too, e.g. to convert or check results copied back from a Linux machine. They need scikit-rf, which gds2palace itself does not install: `pip install scikit-rf`.
+
+```
+python -m gds2palace.scripts.palace_summary [path]
+python -m gds2palace.scripts.combine_extend_snp
+```
+
+As above, `combine_extend_snp` searches the current directory and its subdirectories for results. In Python, `utilities.get_scripts_dir()` returns the folder with both files.
+
 ## Other Utilities
 
 **build_pypi_readme.py** regenerates `README_pypi.md` at the repo root from `README.md`, rewriting relative `./doc/...` links to absolute GitHub URLs so images render on the PyPI package page. Run this before `python -m build`, from the repo root: `python scripts/build_pypi_readme.py`
