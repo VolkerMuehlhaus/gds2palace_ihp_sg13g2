@@ -268,7 +268,7 @@ It must be noted that Palace behaves differently from other FEM solvers: to get 
 
 To get the full S-parameter file, all ports must be defined with non-zero voltage, so that all port excitations are simulated, one after another.  
 
-**PORT SHAPE IN GDSII** : The workflow creates lumped ports in Palace, which need to be 2D sheets. This means that for vertical ports (via ports), you should draw a zero-width box in GDSII, resulting in a vertical 2D sheet with no width. If you define a vertical port from a box with finite xy area, the Palace port will be created as a vertical 2D sheet along the center line of that 2D box.  
+**PORT SHAPE IN GDSII** : The workflow creates lumped ports in Palace, which need to be 2D sheets. This means that for vertical ports (via ports), you should draw a zero-width box in GDSII, resulting in a vertical 2D sheet with no width. If you define a vertical port from a box with finite xy area, the Palace port will be created as a vertical 2D sheet along the left edge (xmin) of that box if it is taller than wide, else along its bottom edge (ymin), not along its center line.  
 
 **Composite ports** (multiple EM ports grouped into one port in the final output file) are not yet supported by this workflow. All ports with non-zero voltage are simulated one after another, resulting in n-port S-parameters.  
 
@@ -547,7 +547,7 @@ It must be noted that Palace behaves differently from other FEM solvers: to get 
 
 To get the full S-parameter file, all ports must be defined with non-zero voltage, so that all port excitations are simulated, one after another.  
 
-**PORT SHAPE IN GDSII** : The workflow creates lumped ports in Palace, which need to be 2D sheets. This means that for vertical ports (via ports), you should draw a zero-width box in GDSII, resulting in a vertical 2D sheet with no width. If you define a vertical port from a box with finite xy area, the Palace port will be created as a vertical 2D sheet along the center line of that 2D box.  
+**PORT SHAPE IN GDSII** : The workflow creates lumped ports in Palace, which need to be 2D sheets. This means that for vertical ports (via ports), you should draw a zero-width box in GDSII, resulting in a vertical 2D sheet with no width. If you define a vertical port from a box with finite xy area, the Palace port will be created as a vertical 2D sheet along the left edge (xmin) of that box if it is taller than wide, else along its bottom edge (ymin), not along its center line.  
 
 **Composite ports** (multiple EM ports grouped into one port in the final output file) are not yet supported by this workflow. All ports with non-zero voltage are simulated one after another, resulting in n-port S-parameters.  
 

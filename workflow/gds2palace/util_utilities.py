@@ -21,7 +21,7 @@
 import os, tempfile, platform, sys, importlib
 from . import util_elmer 
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 # ============================== filename and path  =================================
 
@@ -97,6 +97,23 @@ def get_stackup_dir ():
                   os.path.join(here, '..', '..', 'XML_stackup', 'latest', 'IHP')]  # git clone or editable install
     for candidate in candidates:
         if os.path.isdir(candidate):
+            return os.path.normpath(candidate)
+    return None
+
+
+def get_scripts_dir ():
+    """Folder with the result tools combine_extend_snp.py (Palace/Elmer results to
+    Touchstone) and palace_summary.py (run summary), which ship with gds2palace.
+    They need scikit-rf, which gds2palace itself does not install.
+    Returns:
+        string: path of that folder, or None if it is not found
+    """
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [os.path.join(here, 'scripts'),               # pip installed package
+                  os.path.join(here, '..', '..', 'scripts')]  # git clone or editable install
+    for candidate in candidates:
+        if os.path.isfile(os.path.join(candidate, 'palace_summary.py')):
             return os.path.normpath(candidate)
     return None
 

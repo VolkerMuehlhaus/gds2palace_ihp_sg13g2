@@ -287,8 +287,9 @@ an unattended run seems to hang. Double-check key names against the source.
   `read_gds()`, or the port shapes are not read.
 - **Via port** (vertical): `from_layername` and `to_layername`, `direction='z'`
   or `'-z'`. Draw it as a **zero-width box** (a line) in GDSII: the port is a
-  vertical 2D sheet. A box with an area is turned into a sheet along its center
-  line.
+  vertical 2D sheet. A box with an area is turned into a sheet along its left
+  edge (xmin) if it is taller than wide, else along its bottom edge (ymin), not
+  along its center line.
 - **In-plane port**: `target_layername`, `direction='x'`, `'-x'`, `'y'` or
   `'-y'`. Draw it as a rectangle on that metal's level.
 - The sign of `direction` sets the polarity.
@@ -338,13 +339,17 @@ Simplify GDS), the original vias are gone and no correction is possible.
      for parallel runs; AMR runs can use most of a machine's RAM.
 4. **Check the run**: [`scripts/palace_summary.py`](scripts/README.md) prints
    degrees of freedom, solve time, peak RAM and AMR error indicators, and
-   exits non-zero if a run has no results. Search the Palace log for
+   exits non-zero if a run has no results. With only the pip package
+   (gds2palace 0.9.2 and newer): `python -m gds2palace.scripts.palace_summary <path>`
+   (needs scikit-rf). Search the Palace log for
    `did NOT converge`: S-parameters at those frequencies are unreliable.
 
 ## 6. Results
 
 - `combine_snp` (`combine_extend_snp.py`) converts Palace's `port-S.csv` to
-  Touchstone `<model>.sNp`. Extra files:
+  Touchstone `<model>.sNp`. With only the pip package (0.9.2 and newer), run
+  `python -m gds2palace.scripts.combine_extend_snp` in the results folder
+  (needs scikit-rf). Extra files:
   - `_dc`: a DC point extrapolated from the low-frequency data (FEM can't
     solve at 0 Hz); check it before use.
   - `_deembedded`: the estimated lumped-port inductance removed.
