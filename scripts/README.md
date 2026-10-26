@@ -35,6 +35,21 @@ Given the config.json model file, that entire directory (including mesh) is copi
 This script was successfully used to send simulation from setupEM + gds2palace on MacOS to an Ubuntu simulation server running Ubuntu 24.02.  On the remote system, script run_sim (no parameters) is executed to start Palace for model config.json in the current directory 
 
 
+---
+
+**run_palace_shared** is run_palace for a Linux simulation server that several users share. Every run waits for a free slot, so that at most a set number of Palace runs (with a set number of MPI processes each) run at the same time, whoever starts them: setupEM, gds2palace_mcp, or run_palace in a terminal. A run that waits writes `[run_palace] waiting for a free Palace slot` to its log, with the users who run Palace at that moment; when it starts, `[run_palace] got Palace slot`. Each run runs as the user who started it.
+
+The slots are `flock` locks. A slot is free again when its run ends, also when the run crashes or is killed; if only run_palace is killed, the slot stays taken until the Palace processes have ended too. Waiting runs take free slots one after the other, roughly in the order they arrived.
+
+The administrator sets it up once (details in the head of the script):
+
+- Set `SLOTS`, `NP` and `PALACE_SIF` in the script. `SLOTS` x `NP` should not be more than the physical cores, e.g. 16 cores: one slot with 16 processes, or two slots with 8.
+- Install it as `/usr/local/bin/run_palace`, and create the lock files in `/var/lib/palace-queue` (`queue.lock` and one `slotN.lock` per slot, readable by all users).
+- Users must not have their own run_palace earlier on their PATH: the installers write one to `~/venv/palace/bin`. Delete it there.
+
+For gds2palace_mcp, such a simulation server is an ssh target with `shared = true`: the MCP server then checks that the simulation server's run_palace is this script, and reports runs as queued while they wait.
+
+
 ## Show simulation log / report
 
 **palace_summary.py** prints a human-readable summary of AWS Palace solver results for a completed or in-progress run. 
