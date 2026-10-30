@@ -2,6 +2,12 @@
 
 This is an (incomplete) list of changes and new features.
 
+## Next version
+gds2palace 0.9.3
+
+**New features**  
+Multielement ports: several shapes on one port layer now become one port with one element per shape, the elements in parallel (a Palace `LumpedPort` with `Elements`; the port impedance stays the given Z0). Use it for a terminal that is spread over several strips, e.g. the source fingers of a multi-finger transistor. Before, only the last shape read became the port, and the others stayed in the model as surfaces without a port. `port_information.json` has one entry per element, with its `element` number. `combine_extend_snp.py` takes one Z0 per port for the Touchstone option line and treats the port inductances of the elements as parallel for de-embedding. Elmer models stop with an error for a multielement port.
+
 ## 22 October-2026
 gds2palace 0.9.2
 

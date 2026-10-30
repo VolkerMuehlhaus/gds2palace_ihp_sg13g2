@@ -293,6 +293,9 @@ an unattended run seems to hang. Double-check key names against the source.
 - **In-plane port**: `target_layername`, `direction='x'`, `'-x'`, `'y'` or
   `'-y'`. Draw it as a rectangle on that metal's level.
 - The sign of `direction` sets the polarity.
+- Several shapes on one port layer: one port with one element per shape, in
+  parallel (Palace multielement lumped port, port impedance = Z0), e.g. one
+  line per source finger of a transistor. Palace only, not Elmer.
 - A port can end on an artificial ground: a `Type="sheet"` layer with
   `Material="PEC"`, like `REF_FOR_TRANSISTOR` in the latest stackups.
 - `voltage` is not a physical voltage here: **voltage 0 means "not excited"**.

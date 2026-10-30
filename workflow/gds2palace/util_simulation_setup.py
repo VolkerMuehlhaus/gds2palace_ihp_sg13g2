@@ -943,6 +943,11 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
 
 
 
+def port_number_from_group (groupname):
+    """Port number from a port's physical group name: P4 (single shape), P4_2, P4_3 (more elements of port 4)."""
+    return int(groupname[1:].split('_')[0])
+
+
 def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
     """Add ports from special port layers to gmsh
 
@@ -1079,7 +1084,15 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
                     surfacetag = gmsh.model.occ.addPlaneSurface([curvetag], tag=-1)
 
                     port_dimtag.append(surfacetag)
-                    tags_created_2D['P'+str(portnum)]=port_dimtag
+                    # several shapes on one port layer: each is one element of a multielement lumped port
+                    # (elements in parallel), stored as P<n>, P<n>_2, P<n>_3, ...
+                    key = 'P'+str(portnum)
+                    element = 1
+                    while key in tags_created_2D:
+                        element += 1
+                        key = 'P'+str(portnum)+'_'+str(element)
+                    port_information_data['element'] = element
+                    tags_created_2D[key]=port_dimtag
 
     gmsh.model.occ.synchronize()
 
@@ -2559,11 +2572,14 @@ def create_model (excite_ports, settings):
     # PORTS
     Palace_lumpedports = []
 
+    # the physical groups of one port: one for a single shape, one per element for several shapes on its layer
+    port_groups = {}
     for item in physical_groups_ports:
         layername, portname, grouptag = item.values()
+        port_groups.setdefault(port_number_from_group(portname), []).append(grouptag)
 
+    for portnum, grouptags in port_groups.items():
         Palace_lumpedport = {}
-        portnum = int(portname.replace('P',''))
         port = simulation_ports.get_port_by_number(portnum)
 
         # find in which excitation group the port is, defaults to boolean false
@@ -2574,9 +2590,16 @@ def create_model (excite_ports, settings):
 
         Palace_lumpedport['Index'] = portnum
         Palace_lumpedport['R'] = port.port_Z0
-        Palace_lumpedport['Direction'] = port.direction.upper()
-        Palace_lumpedport['Excitation'] = excite_group
-        Palace_lumpedport['Attributes']=[grouptag]
+        if len(grouptags) == 1:
+            Palace_lumpedport['Direction'] = port.direction.upper()
+            Palace_lumpedport['Excitation'] = excite_group
+            Palace_lumpedport['Attributes']=[grouptags[0]]
+        else:
+            # multielement lumped port: the elements add in parallel, the port impedance stays R
+            # (Palace gives each of the n elements n*R)
+            Palace_lumpedport['Excitation'] = excite_group
+            Palace_lumpedport['Elements'] = [{'Attributes': [tag], 'Direction': port.direction.upper()}
+                                             for tag in grouptags]
         Palace_lumpedports.append(Palace_lumpedport)
 
     boundaries['LumpedPort'] = Palace_lumpedports
@@ -2913,6 +2936,10 @@ def create_model (excite_ports, settings):
             for item in physical_groups_ports:
                 layername, portname, grouptag = item.values()
 
+                if '_' in portname:
+                    print(f'ERROR: port {port_number_from_group(portname)} has several shapes on its port layer '
+                          '(a multielement port). This is supported for Palace only, not for Elmer.')
+                    exit(1)
                 portnum = int(portname.replace('P',''))
                 port = simulation_ports.get_port_by_number(portnum)
                 Elmer_port_boundary = {}

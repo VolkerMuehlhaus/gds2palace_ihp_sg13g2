@@ -2,7 +2,7 @@
 
 Volker Mühlhaus,volker@muehlhaus.com
 ---
-Document version: 2026-10-17
+Document version: 2026-10-30
 
 ## Contents
 [What's New](#whats-new)  
@@ -269,6 +269,8 @@ It must be noted that Palace behaves differently from other FEM solvers: to get 
 To get the full S-parameter file, all ports must be defined with non-zero voltage, so that all port excitations are simulated, one after another.  
 
 **PORT SHAPE IN GDSII** : The workflow creates lumped ports in Palace, which need to be 2D sheets. This means that for vertical ports (via ports), you should draw a zero-width box in GDSII, resulting in a vertical 2D sheet with no width. If you define a vertical port from a box with finite xy area, the Palace port will be created as a vertical 2D sheet along the left edge (xmin) of that box if it is taller than wide, else along its bottom edge (ymin), not along its center line.  
+
+**SEVERAL SHAPES ON ONE PORT LAYER** : Each shape becomes one element of the same port, and the elements are in parallel (a Palace multielement lumped port; the port impedance stays the given Z0). This is useful for a terminal that is spread over several strips, e.g. the source fingers of a multi-finger transistor: draw one line per finger on the same port layer. Multielement ports are supported for Palace only, not for Elmer.  
 
 **Composite ports** (multiple EM ports grouped into one port in the final output file) are not yet supported by this workflow. All ports with non-zero voltage are simulated one after another, resulting in n-port S-parameters.  
 
@@ -548,6 +550,8 @@ It must be noted that Palace behaves differently from other FEM solvers: to get 
 To get the full S-parameter file, all ports must be defined with non-zero voltage, so that all port excitations are simulated, one after another.  
 
 **PORT SHAPE IN GDSII** : The workflow creates lumped ports in Palace, which need to be 2D sheets. This means that for vertical ports (via ports), you should draw a zero-width box in GDSII, resulting in a vertical 2D sheet with no width. If you define a vertical port from a box with finite xy area, the Palace port will be created as a vertical 2D sheet along the left edge (xmin) of that box if it is taller than wide, else along its bottom edge (ymin), not along its center line.  
+
+**SEVERAL SHAPES ON ONE PORT LAYER** : Each shape becomes one element of the same port, and the elements are in parallel (a Palace multielement lumped port; the port impedance stays the given Z0). This is useful for a terminal that is spread over several strips, e.g. the source fingers of a multi-finger transistor: draw one line per finger on the same port layer. Multielement ports are supported for Palace only, not for Elmer.  
 
 **Composite ports** (multiple EM ports grouped into one port in the final output file) are not yet supported by this workflow. All ports with non-zero voltage are simulated one after another, resulting in n-port S-parameters.  
 
