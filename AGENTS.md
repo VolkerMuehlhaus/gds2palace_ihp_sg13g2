@@ -141,7 +141,11 @@ clone, it is [`workflow/gds2palace/`](workflow/gds2palace/).
   - `REF_FOR_TRANSISTOR` (GDS 300): PEC sheet used as a port reference for
     transistor ports, see [`more_examples/core_transistor_3port_bce/`](more_examples/core_transistor_3port_bce/).
   - Resistor sheets `RHIGH`, `RPPD`, `RSIL`, created by derived layers from
-    the drawn PDK layers.
+    the drawn PDK layers. They have the drawn size and the nominal sheet
+    resistance, without the PDK's width offset and contact end resistance:
+    rhigh and rppd come out about 10 % below their PDK value (small ones
+    most), rsil within about 2 %. When the value matters, put ports at the
+    resistor's Metal1 heads and use the PDK model in the circuit instead.
 
   These layers only appear in the model if the layout has shapes on them (or,
   for derived layers, on their source layers).

@@ -2,7 +2,7 @@
 
 Volker Mühlhaus,volker@muehlhaus.com
 ---
-Document version: 2026-10-30
+Document version: 2026-10-31
 
 ## Contents
 [What's New](#whats-new)  
@@ -1406,6 +1406,24 @@ In the Palace config file, this results in an Impedance boundary with Rs value m
     }
 ],
 ```
+
+**Accuracy of IHP SG13G2 PDK resistors as sheets.** The SG13G2 stackups build the resistor sheets `RSIL`, `RPPD` and `RHIGH` from the drawn poly, salicide block and implant layers. The sheet has the drawn size and the nominal sheet resistance. The PDK computes the resistance differently. Its pcells and SPICE models use R = Rsh · l / (w + Δw) + 2 · rz / w, with two corrections:
+
+- **A width offset Δw.** The PDK uses an effective width that differs from the drawn one: rhigh 0.04 µm narrower, rsil and rppd 0.01 µm and 0.006 µm wider. This changes the width only, not the length.
+- **An end resistance rz** at each end, between the silicided contact head and the resistor body: rsil 4.5 Ω·µm, rppd 35 Ω·µm, rhigh 80 Ω·µm. No drawn sheet carries it. In the EM model, only the contacts (`Cont`) add some resistance there.
+
+Both corrections are fixed amounts, so physically small resistors are affected most: narrow ones by the width offset, short ones by the end resistance. Palace simulations of PDK resistor cells as drawn, each between two via ports, at 10 MHz:
+
+| Resistor (w × l) | PDK value | Palace | Error |
+| --- | --- | --- | --- |
+| rhigh 0.655 µm × 1.245 µm | 2997 Ω | 2599 Ω | −13 % |
+| rppd 1 µm × 1.665 µm | 500 Ω | 442 Ω | −12 % |
+| rhigh 0.5 µm × 4.29 µm | 13.0 kΩ | 11.7 kΩ | −10 % |
+| rhigh 2 µm × 1.325 µm | 999 Ω | 906 Ω | −9 % |
+| rsil 0.5 µm × 2.33 µm | 50.0 Ω | 48.9 Ω | −2 % |
+| rsil 2 µm × 13.06 µm | 50.0 Ω | 49.9 Ω | −0.2 % |
+
+rhigh and rppd come out about 10 % low. rsil is close, because its contacts in the EM model happen to make up for most of its end resistance. If the exact value of an rhigh or rppd resistor matters, leave the resistor out of the EM model: put ports at its two Metal1 heads and connect the PDK resistor model there in the circuit simulator.
 
 
 ### Extended XML stackup format

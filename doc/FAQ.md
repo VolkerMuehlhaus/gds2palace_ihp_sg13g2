@@ -111,6 +111,19 @@ is the full reference; [`more_examples/derived_layers_and_resistors`](../more_ex
 is a complete worked example (IHP `Rsil`/`Rppd`/`Rhigh` recognized from
 poly/implant/contact layers).
 
+### Why is my IHP rhigh or rppd resistor about 10 % lower in Palace than its PDK value?
+
+The resistor sheet in the EM model has the drawn size and the nominal sheet
+resistance. The PDK adds two corrections: an effective width that differs
+from the drawn one (rhigh 0.04 µm narrower), and an end resistance at each
+contact head (rhigh 80 Ω·µm, rppd 35 Ω·µm). The EM model has neither, except
+for what the contacts contribute. Both are fixed amounts, so small resistors
+are affected most. Palace tests of PDK cells as drawn: rhigh and rppd 9 % to
+13 % low, rsil within 2 % (its contacts make up for most of its end
+resistance). If the value matters, replace the resistor by ports at its two
+Metal1 heads and use the PDK model in the circuit simulator. The user's guide
+explains it in "Accuracy of IHP SG13G2 PDK resistors as sheets".
+
 ### Can I reuse the openEMS stackup file here, or the other way round?
 
 No. The Palace/Elmer FEM stackup and the openEMS FDTD stackup encode
