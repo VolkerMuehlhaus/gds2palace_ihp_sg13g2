@@ -11,7 +11,7 @@
         "preprocess_gds": true,
         "merge_polygon_size": 1.2,
         "margin": 30.0,
-        "fstart": 1.0,
+        "fstart": 0.0,
         "fstop": 350.0,
         "fstep": 5.0,
         "refined_cellsize": 1.0,

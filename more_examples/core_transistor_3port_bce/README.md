@@ -81,11 +81,12 @@ the port of the same net with a large inductor (for example 1 mH: a short at DC,
 
 The bias is then applied at the pads, for example through bias tees in the testbench.
 
-**DC point of the S-parameters.** For a circuit with bias, set `settings['fstart'] = 0`. gds2palace then simulates
-10 MHz and 20 MHz, and `combine_snp` writes a `_dc` file with a 0 Hz point extrapolated from them. Use that file for the
-equivalent circuit. This example's script starts at 1 GHz: a DC point extrapolated from there is not accurate enough
-for a bias network with kΩ resistors. Without a good 0 Hz point, connect the S-parameter model through DC blocks
-(for example 1 µF at each port), so that only the inductors carry the bias.
+**DC point of the S-parameters.** For a circuit with bias, the sweep has to start at 0 Hz, as in this example
+(`settings['fstart'] = 0`). gds2palace then simulates 10 MHz and 20 MHz, and `combine_snp` writes a `_dc` file with a
+0 Hz point extrapolated from them. Use that file for the equivalent circuit. A DC point extrapolated from a sweep that
+starts at 1 GHz or higher is not accurate enough for a bias network with kΩ resistors. Without a good 0 Hz point,
+connect the S-parameter model through DC blocks (for example 1 µF at each port), so that only the inductors carry the
+bias.
 
 **Port polarity.** With `direction='Z'`, every via port has the same orientation along +z, whatever the order of
 `from_layername` and `to_layername`; `'-Z'` reverses it. In this example the signal metal is on top at every port
