@@ -2,11 +2,14 @@
 
 This is an (incomplete) list of changes and new features.
 
-## Next version
+## 31 October-2026
 gds2palace 0.9.3
 
 **New features**  
 Multielement ports: several shapes on one port layer now become one port with one element per shape, the elements in parallel (a Palace `LumpedPort` with `Elements`; the port impedance stays the given Z0). Use it for a terminal that is spread over several strips, e.g. the source fingers of a multi-finger transistor. Before, only the last shape read became the port, and the others stayed in the model as surfaces without a port. `port_information.json` has one entry per element, with its `element` number. `combine_extend_snp.py` takes one Z0 per port for the Touchstone option line and treats the port inductances of the elements as parallel for de-embedding. Elmer models stop with an error for a multielement port.
+
+**Documentation**  
+User's guide, FAQ and AGENTS.md: the IHP SG13G2 PDK resistors as sheets in the EM model. The sheets have the drawn size and the nominal sheet resistance, without the PDK's width offset and contact end resistance; in Palace, rhigh and rppd come out about 10 % below their PDK value, rsil within about 2 %. See "Accuracy of IHP SG13G2 PDK resistors as sheets" in the user's guide.
 
 ## 22 October-2026
 gds2palace 0.9.2
