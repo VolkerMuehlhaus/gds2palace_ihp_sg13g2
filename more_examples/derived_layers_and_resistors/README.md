@@ -12,6 +12,12 @@ for how that mechanism works in general.
 Two via ports (`Metal1` → `Metal2`, layers 201/202) sit at either end of the
 resistor.
 
+Palace gives 49.9 Ω for this 2 µm × 13.06 µm rsil, the PDK value is 50.0 Ω.
+That close agreement holds for rsil, not for every resistor: the sheet has the
+drawn size and lacks the PDK's width offset and contact end resistance, so
+small rhigh and rppd resistors come out about 10 % low. See "Accuracy of IHP
+SG13G2 PDK resistors as sheets" in the user's guide.
+
 This is also the reference example for overriding stackup `<Variable>`s
 (`total_thickness`, `air_thickness`) from a Python script without editing
 the XML - via `stackup_reader.read_substrate(..., variable_overrides=...)` -
