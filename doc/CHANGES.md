@@ -3,6 +3,12 @@
 This is an (incomplete) list of changes and new features.
 
 ## 31 October-2026
+gds2palace 0.9.4
+
+**Fix**  
+`read_gds()` reads each GDS layer number once. A stackup can use one GDS layer for several stackup layers (one drawn shape makes all of them, e.g. a MIM top plate and the dielectric below it); `read_gds()` read such a layer once per stackup layer, so its polygons were in the model several times. The current IHP stackups have no shared layers, so their models do not change. `read_gds()` also no longer adds `gds_boundary_layers` to the caller's layer list.
+
+## 31 October-2026
 gds2palace 0.9.3
 
 **New features**  
