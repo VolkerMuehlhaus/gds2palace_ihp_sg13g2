@@ -50,6 +50,60 @@ defined.
 
 ![setupEM port configuration](png/port_setup.png)
 
+## Using the result in a circuit simulator
+
+The 5-port S-parameters describe the interconnect only. The transistor itself is not in the EM model: in a circuit
+simulator, the foundry model (here npn13G2 from the IHP SG13G2 PDK) goes back in at ports 3, 4 and 5, together with
+three inductors for the DC bias (explained below):
+
+![Circuit wiring of the 5-port result](png/circuit_wiring.png)
+
+**Wiring.** Use the S-parameters directly (an S-parameter block) or an equivalent circuit made from them (for example
+by vector fitting). Either way, each port is referenced to ground. Then:
+
+- Ports 1 and 2 are the RF pads: they connect to the outside circuit.
+- The transistor's base, collector and emitter connect directly to ports 3, 4 and 5. Its substrate pin goes to
+  ground.
+
+This grounds the `REF_FOR_TRANSISTOR` sheet. In the EM model the sheet floats: it touches only the three ports. Wiring
+the transistor directly adds the sheet's own capacitance to ground, a few fF. In a cascode test with two npn13G2
+(Nx = 8), this lowered S21 by 0.06 dB at 10 GHz and 0.4 dB at 200 GHz. To keep the sheet floating instead, couple each
+of the three ports through an ideal 1:1 transformer (a voltage-controlled voltage source plus a current-controlled
+current source) to a common node for the transistor.
+
+**DC bias.** A port measures a voltage difference, between a terminal and the reference sheet. At DC the sheet has
+no connection, so the EM model does not fix the transistor's potential as a whole. Tie each transistor terminal to
+the port of the same net with a large inductor (for example 1 mH: a short at DC, open at RF):
+
+- port 3 (base) to port 1 (left pad),
+- port 4 (collector) to port 2 (right pad),
+- port 5 (emitter) to ground, since the emitter is on the Metal3 ground plane.
+
+The bias is then applied at the pads, for example through bias tees in the testbench.
+
+**DC point of the S-parameters.** For a circuit with bias, set `settings['fstart'] = 0`. gds2palace then simulates
+10 MHz and 20 MHz, and `combine_snp` writes a `_dc` file with a 0 Hz point extrapolated from them. Use that file for the
+equivalent circuit. This example's script starts at 1 GHz: a DC point extrapolated from there is not accurate enough
+for a bias network with kΩ resistors. Without a good 0 Hz point, connect the S-parameter model through DC blocks
+(for example 1 µF at each port), so that only the inductors carry the bias.
+
+**Port polarity.** With `direction='Z'`, every via port has the same orientation along +z, whatever the order of
+`from_layername` and `to_layername`; `'-Z'` reverses it. In this example the signal metal is on top at every port
+(TopMetal2 over Metal3, Metal2 over the reference sheet), so `Z` is right for all of them. For a port whose signal
+metal is below its reference metal, use `'-Z'`, so that all ports have the same orientation.
+
+A minimal ngspice subcircuit (`em5` is the equivalent circuit of the 5-port, pins in port order):
+
+```spice
+.subckt core pad1 pad2
+XEM pad1 pad2 b c e em5
+XQ c b e 0 npn13G2 <parameters of the transistor in the layout>
+Lb pad1 b 1m        ; DC ties, open at RF
+Lc pad2 c 1m
+Le e 0 1m
+.ends core
+```
+
 ## GDSII changes
 
 Compared to the baseline `50_ghz_mpa_core_no_BJT.gds`, this layout
