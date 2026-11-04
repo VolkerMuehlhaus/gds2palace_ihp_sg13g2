@@ -13,6 +13,8 @@ Elmer thermal: a heat source inside a conductor of its target layer (an npn emit
 
 Mesh check: after meshing, elements of zero (or negative) volume are reported with their volume and position. A coarse mesh around small conductors (e.g. 0.7 µm metal fingers with a cell size of several µm) can leave flat tetrahedra in the dielectric between them, which gmsh's optimization keeps; Elmer then stops with "Degenerate 3D element" and a NaN solution. For Elmer models (thermal and EM) this is an error before the mesh is written, with the hint to use a finer mesh (`refined_cellsize`, `meshsize_max`); for Palace a warning.
 
+ElmerGrid check: the conversion of the gmsh mesh to an Elmer mesh (and the split for MPI) now stops with an error when ElmerGrid fails. A crashed ElmerGrid (a segmentation fault on a large thermal mesh, on Windows and Linux) went unnoticed until ElmerSolver reported a missing mesh folder. When the ElmerGrid location is unknown (Windows: `ELMER_HOME` set but empty), the message no longer fails on an undefined variable.
+
 ## 31 October-2026
 gds2palace 0.9.4
 

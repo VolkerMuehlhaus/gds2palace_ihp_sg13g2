@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.19.0"
+__version__ = "1.19.1"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -3348,7 +3348,8 @@ def create_model (excite_ports, settings):
                   f'(x, y, z) in drawing units:')
             for name, center in degenerate[:10]:
                 print(f'   {name or "unnamed volume"}: ({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})')
-            print('   Use a finer mesh there: a smaller refined_cellsize ("Mesh refinement at metal edges") or '
+            refined_label = "Mesh size at heat sources" if elmer_thermal else "Mesh refinement at metal edges"
+            print(f'   Use a finer mesh there: a smaller refined_cellsize ("{refined_label}") or '
                   'meshsize_max ("Mesh cell maximum size").')
             if elmer:
                 exit(1)

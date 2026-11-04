@@ -584,14 +584,7 @@ def convert_mesh_to_elmer (input_mesh, ELMER_MPI_THREADS=1):
             elmer_mesh_path.replace('\\','/')
         ]
 
-        # Run the command
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        # Print output and errors
-        print("STDOUT:\n", result.stdout)
-        if len(result.stderr)>0:
-            print("STDERR:\n", result.stderr)
-
+        run_elmergrid(cmd, f"converting {input_mesh} to an Elmer mesh")
 
         # Second step if we use multithreading: modify the mesh again
         if ELMER_MPI_THREADS>1:
@@ -609,17 +602,23 @@ def convert_mesh_to_elmer (input_mesh, ELMER_MPI_THREADS=1):
                 str(int(ELMER_MPI_THREADS))
             ]
 
-            # Run the command
             print(cmd)
-            result = subprocess.run(cmd, capture_output=True, text=True)
-
-            # Print output and errors
-            print("STDOUT:\n", result.stdout)
-            if len(result.stderr)>0:
-                print("STDERR:\n", result.stderr)
+            run_elmergrid(cmd, f"splitting the Elmer mesh into {ELMER_MPI_THREADS} partitions")
 
     else:
-        print('Location of ElmerGrid executable unknown, cannot run mesh conversion automatically.\n', cmd)    
+        print('Location of ElmerGrid executable unknown (set ELMER_HOME), cannot run mesh conversion automatically.')
+
+
+def run_elmergrid (cmd, what):
+    """Run ElmerGrid and print its output; stop if it fails. Without this check a crashed ElmerGrid (e.g. a
+    segmentation fault on a large gmsh mesh) went unnoticed until ElmerSolver reported a missing mesh folder."""
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print("STDOUT:\n", result.stdout)
+    if len(result.stderr)>0:
+        print("STDERR:\n", result.stderr)
+    if result.returncode != 0:
+        print(f"ERROR: ElmerGrid failed {what} (exit code {result.returncode}), no usable Elmer mesh was written.")
+        exit(1)
 
 
 def get_ELMER_MPI_THREADS (settings):
