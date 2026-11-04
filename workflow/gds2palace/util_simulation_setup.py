@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.18.1"
+__version__ = "1.19.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -3309,6 +3309,18 @@ def create_model (excite_ports, settings):
             return [tag for _, tag in gmsh.model.getEntities(3)
                     if sum(len(e) for e in gmsh.model.mesh.getElements(3, tag)[1]) == 0]
 
+        def degenerate_elements ():
+            """[(volume name, element center)] of the 3D elements with (almost) zero or negative volume."""
+            found = []
+            for _, tag in gmsh.model.getEntities(3):
+                for element_type, element_tags, _ in zip(*gmsh.model.mesh.getElements(3, tag)):
+                    qualities = gmsh.model.mesh.getElementQualities(element_tags, "minSICN")
+                    bad = [n for n, q in enumerate(qualities) if q < 1e-10]
+                    if bad:
+                        centers = gmsh.model.mesh.getBarycenters(element_type, tag, False, True).reshape(-1, 3)
+                        found += [(gmsh.model.getEntityName(3, tag), centers[n]) for n in bad]
+            return found
+
         abort_on_error = gmsh.option.getNumber("General.AbortOnError")
         gmsh.option.setNumber("General.AbortOnError", 0)
         try:
@@ -3326,6 +3338,20 @@ def create_model (excite_ports, settings):
         if unmeshed:
             print(f'ERROR: 3D meshing failed, {len(unmeshed)} volume(s) without mesh elements.')
             exit(1)
+
+        # A coarse mesh around small conductors (e.g. 0.7 um metal fingers with a cell size of several um) can leave
+        # flat tetrahedra of zero volume in the dielectric between them, which gmsh's optimization keeps. Elmer stops
+        # with "Degenerate 3D element" and a NaN solution; say where, before the mesh is written.
+        degenerate = degenerate_elements()
+        if degenerate:
+            print(f'{"ERROR" if elmer else "WARNING"}: {len(degenerate)} mesh element(s) with zero volume, at '
+                  f'(x, y, z) in drawing units:')
+            for name, center in degenerate[:10]:
+                print(f'   {name or "unnamed volume"}: ({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})')
+            print('   Use a finer mesh there: a smaller refined_cellsize ("Mesh refinement at metal edges") or '
+                  'meshsize_max ("Mesh cell maximum size").')
+            if elmer:
+                exit(1)
 
         # Save mesh
         gmsh.option.setNumber("Mesh.Binary", 0)

@@ -11,6 +11,8 @@ gds2palace 0.9.4
 **Fix**  
 Elmer thermal: a heat source inside a conductor of its target layer (an npn emitter's heat area in `Activ`) stopped the model with "Polygon on conductor layer source_... touches another conductor layer". The heat source takes the target layer's material, so the face it shares with that conductor is an interior face; it now stays with the conductor's surface group (thermal surface groups are only for viewing, boundary conditions come from the constant-temperature groups). Heat sources outside conductors (resistors over field oxide) are unchanged.
 
+Mesh check: after meshing, elements of zero (or negative) volume are reported with their volume and position. A coarse mesh around small conductors (e.g. 0.7 µm metal fingers with a cell size of several µm) can leave flat tetrahedra in the dielectric between them, which gmsh's optimization keeps; Elmer then stops with "Degenerate 3D element" and a NaN solution. For Elmer models (thermal and EM) this is an error before the mesh is written, with the hint to use a finer mesh (`refined_cellsize`, `meshsize_max`); for Palace a warning.
+
 ## 31 October-2026
 gds2palace 0.9.4
 
