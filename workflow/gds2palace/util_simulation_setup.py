@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.19.1"
+__version__ = "1.20.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -3051,18 +3051,22 @@ def create_model (excite_ports, settings):
 
         # REFINE MESH AT CONDUCTORS (SURFACES)
 
-        def refine_along_boundary (boundary_line_tags, refined_cellsize_value, i):
-            """Create mesh field for given boundary line tags, with specified cellsize value, place extra vertices and save mesh field 
+        def refine_along_boundary (boundary_line_tags, refined_cellsize_value, i, size_max=None, dist_max=None):
+            """Create mesh field for given boundary line tags, with specified cellsize value, place extra vertices and save mesh field
 
 
             Args:
                 boundary_line_tags (list of int): line tags where to place refined cellsize
                 refined_cellsize_value (float): refined cellsize in micron
                 i (int): index of mesh size field for gmsh (couting upwards, returns the next index)
+                size_max, dist_max (float): the size the mesh grows to, and over which distance (default for both:
+                    max_cellsize_air; Elmer thermal: the cell maximum size, over 30 times refined_cellsize_value)
 
             Returns:
                 int: next index
             """
+            size_max = max_cellsize_air if size_max is None else size_max
+            dist_max = max_cellsize_air if dist_max is None else dist_max
             # resample along boundaries, i.e. place points along the boundaries
             # The gmsh Distance field measures the distance to points sampled along each curve, with the
             # same number of points ("Sampling") on every curve of the field. Between two samples the
@@ -3110,9 +3114,9 @@ def create_model (excite_ports, settings):
                 gmsh.model.mesh.field.add("Threshold", i)
                 gmsh.model.mesh.field.setNumber(i, "InField", i-1)  # number of this field definition
                 gmsh.model.mesh.field.setNumber(i, "SizeMin", refined_cellsize_value)
-                gmsh.model.mesh.field.setNumber(i, "SizeMax", max_cellsize_air)
+                gmsh.model.mesh.field.setNumber(i, "SizeMax", size_max)
                 gmsh.model.mesh.field.setNumber(i, "DistMin", 0)
-                gmsh.model.mesh.field.setNumber(i, "DistMax", max_cellsize_air)
+                gmsh.model.mesh.field.setNumber(i, "DistMax", dist_max)
 
                 fields_list.append(i)
                 i = i + 1
@@ -3159,28 +3163,42 @@ def create_model (excite_ports, settings):
 
 
         if elmer_thermal:
-            # special rule for elmer_thermal: refine near source(s) using refined_cellsize
+            # special rule for elmer_thermal: refine near source(s) using refined_cellsize, or a heat source's own
+            # value from refined_cellsize_override (key source_<layer>). Metal layers in refined_cellsize_override
+            # get edge refinement at their value; without an override, thermal models refine no metal edges.
+            max_cellsize_outside = min(max_cellsize_air/math.sqrt(11.9), meshsize_max)
 
             for dimtag in thermal_volume_dimtags:
                 dim, tag = dimtag
                 xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.occ.getBoundingBox(dim, tag)
-
-                max_cellsize_outside = min(max_cellsize_air/math.sqrt(11.9), meshsize_max)
+                size = refined_cellsize_override_dict.get(gmsh.model.getEntityName(dim, tag), refined_cellsize)
 
                 # Create a mesh size field
                 gmsh.model.mesh.field.add("Box", i)
-                gmsh.model.mesh.field.setNumber(i, "VIn", refined_cellsize)   # inside box
+                gmsh.model.mesh.field.setNumber(i, "VIn", size)   # inside box
                 gmsh.model.mesh.field.setNumber(i, "VOut", max_cellsize_outside)  # outside box
-                gmsh.model.mesh.field.setNumber(i, "XMin", xmin-refined_cellsize)
-                gmsh.model.mesh.field.setNumber(i, "XMax", xmax+refined_cellsize)
-                gmsh.model.mesh.field.setNumber(i, "YMin", ymin-refined_cellsize)
-                gmsh.model.mesh.field.setNumber(i, "YMax", ymax+refined_cellsize)
-                gmsh.model.mesh.field.setNumber(i, "ZMin", zmin-refined_cellsize)
-                gmsh.model.mesh.field.setNumber(i, "ZMax", zmax+refined_cellsize)
-                gmsh.model.mesh.field.setNumber(i, "Thickness", 30*refined_cellsize)
+                gmsh.model.mesh.field.setNumber(i, "XMin", xmin-size)
+                gmsh.model.mesh.field.setNumber(i, "XMax", xmax+size)
+                gmsh.model.mesh.field.setNumber(i, "YMin", ymin-size)
+                gmsh.model.mesh.field.setNumber(i, "YMax", ymax+size)
+                gmsh.model.mesh.field.setNumber(i, "ZMin", zmin-size)
+                gmsh.model.mesh.field.setNumber(i, "ZMax", zmax+size)
+                gmsh.model.mesh.field.setNumber(i, "Thickness", 30*size)
 
                 fields_list.append(i)
                 i = i + 1
+
+            source_names = {gmsh.model.getEntityName(dim, tag) for dim, tag in thermal_volume_dimtags}
+            for key, size in refined_cellsize_override_dict.items():
+                if key in source_names:
+                    print(f"Mesh size at heat source {key}: {size}")
+                elif key in boundary_line_tags_dict and not key.startswith("source_"):
+                    print(f"Edge refinement of {key}: {size}")
+                    i = refine_along_boundary(boundary_line_tags_dict[key], size, i, size_max=max_cellsize_outside,
+                                              dist_max=30*size)
+                else:
+                    print(f"WARNING: refined_cellsize_override: {key} is neither a heat source nor a metal layer of "
+                          "this model, ignored")
 
         
         # Optional refinement of mesh at the upper end of the semiconductor
