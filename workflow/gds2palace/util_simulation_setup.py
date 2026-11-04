@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.20.0"
+__version__ = "1.21.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -39,6 +39,12 @@ import types
 
 from . import util_elmer
 from .util_stackup_reader import PEC_MATERIAL_NAME
+
+# Elmer thermal: away from a refined region (a heat source's box, a metal edge with refined_cellsize_override), the
+# mesh size grows by this much per unit of distance, up to the maximum size. A fixed transition of 30 x the refined
+# size grew far too fast for small sizes (0.25 um: 2.6 per unit), and the temperature rise of an npn13G2 came out
+# about 20 % too low; growth rates of 0.5 and 0.16 per unit gave results within 1.2 % of each other.
+THERMAL_MESH_GROWTH = 0.3
 
 # Neither Palace nor Elmer (both FEM continuum solvers) can represent a literal ideal-conductor
 # 3D volume - a PEC via is instead approximated with this fixed, very high but finite
@@ -3060,7 +3066,7 @@ def create_model (excite_ports, settings):
                 refined_cellsize_value (float): refined cellsize in micron
                 i (int): index of mesh size field for gmsh (couting upwards, returns the next index)
                 size_max, dist_max (float): the size the mesh grows to, and over which distance (default for both:
-                    max_cellsize_air; Elmer thermal: the cell maximum size, over 30 times refined_cellsize_value)
+                    max_cellsize_air; Elmer thermal: the cell maximum size, at THERMAL_MESH_GROWTH)
 
             Returns:
                 int: next index
@@ -3168,6 +3174,10 @@ def create_model (excite_ports, settings):
             # get edge refinement at their value; without an override, thermal models refine no metal edges.
             max_cellsize_outside = min(max_cellsize_air/math.sqrt(11.9), meshsize_max)
 
+            def thermal_transition(size):
+                """The distance over which the mesh grows from size to max_cellsize_outside (THERMAL_MESH_GROWTH)."""
+                return max(max_cellsize_outside - size, 0) / THERMAL_MESH_GROWTH
+
             for dimtag in thermal_volume_dimtags:
                 dim, tag = dimtag
                 xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.occ.getBoundingBox(dim, tag)
@@ -3183,7 +3193,7 @@ def create_model (excite_ports, settings):
                 gmsh.model.mesh.field.setNumber(i, "YMax", ymax+size)
                 gmsh.model.mesh.field.setNumber(i, "ZMin", zmin-size)
                 gmsh.model.mesh.field.setNumber(i, "ZMax", zmax+size)
-                gmsh.model.mesh.field.setNumber(i, "Thickness", 30*size)
+                gmsh.model.mesh.field.setNumber(i, "Thickness", thermal_transition(size))
 
                 fields_list.append(i)
                 i = i + 1
@@ -3195,7 +3205,7 @@ def create_model (excite_ports, settings):
                 elif key in boundary_line_tags_dict and not key.startswith("source_"):
                     print(f"Edge refinement of {key}: {size}")
                     i = refine_along_boundary(boundary_line_tags_dict[key], size, i, size_max=max_cellsize_outside,
-                                              dist_max=30*size)
+                                              dist_max=thermal_transition(size))
                 else:
                     print(f"WARNING: refined_cellsize_override: {key} is neither a heat source nor a metal layer of "
                           "this model, ignored")
