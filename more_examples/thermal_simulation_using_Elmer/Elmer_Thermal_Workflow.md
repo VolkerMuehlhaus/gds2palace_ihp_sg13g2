@@ -62,7 +62,9 @@ Every `<Material>` used in a thermal run needs **thermal conductivity** data, th
 ```
 
 gds2palace writes this straight through as an Elmer temperature-dependent
-material table — no manual `.sif` editing needed for this part.
+material table — no manual `.sif` editing needed for this part. With a table,
+Elmer solves the model nonlinearly: it starts at the lowest constant temperature
+of the model and iterates until the temperatures and the conductivities agree.
 
 ## 2. Layout: heat sources and constant-temperature boundaries
 

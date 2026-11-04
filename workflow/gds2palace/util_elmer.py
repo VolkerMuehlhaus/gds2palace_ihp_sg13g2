@@ -447,6 +447,17 @@ Linear System Preconditioning = ILU1'''
             linear_system_block = '''Linear System Solver = Direct
 Linear System Direct Method = umfpack'''
 
+        # A temperature-dependent conductivity (a Variable Temperature table) is evaluated at the current temperature.
+        # With a single heat solver iteration and no initial condition, that is 0 K, far below the table, where Elmer
+        # extrapolates linearly (IHP's Si table: about 270 instead of 82 W/mK at 300 K). So iterate until converged,
+        # starting from the lowest constant temperature of the model. Models without a table are unchanged.
+        has_table = any("Variable Temperature" in str(m["thermalcond"]) for m in Elmer_materials)
+        start_temp = min((bc["temp"] for bc in Elmer_thermal_boundaryconditions), default=None) if has_table else None
+        if has_table:
+            linear_system_block += '''
+Nonlinear System Max Iterations = 50
+Nonlinear System Convergence Tolerance = 1.0e-6'''
+
         header1=f'''
 Check Keywords "warn"
 
@@ -511,9 +522,14 @@ End
 
             if "bodyforce_number" in body.keys():
                 item = item + f'   Body Force = {body["bodyforce_number"]}\n'
+            if start_temp is not None:
+                item = item + '   Initial Condition = 1\n'
 
             item = item + "End\n"
             f.write(item + '\n')
+
+        if start_temp is not None:
+            f.write(f'Initial Condition 1\n   Temperature = Real {start_temp:2f}\nEnd\n\n')
 
         # write thermal power for heat source
         for n,power in enumerate(Elmer_body_forces):
