@@ -2,6 +2,12 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 4 November-2026
+gds2palace 0.9.4
+
+**New features**  
+`util_thermal_map`: powers from a circuit simulation onto the heat sources of a thermal export. The thermal export of the KLayout EM Export plug-in puts each transistor and resistor on a heat source layer of its own and writes `<name>_thermalmap.json` (layer, layout device and, from LVS, the schematic instance name per heat source). `read_powers()` reads a file with one line per device (instance name and power in W; comma, semicolon, tab or spaces; SPICE suffixes), `apply_powers()` returns the power per heat source layer and a report of heat sources without a power and names that match no heat source or several. Nothing is set silently. Command line: `python -m gds2palace.util_thermal_map <name>_thermalmap.json powers.csv <name>.tsimcfg` writes the powers into a setupThermal file. setupThermal's **Load powers...** uses it.
+
 ## 31 October-2026
 gds2palace 0.9.4
 
