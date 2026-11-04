@@ -8,6 +8,9 @@ gds2palace 0.9.4
 **New features**  
 `util_thermal_map`: powers from a circuit simulation onto the heat sources of a thermal export. The thermal export of the KLayout EM Export plug-in puts each transistor and resistor on a heat source layer of its own and writes `<name>_thermalmap.json` (layer, layout device and, from LVS, the schematic instance name per heat source). `read_powers()` reads a file with one line per device (instance name and power in W; comma, semicolon, tab or spaces; SPICE suffixes), `apply_powers()` returns the power per heat source layer and a report of heat sources without a power and names that match no heat source or several. Nothing is set silently. Command line: `python -m gds2palace.util_thermal_map <name>_thermalmap.json powers.csv <name>.tsimcfg` writes the powers into a setupThermal file. setupThermal's **Load powers...** uses it.
 
+**Fix**  
+Elmer thermal: a heat source inside a conductor of its target layer (an npn emitter's heat area in `Activ`) stopped the model with "Polygon on conductor layer source_... touches another conductor layer". The heat source takes the target layer's material, so the face it shares with that conductor is an interior face; it now stays with the conductor's surface group (thermal surface groups are only for viewing, boundary conditions come from the constant-temperature groups). Heat sources outside conductors (resistors over field oxide) are unchanged.
+
 ## 31 October-2026
 gds2palace 0.9.4
 

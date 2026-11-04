@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.18.0"
+__version__ = "1.18.1"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -2127,7 +2127,14 @@ def create_model (excite_ports, settings):
     # here rather than also being tagged as a generic conductor surface.
     port_surface_tags = {tag for tags in port_dimtags_created_2D.values() for tag in tags}
 
-    for key in metal_surface_dict.keys():
+    # Elmer thermal: heat sources last. A heat source takes the material of its target layer and may lie inside
+    # a conductor of that layer (e.g. an npn emitter in Activ), so a face it shares with that conductor is an
+    # interior face, not two conductors touching. Thermal surface groups are only for viewing (boundary
+    # conditions come from the constanttemp groups), so that face simply stays in the conductor's group.
+    def is_heat_source(key):
+        return elmer_thermal and key.startswith("source_")
+
+    for key in sorted(metal_surface_dict.keys(), key=is_heat_source):
         surfaces_list = metal_surface_dict[key]
         if len(surfaces_list)>0:
 
@@ -2146,11 +2153,13 @@ def create_model (excite_ports, settings):
                         # surface - see port_surface_tags comment above
                         continue
 
-                    new_tags.append(tag)
-
                     # we should not have this in list
                     if tag not in already_assigned_tags:
                         already_assigned_tags.append(tag)
+                        new_tags.append(tag)
+                    elif is_heat_source(key):
+                        # shared with the conductor around the heat source, see above
+                        continue
                     else:
                         print("ERROR in XML stackup definition:")
                         print(f"   Polygon on conductor layer {key} touches another conductor layer (overlapping surface), this is invalid.")
