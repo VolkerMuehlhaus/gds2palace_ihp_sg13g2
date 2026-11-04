@@ -102,6 +102,8 @@ Every material now has a thermal conductivity; the legacy files had none.
 
 Activ is silicon too, with the same table, as in IHP's own thermal stack (Korndörfer, Datsuk, Kaynak, "Layout based electro-thermal simulation setup", SiRF 2018). IHP fitted the table to measured thermal resistances of SiGe HBTs: 83 W/m·K at 300 K, lower than undoped silicon (130 to 156 W/m·K) because of the doping. Until gds2palace 0.9.4, Activ had a constant 50 W/m·K without a source. In IHP's npn cells the silicon around each emitter is on Activ.mask (1/20), not Activ, so a thermal model of these cells needs datatype 20 as well (setupThermal's default).
 
+The resistor layers `RHIGH`, `RPPD` and `RSIL` are sheets without thickness and have no thermal properties. Thermal models of resistors are not accurate yet: a resistor is polysilicon on oxide, and a heat source in Activ's height and material puts it into silicon instead, so it comes out too cool.
+
 The `PEC` sheets `SUBGND`, `BACKSIDEGND` and `REF_FOR_TRANSISTOR` have no thermal properties. Thermal models ignore them, like the resistor sheets: they have zero thickness and add no thermal volume. A `PEC` sheet can be the target layer of a constant temperature boundary, because the boundary uses only the target layer's z position. For example, this models a heat sink at the chip backside, at the area drawn on layer 202:
 
 ```python
