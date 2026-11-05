@@ -102,7 +102,22 @@ Every material now has a thermal conductivity; the legacy files had none.
 
 Activ is silicon too, with the same table. IHP fitted the table to measured thermal resistances of SiGe HBTs (Korndörfer, Datsuk, Kaynak, "Layout based electro-thermal simulation setup", SiRF 2018): 83 W/m·K at 300 K, lower than undoped silicon (130 to 156 W/m·K) because of the doping. Until gds2palace 0.9.4, Activ had a constant 50 W/m·K without a source. In IHP's npn cells the silicon around each emitter is on Activ.mask (1/20), not Activ, so a thermal model of these cells needs datatype 20 as well (setupThermal's default).
 
-The resistor layers `RHIGH`, `RPPD` and `RSIL` are sheets without thickness and have no thermal properties. Thermal models of resistors are not accurate yet: a resistor is polysilicon on oxide, and a heat source in Activ's height and material puts it into silicon instead, so it comes out too cool.
+The resistor layers `RHIGH`, `RPPD` and `RSIL` are sheets without thickness and have no thermal properties.
+
+**Heat source targets.** `HEAT_TRANSISTOR` (GDS 320) and `HEAT_RESISTOR` (GDS 321) are target layers for heat sources only. A heat source takes the z range and the material of its target layer, not its shapes. Nothing is drawn on these two GDS layers, so they add no geometry to a model, and EM models are unchanged. Don't draw on GDS layers 320 and 321.
+
+| Target layer | z range | Material | Use for |
+|---|---|---|---|
+| `HEAT_TRANSISTOR` | top 40 nm of Activ | silicon (`Si_vs_T_IHP`) | transistors |
+| `HEAT_RESISTOR` | 0.16 µm above the Activ level | polysilicon, 20 W/m·K | resistors |
+
+A transistor dissipates its heat in a thin layer at the top of the silicon, not in all 0.4 µm of Activ. With `Activ` as the target the heat source is ten times thicker, and the device comes out too cool: for an npn13G2 with 8 emitters and a 750 µm substrate, the thermal resistance at a heat source mesh of 0.125 µm is about 1300 K/W with `Activ` and about 1740 K/W with `HEAT_TRANSISTOR`. With a finer mesh, `HEAT_TRANSISTOR` gives 1832 K/W at 0.0625 µm and 1865 K/W at 0.031 µm, and converges to about 1890 K/W, 8 % above the 1750 K/W of the PDK's transistor model.
+
+A resistor is polysilicon on field oxide. `HEAT_RESISTOR` is that polysilicon body: 0.16 µm thick (gate polysilicon thickness in the SG13G2 process specification), 20 W/m·K (Datsuk, Kaynak, Krupkina, EuroSimE 2018), on the 0.4 µm of oxide that fills the Activ level where no Activ is drawn. With `Activ` as the target, the heat source is silicon that touches the substrate, and the resistor comes out far too cool. The heat source is the resistor body only; the heads under the contacts are not modelled.
+
+Resistor results are not validated yet. For eight sizes of rhigh, rppd and rsil, from 0.5 µm × 0.96 µm to 5 µm × 20 µm, the thermal resistance is 1.5 to 2.5 times the value of the PDK's resistor model, and the ratio grows with the area. 83 to 98 % of the temperature rise is across the oxide below the resistor, so the result follows from the oxide's thickness (0.4 µm) and thermal conductivity (1 W/m·K). The PDK's area term corresponds to 2.4 W/m·K at that thickness. There is no measurement to decide between the two.
+
+Mesh size at the heat source: 0.0625 µm is about 6 % below the converged value for the smallest resistor (0.5 µm × 0.96 µm) and about 3 % below for 0.5 µm × 5 µm. For a resistor 2 µm or wider, 0.125 µm is within about 3 %.
 
 The `PEC` sheets `SUBGND`, `BACKSIDEGND` and `REF_FOR_TRANSISTOR` have no thermal properties. Thermal models ignore them, like the resistor sheets: they have zero thickness and add no thermal volume. A `PEC` sheet can be the target layer of a constant temperature boundary, because the boundary uses only the target layer's z position. For example, this models a heat sink at the chip backside, at the area drawn on layer 202:
 

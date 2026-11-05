@@ -2,6 +2,15 @@
 
 This is an (incomplete) list of changes and new features.
 
+## Not released yet
+gds2palace 0.9.5
+
+**New features**  
+Stackups (`XML_stackup/latest/IHP`): two target layers for heat sources, `HEAT_TRANSISTOR` (the top 40 nm of Activ, silicon) and `HEAT_RESISTOR` (a 0.16 µm polysilicon body with 20 W/m·K above the Activ level, i.e. on the field oxide). A heat source takes the z range and the material of its target layer, and nothing is drawn on the two GDS layers (320, 321), so EM models are unchanged. With `Activ` as the target, a transistor's heat source was ten times too thick and a resistor's heat source was silicon on the substrate; both came out too cool. At a heat source mesh of 0.125 µm, an npn13G2 with 8 emitters now has about 1740 K/W instead of 1300 K/W; the converged value is about 1890 K/W (PDK model: 1750 K/W). Resistor results are not validated yet. See "Heat source targets" in `XML_stackup/latest/IHP/README.md`.
+
+**Fix**  
+Elmer thermal: a heat source that partly overlaps another volume (e.g. a heat source that reaches under a contact) lost its mesh refinement. The model was built and solved with a coarse mesh at that source, and the only sign was the message that its `refined_cellsize_override` entry is "neither a heat source nor a metal layer". Heat sources inside one volume or in the oxide are unchanged.
+
 ## 5 November-2026
 gds2palace 0.9.4
 
