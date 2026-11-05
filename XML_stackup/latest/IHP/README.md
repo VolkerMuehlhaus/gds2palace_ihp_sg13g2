@@ -100,7 +100,7 @@ Every material now has a thermal conductivity; the legacy files had none.
 | AIR | 0.026 |
 | Substrate, EPI, Activ | temperature table `Si_vs_T_IHP` (IHP-measured, DOI: 10.1109/EuroSimE.2018.8369872) |
 
-Activ is silicon too, with the same table, as in IHP's own thermal stack (Korndörfer, Datsuk, Kaynak, "Layout based electro-thermal simulation setup", SiRF 2018). IHP fitted the table to measured thermal resistances of SiGe HBTs: 83 W/m·K at 300 K, lower than undoped silicon (130 to 156 W/m·K) because of the doping. Until gds2palace 0.9.4, Activ had a constant 50 W/m·K without a source. In IHP's npn cells the silicon around each emitter is on Activ.mask (1/20), not Activ, so a thermal model of these cells needs datatype 20 as well (setupThermal's default).
+Activ is silicon too, with the same table. IHP fitted the table to measured thermal resistances of SiGe HBTs (Korndörfer, Datsuk, Kaynak, "Layout based electro-thermal simulation setup", SiRF 2018): 83 W/m·K at 300 K, lower than undoped silicon (130 to 156 W/m·K) because of the doping. Until gds2palace 0.9.4, Activ had a constant 50 W/m·K without a source. In IHP's npn cells the silicon around each emitter is on Activ.mask (1/20), not Activ, so a thermal model of these cells needs datatype 20 as well (setupThermal's default).
 
 The resistor layers `RHIGH`, `RPPD` and `RSIL` are sheets without thickness and have no thermal properties. Thermal models of resistors are not accurate yet: a resistor is polysilicon on oxide, and a heat source in Activ's height and material puts it into silicon instead, so it comes out too cool.
 
