@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.21.0"
+__version__ = "1.21.1"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -1875,12 +1875,6 @@ def create_model (excite_ports, settings):
                 thermal_boundary_dimtags.append((2,tag))
         geom_dimtags.extend(thermal_boundary_dimtags)
 
-        # add thermal volume dimtags (i.e. thermal sources)
-        thermal_volume_dimtags = []
-        for key in thermalsource_dimtags_created_3D:
-            for tag in thermalsource_dimtags_created_3D[key]:
-                thermal_volume_dimtags.append((3,tag))
-
     # sheet and volume names must be captured before fragment(), since fragment() can split
     # a sheet or a 3D volume into multiple new entities (e.g. where a sheet touches another
     # sheet, or touches/sits inside a volume boundary) and the new entities do not inherit
@@ -1967,18 +1961,11 @@ def create_model (excite_ports, settings):
             layername = gmsh.model.getEntityName(dim=2,tag=tag)
             thermal_boundary_dict[layername].append(tag)
 
-        # restore thermal source dimtags
-        restored_thermalvolume_dimtags = []
-        for n, new_dimtag_list in enumerate(geom_map):
-            # we get a list with one or more new dimtags for each the original dimtag
-            original_tag = geom_dimtags[n]
-            if original_tag in thermal_volume_dimtags:
-                # keep all pieces, a source volume can be split by fragment(), e.g. where two
-                # polygons on the same source layer overlap
-                for dimtag in new_dimtag_list:
-                    if dimtag not in restored_thermalvolume_dimtags:
-                        restored_thermalvolume_dimtags.append(dimtag)
-        thermal_volume_dimtags = restored_thermalvolume_dimtags        
+        # heat source volumes after both fragment() calls, by name: a source box that partly overlaps
+        # another volume (e.g. a via) is already split by the first fragment(), so its tag from
+        # add_thermal_sources() no longer exists
+        thermal_volume_dimtags = [(3, tag) for _, tag in gmsh.model.getEntities(3)
+                                  if gmsh.model.getEntityName(3, tag) in thermal_volume_dict]
 
 
 
