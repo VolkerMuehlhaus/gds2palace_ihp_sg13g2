@@ -447,6 +447,17 @@ Linear System Preconditioning = ILU1'''
             linear_system_block = '''Linear System Solver = Direct
 Linear System Direct Method = umfpack'''
 
+        # A temperature-dependent conductivity (a Variable Temperature table) is evaluated at the current temperature.
+        # With a single heat solver iteration and no initial condition, that is 0 K, far below the table, where Elmer
+        # extrapolates linearly (IHP's Si table: about 270 instead of 82 W/mK at 300 K). So iterate until converged,
+        # starting from the lowest constant temperature of the model. Models without a table are unchanged.
+        has_table = any("Variable Temperature" in str(m["thermalcond"]) for m in Elmer_materials)
+        start_temp = min((bc["temp"] for bc in Elmer_thermal_boundaryconditions), default=None) if has_table else None
+        if has_table:
+            linear_system_block += '''
+Nonlinear System Max Iterations = 50
+Nonlinear System Convergence Tolerance = 1.0e-6'''
+
         header1=f'''
 Check Keywords "warn"
 
@@ -511,9 +522,14 @@ End
 
             if "bodyforce_number" in body.keys():
                 item = item + f'   Body Force = {body["bodyforce_number"]}\n'
+            if start_temp is not None:
+                item = item + '   Initial Condition = 1\n'
 
             item = item + "End\n"
             f.write(item + '\n')
+
+        if start_temp is not None:
+            f.write(f'Initial Condition 1\n   Temperature = Real {start_temp:2f}\nEnd\n\n')
 
         # write thermal power for heat source
         for n,power in enumerate(Elmer_body_forces):
@@ -584,14 +600,7 @@ def convert_mesh_to_elmer (input_mesh, ELMER_MPI_THREADS=1):
             elmer_mesh_path.replace('\\','/')
         ]
 
-        # Run the command
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        # Print output and errors
-        print("STDOUT:\n", result.stdout)
-        if len(result.stderr)>0:
-            print("STDERR:\n", result.stderr)
-
+        run_elmergrid(cmd, f"converting {input_mesh} to an Elmer mesh")
 
         # Second step if we use multithreading: modify the mesh again
         if ELMER_MPI_THREADS>1:
@@ -609,17 +618,23 @@ def convert_mesh_to_elmer (input_mesh, ELMER_MPI_THREADS=1):
                 str(int(ELMER_MPI_THREADS))
             ]
 
-            # Run the command
             print(cmd)
-            result = subprocess.run(cmd, capture_output=True, text=True)
-
-            # Print output and errors
-            print("STDOUT:\n", result.stdout)
-            if len(result.stderr)>0:
-                print("STDERR:\n", result.stderr)
+            run_elmergrid(cmd, f"splitting the Elmer mesh into {ELMER_MPI_THREADS} partitions")
 
     else:
-        print('Location of ElmerGrid executable unknown, cannot run mesh conversion automatically.\n', cmd)    
+        print('Location of ElmerGrid executable unknown (set ELMER_HOME), cannot run mesh conversion automatically.')
+
+
+def run_elmergrid (cmd, what):
+    """Run ElmerGrid and print its output; stop if it fails. Without this check a crashed ElmerGrid (e.g. a
+    segmentation fault on a large gmsh mesh) went unnoticed until ElmerSolver reported a missing mesh folder."""
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print("STDOUT:\n", result.stdout)
+    if len(result.stderr)>0:
+        print("STDERR:\n", result.stderr)
+    if result.returncode != 0:
+        print(f"ERROR: ElmerGrid failed {what} (exit code {result.returncode}), no usable Elmer mesh was written.")
+        exit(1)
 
 
 def get_ELMER_MPI_THREADS (settings):

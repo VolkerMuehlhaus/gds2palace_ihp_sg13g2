@@ -62,7 +62,9 @@ Every `<Material>` used in a thermal run needs **thermal conductivity** data, th
 ```
 
 gds2palace writes this straight through as an Elmer temperature-dependent
-material table — no manual `.sif` editing needed for this part.
+material table — no manual `.sif` editing needed for this part. With a table,
+Elmer solves the model nonlinearly: it starts at the lowest constant temperature
+of the model and iterates until the temperatures and the conductivities agree.
 
 ## 2. Layout: heat sources and constant-temperature boundaries
 
@@ -96,6 +98,10 @@ thermal_objects.add_consttemp(simulation_setup.constanttemp(
 Both marker layers (201 and 202 here) must actually be drawn as polygons
 in the GDSII file, in the cell you're reading (`cellname` in the script) —
 gds2palace only picks up what's physically there.
+
+Any layer number that the stackup does not use works as a marker layer. If the same layout also has
+EM ports (layers 201–299), put the thermal markers elsewhere, e.g. on 401–499, which none of the
+stackups in this repository use; then the EM and the thermal model read their own layers only.
 
 Target layer for **heat sources** must be **volumes** with non-zero thickness, i.e. Zmax 
 value larger than Zmin.

@@ -2,6 +2,33 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 5 November-2026
+gds2palace 0.9.4
+
+**New features**  
+`util_thermal_map`: powers from a circuit simulation onto the heat sources of a thermal export. The thermal export of the KLayout EM Export plug-in puts each transistor and resistor on a heat source layer of its own and writes `<name>_thermalmap.json` (layer, layout device and, from LVS, the schematic instance name per heat source). `read_powers()` reads a file with one line per device (instance name and power in W; comma, semicolon, tab or spaces; SPICE suffixes), `apply_powers()` returns the power per heat source layer and a report of heat sources without a power and names that match no heat source or several. Nothing is set silently. Command line: `python -m gds2palace.util_thermal_map <name>_thermalmap.json powers.csv <name>.tsimcfg` writes the powers into a setupThermal file. setupThermal's **Load powers...** uses it.
+
+Elmer thermal: `refined_cellsize_override` now works for thermal models too. A heat source in the list (`source_<GDS layer>`, e.g. `['source_205', 0.25]`) gets its own mesh size instead of `refined_cellsize`, e.g. a fine mesh only at the emitter fingers of an npn. A metal layer in the list gets edge refinement at its value, growing to `meshsize_max` like the mesh around a heat source (below); thermal models refine no metal edges otherwise.
+
+Elmer thermal: the mesh around a heat source now grows at a fixed rate, 0.3 µm per µm of distance, to the maximum size away from the sources. Before, it reached the maximum size within 30 times the source's mesh size, which is very fast for a small mesh size: for an npn13G2 with 0.25 µm at the emitter fingers, the temperature rise came out about 20 % too low. Models whose maximum size is more than 10 times the mesh size at the sources get more elements; at 10 times (e.g. 2 µm / 20 µm) the mesh is the same as before. The thermal example (5 µm / 100 µm) has 98k instead of 74k elements, with the same peak temperature within 0.1 K. Without the setting, thermal meshes are unchanged. Names that are neither a heat source nor a metal layer of the model are reported.
+
+**Fix**  
+Elmer thermal: a temperature-dependent thermal conductivity (`ThermalConductivityTable`, e.g. silicon) was taken at 0 K. The model had a single heat solver iteration and no initial temperature, so Elmer read the table once at 0 K, far below its range, and extrapolated it linearly: about 270 W/m·K for IHP's silicon table instead of 82 W/m·K at 300 K, and about 380 W/m·K for the literature table of the thermal example. Temperatures came out too low. A model with a table now starts at the lowest constant temperature of the model and iterates until converged (at most 50 iterations). The thermal example now gives a temperature rise of 48.0 K instead of 39.7 K. Models with constant thermal conductivities are unchanged.
+
+Stackups (`XML_stackup/latest/IHP`): Activ's thermal conductivity is now the silicon table `Si_vs_T_IHP` instead of a constant 50 W/m·K that had no source. The heat sources of a thermal export sit in Activ, so this value decides much of a transistor's temperature rise. Thermal models of devices now come out cooler; EM models are unchanged.
+
+Elmer thermal: a heat source inside a conductor of its target layer (an npn emitter's heat area in `Activ`) stopped the model with "Polygon on conductor layer source_... touches another conductor layer". The heat source takes the target layer's material, so the face it shares with that conductor is an interior face; it now stays with the conductor's surface group (thermal surface groups are only for viewing, boundary conditions come from the constant-temperature groups). Heat sources outside conductors (resistors over field oxide) are unchanged.
+
+Mesh check: after meshing, elements of zero (or negative) volume are reported with their volume and position. A coarse mesh around small conductors (e.g. 0.7 µm metal fingers with a cell size of several µm) can leave flat tetrahedra in the dielectric between them, which gmsh's optimization keeps; Elmer then stops with "Degenerate 3D element" and a NaN solution. For Elmer models (thermal and EM) this is an error before the mesh is written, with the hint to use a finer mesh (`refined_cellsize`, `meshsize_max`); for Palace a warning.
+
+ElmerGrid check: the conversion of the gmsh mesh to an Elmer mesh (and the split for MPI) now stops with an error when ElmerGrid fails. A crashed ElmerGrid (a segmentation fault on a large thermal mesh, on Windows and Linux) went unnoticed until ElmerSolver reported a missing mesh folder. When the ElmerGrid location is unknown (Windows: `ELMER_HOME` set but empty), the message no longer fails on an undefined variable.
+
+## 31 October-2026
+gds2palace 0.9.4
+
+**Fix**  
+`read_gds()` reads each GDS layer number once. A stackup can use one GDS layer for several stackup layers (one drawn shape makes all of them, e.g. a MIM top plate and the dielectric below it); `read_gds()` read such a layer once per stackup layer, so its polygons were in the model several times. The current IHP stackups have no shared layers, so their models do not change. `read_gds()` also no longer adds `gds_boundary_layers` to the caller's layer list.
+
 ## 31 October-2026
 gds2palace 0.9.3
 
