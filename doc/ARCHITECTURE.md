@@ -595,7 +595,7 @@ against the source, e.g. `get_optional_setting` defaults in `util_simulation_set
 | Key | Meaning |
 |---|---|
 | `unit` | Unit of values in mesh, typically `1e-6` (micron) |
-| `margin` | Oversize of dielectrics from the drawing's bounding box, in the xy plane |
+| `margin` | Oversize of dielectrics from the drawing's bounding box, in the xy plane. Single value, or a list of 4 `[xmin,xmax,ymin,ymax]` values, all 0 or more |
 | `fstart`, `fstop`, `fstep` | Frequency sweep, in Hz. Not every step is necessarily EM-simulated, due to the adaptive frequency sweep |
 | `refined_cellsize` | Target mesh size at polygon edges, in `unit` |
 
@@ -614,7 +614,7 @@ against the source, e.g. `get_optional_setting` defaults in `util_simulation_set
 | `meshsize_max` | 70 | Maximum mesh size limit, on top of `cells_per_wavelength` |
 | `refined_cellsize_override` | `[]` | Per-layer override, e.g. `[['Metal3', 10], ['Metal2', 2]]`. Only conductor/sheet layers produce the boundary curves this applies to — a via or dielectric layer name (or any typo/nonexistent name) is a plain dict-key miss inside `create_model()`, silently ignored with no error (`util_simulation_setup.py`'s `refined_cellsize_override_dict` lookup, fed only by `boundary_line_tags_dict`, which vias/dielectrics never populate). setupEM's own "Advanced..." mesh-override dialog restricts its layer picker to valid conductor/sheet layers for exactly this reason. |
 | `boundary` | `['ABC']*6` | 6 values for xmin/xmax/ymin/ymax/zmin/zmax: `ABC`/`PML`, `PEC`, or `PMC` |
-| `air_around` | same as `margin` | Single value, or a list of 6 `[xmin,xmax,ymin,ymax,zmin,zmax]` values. `0` is allowed on any side (e.g. a backside ground plane flush with the simulation boundary, no wasted air layer) |
+| `air_around` | same as `margin` (a 4-value `margin`: per side, `zmin`/`zmax` the largest value) | Single value, or a list of 6 `[xmin,xmax,ymin,ymax,zmin,zmax]` values. `0` is allowed on any side (e.g. a backside ground plane flush with the simulation boundary, no wasted air layer) |
 | `order` | 2 | FEM basis-function order (2 = accurate; 1 = quick/dirty) — see §7 for what this actually does to accuracy |
 | `substrate_refinement` | `False` | Extra mesh refinement into the substrate |
 | `adaptive_sweep` | `True` | Enable Palace's adaptive frequency sweep |

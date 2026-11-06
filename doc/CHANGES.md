@@ -6,9 +6,13 @@ This is an (incomplete) list of changes and new features.
 gds2palace 0.9.5
 
 **New features**  
+`settings['margin']` can be set per side: a single value (all sides, as before) or a list of 4 values `[margin_xmin, margin_xmax, margin_ymin, margin_ymax]`. Without `air_around`, the air then follows the margin of each side, and `zmin` and `zmax` use the largest margin. Models with a single value are unchanged. A negative margin now stops with an error: it cut the dielectrics smaller than the drawing without notice. A conductor, via or sheet layer that reaches an absorbing boundary now gives a warning, because the boundary changes its result.
+
 Stackups (`XML_stackup/latest/IHP`): two target layers for heat sources, `HEAT_TRANSISTOR` (the top 40 nm of Activ, silicon) and `HEAT_RESISTOR` (a 0.16 µm polysilicon body with 20 W/m·K above the Activ level, i.e. on the field oxide). A heat source takes the z range and the material of its target layer, and nothing is drawn on the two GDS layers (320, 321), so EM models are unchanged. With `Activ` as the target, a transistor's heat source was ten times too thick and a resistor's heat source was silicon on the substrate; both came out too cool. At a heat source mesh of 0.125 µm, an npn13G2 with 8 emitters now has about 1740 K/W instead of 1300 K/W; the converged value is about 1890 K/W (PDK model: 1750 K/W). Resistor results are not validated yet. See "Heat source targets" in `XML_stackup/latest/IHP/README.md`.
 
 **Fix**  
+A conductor that reaches the simulation boundary, with margin and `air_around` both 0 on that side, stopped Palace with an MFEM abort in `STable3D` when using the `surface` conductor model. The conductor's end face belongs to no meshed volume, but was written to the mesh as a boundary. It is now left out; the boundary condition applies to the rest of that side. If that face is the conductor's top or bottom face, the conductor gets `"External": true`, because its other main face now carries all the current. Other models are unchanged. See "Conductors at the simulation boundary" in the user guide.
+
 Elmer thermal: a heat source that partly overlaps another volume (e.g. a heat source that reaches under a contact) lost its mesh refinement. The model was built and solved with a coarse mesh at that source, and the only sign was the message that its `refined_cellsize_override` entry is "neither a heat source nor a metal layer". Heat sources inside one volume or in the oxide are unchanged.
 
 ## 5 November-2026

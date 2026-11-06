@@ -33,6 +33,7 @@ import os
 import sys
 import gmsh
 import math
+import numbers
 import numpy as np
 import json
 import types
@@ -773,6 +774,30 @@ def create_box_with_meshseed (xmin,ymin,zmin,xmax,ymax,zmax, meshseed):
     return volumetag
 
 
+def margin_per_side (margin):
+    """
+    Dielectric oversize per side, from settings['margin'].
+
+    :param margin: single value (all sides) or a list of 4 values [xmin, xmax, ymin, ymax], 0 or more
+    :return: tuple (xmin, xmax, ymin, ymax)
+    """
+    if isinstance(margin, (list, tuple)):
+        values = tuple(margin)
+    else:
+        values = (margin,) * 4
+
+    valid = len(values) == 4
+    for value in values:
+        if isinstance(value, bool) or not isinstance(value, numbers.Real) or not value >= 0:
+            valid = False
+    if not valid:
+        print('Error: expected margin to be a single value or a list of 4 values, all 0 or more:')
+        print('[margin_xmin, margin_xmax, margin_ymin, margin_ymax]')
+        print('but instead we have this: ', str(margin))
+        exit(1)
+    return values
+
+
 def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolygons, margin, air_around, refined_cellsize, add_airbox=True):
     """
     Add dielectric layers (these extend through simulation area and have no polygons in GDSII)
@@ -781,7 +806,8 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
     :param dielectrics_list: from stackup reader
     :param gds_layers_list: from gds reader
     :param allpolygons: from gds reader
-    :param margin: spacing to add from metal bounding box to dielectric boundary
+    :param margin: spacing to add from metal bounding box to dielectric boundary, per side:
+        (margin_xmin, margin_xmax, margin_ymin, margin_ymax) from margin_per_side()
     :param air_around: air margin between dielectric and simulation boundary. Can be float or a list of 6 float values
         [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 on a given side is allowed and
         places the simulation boundary flush with the dielectric/metal stack on that side.
@@ -801,11 +827,7 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
     overall_xmax = -math.inf
     overall_ymax = -math.inf
 
-    # margin can be specified as single value only 
-    if isinstance(margin, list):
-        print('Error: expected margin to be a single value for dielectric layer oversize in xy plane,')
-        print('but instead we have this: ', str(margin))    
-        exit(1)
+    margin_xmin, margin_xmax, margin_ymin, margin_ymax = margin
 
     # air_around can be specified as single value or array, check what we have here
     if isinstance(air_around, list):
@@ -855,10 +877,10 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
             bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.bounding_box.get_layer_bounding_box(bound_layernum)
 
             
-        x1 = bbox_xmin - margin
-        y1 = bbox_ymin - margin
-        x2 = bbox_xmax + margin
-        y2 = bbox_ymax + margin
+        x1 = bbox_xmin - margin_xmin
+        y1 = bbox_ymin - margin_ymin
+        x2 = bbox_xmax + margin_xmax
+        y2 = bbox_ymax + margin_ymax
 
         overall_xmin = min(overall_xmin, x1)
         overall_ymin = min(overall_ymin, y1)
@@ -1423,8 +1445,10 @@ def create_model (excite_ports, settings):
     
     # get settings from simulation model
     unit = get_optional_setting (settings,'unit', 1e-6) # unit defaults to micron
-    margin = settings['margin']   # oversize of dielectric layers relative to drawing
-    air_around = get_optional_setting (settings, "air_around", margin)  # airbox size to simulation boundary
+    margin = margin_per_side (settings['margin'])   # oversize of dielectric layers relative to drawing, per side
+    margin_xmin, margin_xmax, margin_ymin, margin_ymax = margin
+    # airbox size to simulation boundary: same as margin by default, z sides use the largest margin
+    air_around = get_optional_setting (settings, "air_around", [*margin, max(margin), max(margin)])
 
     fstart = get_optional_setting (settings, 'fstart', None)
     fstop  = get_optional_setting (settings, 'fstop', None)
@@ -2120,6 +2144,13 @@ def create_model (excite_ports, settings):
     # here rather than also being tagged as a generic conductor surface.
     port_surface_tags = {tag for tags in port_dimtags_created_2D.values() for tag in tags}
 
+    # faces of hollow conductors that no saved volume has, see below
+    hollow_conductor_end_faces = set()
+    # Physical groups of hollow conductors that lost their top or bottom face that way. Palace's Conductivity boundary
+    # assumes that two main faces share the current (Zs -> 2/(sigma h) when thin), so a conductor with one main face
+    # needs "External": true (Zs -> 1/(sigma h)). A lost side wall or end face leaves both main faces: no change there.
+    one_face_conductor_groups = set()
+
     # Elmer thermal: heat sources last. A heat source takes the material of its target layer and may lie inside
     # a conductor of that layer (e.g. an npn emitter in Activ), so a face it shares with that conductor is an
     # interior face, not two conductors touching. Thermal surface groups are only for viewing (boundary
@@ -2129,6 +2160,7 @@ def create_model (excite_ports, settings):
 
     for key in sorted(metal_surface_dict.keys(), key=is_heat_source):
         surfaces_list = metal_surface_dict[key]
+        hollow_conductor = not elmer_thermal and not metal_volume_dict.get(key)
         if len(surfaces_list)>0:
 
             i=0
@@ -2138,12 +2170,25 @@ def create_model (excite_ports, settings):
                 # all faces of this conductor body (top, bottom and side walls) share one group:
                 # they get the same conductivity and thickness
                 new_tags = []
+                top_or_bottom_face_dropped = False
 
                 all_tags = surfaces[0]
                 for tag in all_tags:
                     if tag in port_surface_tags:
                         # this face belongs to a port, not a generic conductor
                         # surface - see port_surface_tags comment above
+                        continue
+
+                    # A hollow conductor (surface conductor model: its volume is not saved to the mesh)
+                    # that reaches a simulation boundary with no air and no dielectric beyond it (zero
+                    # margin and air_around on that side): its end face touches only the conductor's own
+                    # volume, so no saved volume has this face. Palace/MFEM aborts on a boundary element
+                    # like that. A face inside the model always has a second volume on its other side.
+                    if hollow_conductor and len(gmsh.model.getAdjacencies(2, tag)[0]) < 2:
+                        hollow_conductor_end_faces.add(tag)
+                        _, _, face_zmin, _, _, face_zmax = gmsh.model.occ.getBoundingBox(2, tag)
+                        if abs(face_zmax - face_zmin) < 10 * gmsh.option.getNumber("Geometry.Tolerance"):
+                            top_or_bottom_face_dropped = True
                         continue
 
                     # we should not have this in list
@@ -2165,6 +2210,10 @@ def create_model (excite_ports, settings):
                     gmsh.model.setPhysicalName(2, phys_group, group_name)
                     # store, used when creating solver config file
                     physical_groups_2D.append({"layername":key, "groupname":group_name, "grouptag":phys_group })
+                    if top_or_bottom_face_dropped:
+                        one_face_conductor_groups.add(phys_group)
+                        print(f"Note: {group_name} has its top or bottom face on the simulation boundary, "
+                              "its other main face carries all the current (Palace: External)")
 
                 # add for edge mesh refinement also
                 if key not in boundary_line_tags_dict.keys():
@@ -2545,6 +2594,8 @@ def create_model (excite_ports, settings):
                     # regular conductor
                     Palace_conductor['Conductivity'] = material.sigma
                     Palace_conductor['Thickness'] = metal.thickness
+                    if grouptag in one_face_conductor_groups:
+                        Palace_conductor['External'] = True
                     Palace_conductors.append(Palace_conductor)
 
                 elif metal.is_sheet:
@@ -2645,6 +2696,8 @@ def create_model (excite_ports, settings):
         # boundary, so exclude them before side-matching.
         excluded_face_tags = {tag for _, tag in sheetlayer_dimtags}
         excluded_face_tags.update(tag for tags in port_dimtags_created_2D.values() for tag in tags)
+        # getBoundary() above counts the hollow conductors' volumes too, which are not in the mesh
+        excluded_face_tags.update(hollow_conductor_end_faces)
 
         faces_by_side = {name: [] for name in side_order}
         unmatched_faces = []
@@ -2685,6 +2738,21 @@ def create_model (excite_ports, settings):
                 else:
                     print('Error: Boundary condition ', bc_type, ' is not supported. Use ABC, PML, PEC or PMC only.')
                     exit(1)
+
+        # An absorbing boundary right at a conductor changes the result, in every conductor model. See
+        # "Conductors at the simulation boundary" in the user guide.
+        layers_at_absorbing_side = {}
+        for poly in allpolygons.polygons:
+            metal = metals_list.getbylayernumber(poly.layernum)
+            if metal is None or metal.is_dielectric:
+                continue
+            extent = {'xmin':poly.xmin, 'xmax':poly.xmax, 'ymin':poly.ymin, 'ymax':poly.ymax, 'zmin':metal.zmin, 'zmax':metal.zmax}
+            for idx, side in enumerate(side_order):
+                if boundary_condition[idx] in ('ABC', 'PML') and abs(extent[side]-airbox_bounds[side]) < boundary_face_tol:
+                    layers_at_absorbing_side.setdefault(side, set()).add(metal.name)
+        for side, layer_names in layers_at_absorbing_side.items():
+            print(f"WARNING: the absorbing boundary at {side} touches {', '.join(sorted(layer_names))}. This changes the "
+                  "result of a conductor or resistor there. Keep some air on that side, unless you have checked that this doesn't matter.")
 
 
         phys_group_PML = gmsh.model.addPhysicalGroup(2, PML_boundaries, tag=-1)
@@ -3239,19 +3307,19 @@ def create_model (excite_ports, settings):
 
             if dielectric.gdsboundary is None:
                 # size of dielectric is global size, no boundary defined for this layer
-                x1 = allpolygons.get_xmin() - margin
-                y1 = allpolygons.get_ymin() - margin
-                x2 = allpolygons.get_xmax() + margin
-                y2 = allpolygons.get_ymax() + margin
+                x1 = allpolygons.get_xmin() - margin_xmin
+                y1 = allpolygons.get_ymin() - margin_ymin
+                x2 = allpolygons.get_xmax() + margin_xmax
+                y2 = allpolygons.get_ymax() + margin_ymax
             else:
                 # size of dielectric is defined for this layer by polygon from gds
                 bound_layernum = int(dielectric.gdsboundary) 
                 bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax = allpolygons.bounding_box.get_layer_bounding_box(bound_layernum)
         
-                x1 = bbox_xmin - margin
-                y1 = bbox_ymin - margin
-                x2 = bbox_xmax + margin
-                y2 = bbox_ymax + margin
+                x1 = bbox_xmin - margin_xmin
+                y1 = bbox_ymin - margin_ymin
+                x2 = bbox_xmax + margin_xmax
+                y2 = bbox_ymax + margin_ymax
 
             # add local mesh size according to permittivity
             gmsh.model.mesh.field.add("Box", i)

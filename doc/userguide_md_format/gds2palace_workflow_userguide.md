@@ -440,7 +440,7 @@ settings for meshing and simulation control are implemented as a Python dictiona
 These settings are always required:  
 
 **settings['unit']:** Unit of values in mesh, typically 1E-6  
-**settings['margin']:** Oversize of dielectrics from bounding box of drawing in xy plane  
+**settings['margin']:** Oversize of dielectrics from bounding box of drawing in xy plane. Can be a single value (all sides) or a list of 4 values [margin_xmin, margin_xmax, margin_ymin, margin_ymax]. All values must be 0 or more.  
 **settings['fstart']:** Start frequency in Hz  
 **settings['fstop']:** Stop frequency in Hz  
 **settings['fstep']:** Frequency step in Hz for output, not all of them need to be EM simulated due to adaptive frequency sweep  
@@ -481,7 +481,7 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 #### Simulation boundary
 
 **settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  
-**settings['air_around']:** Other spacing of air around dielectrics, default is same as margin. Can be a single value or a list of 6 values [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 is allowed on any side, placing the simulation boundary flush with the dielectric/metal stack on that side (e.g. a backside ground plane serving directly as the PEC/ABC boundary, with no wasted air layer below it).  
+**settings['air_around']:** Other spacing of air around dielectrics, default is same as margin (with a list of 4 margin values: the margin of each side, and the largest margin for zmin and zmax). Can be a single value or a list of 6 values [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 is allowed on any side, placing the simulation boundary flush with the dielectric/metal stack on that side (e.g. a backside ground plane serving directly as the PEC/ABC boundary, with no wasted air layer below it).  
 
 #### Conductor modelling
 
@@ -937,9 +937,21 @@ Palace's `Conductivity` boundary uses the surface impedance Zs = (γ/σ)·coth(�
 
 The option `"External": true` doubles h. Then Zs tends to 1/(σh), the full sheet resistance on one face. This is meant for a conductor with only one face in the mesh, such as a metal wall that forms the outer boundary of the model.
 
-gds2palace models each conductor as a hollow body with all its faces in the mesh, and does not set `External`. This is exact when both faces carry the same current, for example a Metal1 line at low frequency. It makes no difference for conductors much thicker than the skin depth: with or without `External`, Zs is then nearly the same. For a ground plane with current on one face, it doubles the loss.
+gds2palace models each conductor as a hollow body with all its faces in the mesh, and does not set `External`, except for a conductor at the simulation boundary (see below). This is exact when both faces carry the same current, for example a Metal1 line at low frequency. It makes no difference for conductors much thicker than the skin depth: with or without `External`, Zs is then nearly the same. For a ground plane with current on one face, it doubles the loss.
 
 Setting `External` by hand on a ground plane would fix that case. But it would halve the loss of conductors that carry current on both faces, and gds2palace puts all faces of a conductor in one group. So no setting of the surface model is right for all conductors. Meshing the thin layers as volumes is the better fix: a thin layer is only one or two cells thick, so this costs little, and the current in it is then right. The volume models `'solve_inside'` and `'solve_inside_skin'` do this.
+
+#### Conductors at the simulation boundary
+
+With `margin` and `air_around` both 0 on a side, a conductor can reach the simulation boundary. In the `'surface'` model the conductor is hollow, so its face on the boundary has no mesh on either side. gds2palace leaves this face out of the model. What this means for the loss depends on which face it is.
+
+**A side wall or end face (x and y sides).** The top and bottom faces remain and share the current as before, so Zs stays the same. For a line 5 µm wide and 0.49 µm thick along the boundary, R at low frequency is 4 % below `'solve_inside'`. A line away from the boundary is 8 % below it, because it has one more side wall.
+
+**A top or bottom face (z sides).** One main face is left, and it carries all the current. gds2palace sets `External` on this conductor. For a thin ground plane as the outer wall of the model, the loss is then about 15 % too high, compared with about 2 times too high without `External`.
+
+**A sheet resistor.** Rs is the sheet resistance itself, for one face or two, so `External` plays no role. With a `PMC` boundary, the resistance is correct when an edge of the sheet is on the boundary, and when the sheet lies in the top or bottom boundary plane. With a `PEC` boundary, a sheet that ends on the boundary is a correct resistor to that wall. An absorbing boundary is different, see below.
+
+**An absorbing boundary right at a conductor changes the result, in every conductor model.** At low frequency it acts as a resistive sheet between the conductor and its surroundings. Keep some air between a conductor and an absorbing boundary, unless you have checked that this doesn't matter for your structure.
 
 ## Dielectric loss modelling 
 

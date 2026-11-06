@@ -255,7 +255,8 @@ Use `simulation_setup.create_elmer(excite_ports, settings)` instead of
 ### Settings
 
 Required: `unit`, `margin`, `fstart`, `fstop`, `refined_cellsize`, plus the
-model data keys set at the end of the template. Optional keys and defaults
+model data keys set at the end of the template. `margin` is one value, or 4
+values `[xmin, xmax, ymin, ymax]`, all 0 or more. Optional keys and defaults
 (from `util_simulation_setup.py`; check there for the current list):
 
 | Key | Default | Meaning |
@@ -276,7 +277,7 @@ model data keys set at the end of the template. Optional keys and defaults
 | `complex_coarse_solve` | `True` | Full complex coarse solve; keep it on unless RAM runs out |
 | `solver_maxits` / `solver_tol` | `400` / `1e-6` | Palace linear solver limits |
 | `boundary` | 6 × `'ABC'` | xmin, xmax, ymin, ymax, zmin, zmax: `ABC`, `PEC` or `PMC` |
-| `air_around` | `margin` | Air around the dielectrics, one value or 6 values; 0 is allowed |
+| `air_around` | `margin` (a 4-value `margin`: per side, z sides the largest value) | Air around the dielectrics, one value or 6 values; 0 is allowed |
 | `conductor_model` | `'surface'` | Conductor model: `'surface'` (surface impedance on all conductor faces, fastest, Q of top metal coils 18-30 % high), `'solve_inside'` (conductors meshed as volumes), `'solve_inside_skin'` (volumes with thin layers along the faces for the skin effect, most accurate loss). See the FAQ "Which conductor model should I use?". Scripts from before 0.9.0 use `filled_metals` (`True` = `'solve_inside'`, `False` = `'surface'`), which still works |
 | `fill_factor_correction` | `False` | Scale the conductivity of merged via arrays by their fill factor (needs `merge_polygon_size > 0`) |
 | `no_gui` / `no_preview` / `preview_only` | `False` | gmsh windows: none at all / skip the unmeshed preview / preview and stop |
