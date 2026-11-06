@@ -27,6 +27,7 @@ With all four, the best model is within 1 % in L and SRF and 3.3 % in peak Q of 
 - [6. Cheaper model, revisited](#6-cheaper-model-revisited)
 - [7. The ultimate model?](#7-the-ultimate-model)
 - [8. Solver setting: complex coarse solve](#8-solver-setting-complex-coarse-solve)
+- [9. Shunt parameters: the ground of the model decides](#9-shunt-parameters-the-ground-of-the-model-decides)
 - [Summary](#summary)
 
 This study looks for the best possible model with highest accuracy for an inductor example, including comparison to measured data. It evaluates the effect of four potential error sources:
@@ -305,9 +306,39 @@ If you like the field and mesh plots in this study: they were all created using 
 
 All run times above are with `settings['complex_coarse_solve']` enabled, which is the default since gds2palace 0.8.0. Palace's iterative solver uses a sparse direct solve on the coarsest mesh level as part of its preconditioner. By default, Palace factorizes only the real part of the system there, which leaves out the absorbing boundary, the port resistances and all losses. With `complex_coarse_solve`, it factorizes the full complex system instead. The [v2 study](../more_accurate_models_L6n2_v2/README.md#7-solver-setting-complex-coarse-solve) compares all models with and without it: the S-parameters are the same (largest difference 1e-4), the linear solver needs about a quarter of the iterations, and all 8 sweeps together ran 1.9x faster.
 
+## 9. Shunt parameters: the ground of the model decides
+
+Read this before you take single-ended values or the shunt elements of a pi model from these results.
+
+All values in this study are differential: L, Q and SRF between the two ports. They are set by the current in the coil and do not depend on where the ground is. The shunt path is different. Current that leaves the coil through the oxide flows through the substrate to the nearest ground conductor, so its resistance and capacitance depend on the size and position of that ground.
+
+- **In the model**, the only ground is the SUB_GND plate below the ports (section 0): 257 × 66 µm, on one side of the coil.
+- **In the measurement**, the inductor sits in a GSG test frame. Its Metal1 ground is 580 µm wide, has 7 times the area of the plate and reaches up beside the lower corners of the coil. The substrate current finds a wider and shorter path.
+
+One more model checks this: `L6n2_with_ports_2um_passi3D_testframe_ground.py`. It is the 2 µm conformal model of section 4 with a different ground. Its layout `L6n2_with_ports_testframe_ground.gds` has a SUB_GND plate with the simplified outline of the test frame's Metal1 ground. The dashed line is the plate of all other models.
+
+![L6n2 layout with a ground plate that has the outline of the test frame ground](results/plots/layout_testframe_ground.png)
+
+The shunt branch is taken from the common-mode admittance (both ports tied together). It is fitted from 0.3 to 5 GHz as an oxide capacitance in series with the substrate, Rsub parallel to Csub. `results/shunt_parameters.py` calculates these values and the plot, also for your own Touchstone files.
+
+| | Measured | Small plate | Ground plate of test frame size |
+|---|---:|---:|---:|
+| Substrate resistance Rsub | 623 Ω | 1141 Ω | 709 Ω |
+| Substrate capacitance Csub | 109 fF | 53 fF | 85 fF |
+| Shunt capacitance at 2.4 GHz, both ports | 77 fF | 49 fF | 69 fF |
+| Single-ended SRF (port 2 grounded) | 9.53 GHz | 9.88 GHz | 9.55 GHz |
+
+![Shunt capacitance and conductance of both ports: measured, small ground plate, ground plate of test frame size](results/plots/shunt_ground.png)
+
+- **With the small plate**, the substrate resistance is nearly twice the measured value and the substrate capacitance half of it. The shunt capacitance at 2.4 GHz is 37 % low and the single-ended SRF 3.7 % high. All other models of this study have this plate.
+- **With the ground of test frame size**, the shunt capacitance is 10 % low and the single-ended SRF within 0.3 %. The differential values stay the same: peak Q 15.13 instead of 15.22, SRF 10.91 instead of 10.89 GHz.
+- **A difference remains**: Rsub is 14 % high and Csub 22 % low. It is not resolved here.
+
+For your own inductor, draw the ground that it really sees: the test frame for a comparison with a measurement, the ground ring or mesh of the circuit for a design. Use the differential values of this study as they are.
+
 ## Summary
 
-All models with a 400 µm margin, differential values, relative to the measurement (L = 5.01 nH at 1 GHz, peak Q = 15.96, SRF = 11.07 GHz):
+All models with a 400 µm margin, differential values, relative to the measurement (L = 5.01 nH at 1 GHz, peak Q = 15.96, SRF = 11.07 GHz). Single-ended and shunt values depend on the ground of the model, see section 9.
 
 | Model | L at 1 GHz | Peak Q | SRF | Solve time |
 |---|---:|---:|---:|---:|
