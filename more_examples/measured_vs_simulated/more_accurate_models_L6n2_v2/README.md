@@ -37,6 +37,8 @@ The inductor is a 4-turn octagonal spiral on TopMetal2. It is about 257 × 352 �
 
 Different from the initial version of this study, the **common ground plane** for ports is on the SUB_GND layer. This is (almost) perfect conductor and does not introduce extra series resistance.
 
+This ground plane is much smaller than the ground of the measured test frame. The differential values of this study do not depend on it, but single-ended values and the shunt elements of a pi model do: the substrate resistance is nearly twice the measured value and the substrate capacitance half of it. See [section 9 of the v3 study](../more_accurate_models_L6n2_v3/README.md#9-shunt-parameters-the-ground-of-the-model-decides).
+
 ## 1. Via array merging and effective via array cross section
 
 The effect of via array merging was investigated for this inductor because we have several via arrays, and the 8 μm line width requires small via arrays with only 4x4 vias.  
