@@ -1,0 +1,78 @@
+#!/bin/bash
+# run_palace_shared: run_palace for a Linux simulation server shared by several users.
+#
+# Every run waits for a free slot, so that at most SLOTS Palace runs with NP MPI processes each run at the
+# same time, whoever starts them: setupEM, gds2palace_mcp, or run_palace in a terminal. The slots are flock
+# locks: a slot is free again when its run ends, also when it crashes or is killed. Waiting runs take free
+# slots one after the other, roughly in the order they arrived. Each run runs as the user who started it.
+#
+# Install (administrator, once):
+#   1. Set SLOTS, NP and PALACE_SIF below. SLOTS x NP should not be more than the physical cores
+#      (16 cores: SLOTS=1 with NP=16, or SLOTS=2 with NP=8).
+#   2. sudo install -m 755 run_palace_shared /usr/local/bin/run_palace
+#   3. sudo mkdir -p /var/lib/palace-queue
+#      sudo touch /var/lib/palace-queue/queue.lock /var/lib/palace-queue/slot1.lock   (one slotN.lock per slot)
+#      sudo chmod 644 /var/lib/palace-queue/*.lock
+#   4. Users must not have their own run_palace earlier on their PATH: the gds2palace installer writes one to
+#      ~/venv/palace/bin. Delete it there, so that /usr/local/bin/run_palace is used.
+#
+# Usage, like run_palace: run_palace config.json
+# The lines starting with [run_palace] go to the Palace log; gds2palace_mcp reads them to show 'queued'.
+
+SLOTS=1
+NP=16
+PALACE_SIF=/opt/palace/palace.sif
+QUEUE_DIR=/var/lib/palace-queue
+POLL_S=15
+
+config="$1"
+if [ -z "$config" ]; then
+  echo "usage: run_palace config.json" >&2
+  exit 2
+fi
+for lock in queue $(seq -f "slot%g" 1 "$SLOTS"); do
+  if [ ! -r "$QUEUE_DIR/$lock.lock" ]; then
+    echo "[run_palace] $QUEUE_DIR/$lock.lock is missing: the administrator has to set up the queue (see the head of $0)." >&2
+    exit 3
+  fi
+done
+if [ ! -r "$PALACE_SIF" ]; then
+  echo "[run_palace] Palace container $PALACE_SIF not found: the administrator has to set PALACE_SIF in $0." >&2
+  exit 3
+fi
+
+say_waiting() {
+  # who runs Palace now: user names and process counts only
+  local users
+  users=$(ps -eo user=,comm= 2>/dev/null | awk '$2 ~ /^palace-x86_64/ {print $1}' | sort | uniq -c |
+          awk '{printf "%s%s (%d process%s)", sep, $2, $1, ($1 == 1 ? "" : "es"); sep = ", "}')
+  echo "[run_palace] waiting for a free Palace slot: all $SLOTS slot(s) in use${users:+, running: $users}"
+}
+
+# The queue lock lets one waiting run at a time look for a free slot; the others wait for it here.
+exec {queue}<"$QUEUE_DIR/queue.lock"
+waiting=""
+if ! flock -n "$queue"; then
+  say_waiting
+  waiting=1
+  flock "$queue"
+fi
+while true; do
+  for ((i = 1; i <= SLOTS; i++)); do
+    exec {slot}<"$QUEUE_DIR/slot$i.lock"
+    if flock -n "$slot"; then
+      flock -u "$queue"
+      exec {queue}<&-
+      echo "[run_palace] got Palace slot $i of $SLOTS ($NP MPI processes)"
+      # Palace inherits the slot lock: the slot stays taken as long as any of its processes runs
+      OMP_NUM_THREADS=1 apptainer -q exec "$PALACE_SIF" palace -np "$NP" "$config"
+      exit $?
+    fi
+    exec {slot}<&-
+  done
+  if [ -z "$waiting" ]; then
+    say_waiting
+    waiting=1
+  fi
+  sleep "$POLL_S"
+done
