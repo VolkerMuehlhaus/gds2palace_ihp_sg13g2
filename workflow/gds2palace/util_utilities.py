@@ -21,7 +21,7 @@
 import os, tempfile, platform, sys, importlib
 from . import util_elmer 
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 # ============================== filename and path  =================================
 
@@ -147,11 +147,16 @@ def get_stackup_path (filename=None):
 
 
 def create_run_script (destination_path):
-    """Create run script that can be used to start Palace simulation and then run postprocessing
+    """Create run script that can be used to start Palace simulation and then run postprocessing.
+    With port walls, the calibration standards listed in port_information.json are solved first (an earlier result
+    with the same key is reused), then the device.
     Args:
         destination_path (string): target path for run script file
     """
+    from . import util_calibration
     txt = '#!/bin/bash\n'
+    for line in util_calibration.run_script_lines(destination_path):
+        txt = txt + line + '\n'
     txt = txt + 'run_palace config.json\n'
     txt = txt + 'combine_snp\n'
 

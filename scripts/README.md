@@ -12,7 +12,7 @@ ___
 ## Utility scripts in this directory (already included by installer)
 
 **combine_extend_snp.py** is a script to search for Palace S-parameter result files (port-S.csv) and convert them to the standard Touchstone SnP file format. The script will start searching at the current directory, and search through all directory levels below. If S-parameters include low frequency data, it will also run DC data extrapolation to provide a 0 Hz result, and save that into another file with suffix "_dc.snp"
-If port geometry information is available, as created by the latest version of gds2palace, an additional file with de-embedded results is created. This is an experimental feature, it adds port de-embedding for lumped ports by cascading negative series L at each port.
+If port geometry information is available, as created by the latest version of gds2palace, an additional file with de-embedded results is created (suffix "_deembedded"). Ports at a port wall (a box side set to 'PORTWALL') are removed by calibration, from the two standards per port wall that gds2palace writes and run_sim solves first; the other ports get an estimated port inductance, calculated from the port's size. The first lines of the file say which method was used at each port, and a file "_deembedding.json" next to it lists the details. The standards' own results are not converted.
 
 **combine_snp** is the shell script to run the combine_extend_snp.py Python script, if a Python venv named "palace" exists will all the Python libraries required for the gds2palace workflow, including scikit-rf. Please modify this as required for your environment.
 

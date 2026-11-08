@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.21.1"
+__version__ = "1.22.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -39,6 +39,7 @@ import json
 import types
 
 from . import util_elmer
+from . import util_calibration
 from .util_stackup_reader import PEC_MATERIAL_NAME
 
 # Elmer thermal: away from a refined region (a heat source's box, a metal edge with refined_cellsize_override), the
@@ -1675,7 +1676,33 @@ def create_model (excite_ports, settings):
     print(f"  meshsize_max: {meshsize_max:.1f}  units")
     print(f"  max_cellsize_air: {max_cellsize_air:.1f} units")
     print("---------------------------------------------------")
-    
+
+    # Port walls: box sides set to 'PORTWALL'. The ports on them are calibrated with standards (util_calibration.py):
+    # the gaps are cut out of the lines here, before meshing, and the standards are written after the device's mesh.
+    # Nothing happens without a port wall. The standards themselves come back here with _calibration_standard set.
+    port_walls = None
+    if not elmer_thermal and not get_optional_setting(settings, '_calibration_standard', False):
+        try:
+            wall_sides = util_calibration.port_wall_sides(boundary_condition)
+            if wall_sides:
+                if elmer:
+                    raise util_calibration.PortWallError("port walls are for the Palace flow, Elmer doesn't support them yet")
+                original_boundary = list(boundary_condition)
+                margin, air_around, boundary_condition, log = util_calibration.port_wall_box(wall_sides, margin, air_around, boundary_condition)
+                margin_xmin, margin_xmax, margin_ymin, margin_ymax = margin
+                for line in log:
+                    print(line)
+                port_walls = util_calibration.analyze_port_walls(
+                    allpolygons, metals_list, materials_list, dielectrics_list, simulation_ports, original_boundary, fmax, unit,
+                    get_optional_setting(settings, 'reference_plane_shift', None), get_optional_setting(settings, 'deembedding_length', None))
+                util_calibration.apply_port_walls(port_walls, allpolygons, metals_list, simulation_ports)
+                util_calibration.standard_records(port_walls, model_basename, margin, air_around, boundary_condition)
+                for line in util_calibration.describe(port_walls):
+                    print(line)
+        except util_calibration.PortWallError as error:
+            print(f'ERROR: {error}')
+            exit(1)
+
     gmsh.initialize()
     gmsh.option.setNumber("General.Verbosity", 5)
 
@@ -2327,6 +2354,11 @@ def create_model (excite_ports, settings):
         all_port_information_struct['unit'] = unit
         # add model name
         all_port_information_struct['name'] = model_basename
+        # de-embedding in combine_extend_snp.py: calibrated at port walls, estimated port inductance elsewhere, 'none' = raw only
+        if get_optional_setting(settings, 'deembedding', None) == 'none':
+            all_port_information_struct['deembedding'] = 'none'
+        if port_walls is not None:
+            all_port_information_struct['port_walls'] = util_calibration.port_information_record(port_walls)
 
         # write JSON with port information to Palace outputmodel directory
         port_information_file = os.path.join(sim_path, 'port_information' + config_suffix + '.json')
@@ -3489,6 +3521,18 @@ def create_model (excite_ports, settings):
     # Optional convert mesh file to Elmer format
     if elmer:
         util_elmer.convert_mesh_to_elmer (msh_name, ELMER_MPI_THREADS)
+
+    # calibration standards of the port walls, into the same _data folder (run_sim solves them before the device)
+    if port_walls is not None and not preview_only:
+        for group in port_walls['groups']:
+            if group.get('shared_with'):
+                continue
+            for (tag, factor), record in zip(util_calibration.STANDARDS, group['standards']):
+                print(f"Writing calibration standard {record['name']}: thru line of length {record['length']:g}")
+                standard, standard_ports = util_calibration.standard_settings(settings, group, record, factor, margin, air_around,
+                                                                              boundary_condition, fmax)
+                create_model(standard_ports.all_active_excitations(), standard)
+                util_calibration.write_key(sim_path, record)
 
     return config_name, data_dir
 

@@ -41,6 +41,7 @@ Palace nor Elmer is part of this package** — see §5.
 | `util_simulation_setup.py` | **2694 lines** | The core engine: ports, gmsh geometry/mesh construction, Palace `config.json` writer, Elmer `.sif` writer |
 | `util_elmer.py` | ~600 lines | Elmer-specific file writers — internal, never imported directly by model scripts |
 | `util_utilities.py` | 146 lines | Path/filename helpers, the `run_sim`/`run_elmer` wrapper-script generators |
+| `util_calibration.py` | ~650 lines | Port walls (box sides set to `'PORTWALL'`): finds the wall ports, cuts their gaps, the cross-section at the wall, D and the standards' length, writes the calibration standards through `create_model()`, the `run_sim` lines for them. Exported as `calibration` |
 
 `workflow/gds2palace/__init__.py` (full file, verified):
 
@@ -774,7 +775,20 @@ within (or above) the directory tree holding the Palace/Elmer output — which i
    go all the way to 0 Hz — this step re-reads the file via `skrf.Network` and calls scikit-rf's
    `extrapolate_to_dc(points=None, dc_sparam=None, kind='cubic', coords='polar')`, writing the
    result as `<basename>_dc.s<N>p`.
-7. **Port de-embedding** (`port_deembedding()`, marked **experimental** in `scripts/README.md`):
+7. **Port de-embedding**. With port walls (`port_information.json` has `port_walls`, written by
+   `util_calibration.port_information_record()`), `calibrated_deembedding()`: per port wall it reads the
+   two standards' `port-S.csv` (thru L and 2 L), takes the reciprocal part, converts S to the cascade
+   matrix directly (`s2t`, never through Y, which is singular for a half-wave line and for a
+   DC-extrapolated inductor), and gets the port's shunt and series element from the double delay
+   T_L^-1 T_2L T_L^-1 (`port_from_double`). The elements are interpolated to the device's frequencies
+   (imaginary part per omega, real part per sqrt(f), held outside the three standard frequencies). One
+   2N-port error network at 50 ohm holds the calibrated blocks of all walls (plus `expm(A s)` of the
+   line for a reference plane shift) and the estimated inductance of the other ports; it is removed in
+   the S domain (`deembed_s`). Writes `_deembedded.s<N>p` with one `!` comment line per port and
+   `<basename>_deembedding.json`. The maths is a copy of `test_data/port_deembedding_study/soc_deembed.py`;
+   tests in `tests/test_deembedding.py`. The standards' own result folders are skipped
+   (`_standard_folder_of()`).
+   Without port walls, `port_deembedding()`:
    if `port_information.json` gave port `length`/`width`, computes a parasitic series inductance
    per port using a flat-ribbon-inductor formula credited to F.E. Terman's *Radio Engineers
    Handbook* (1945):
@@ -796,8 +810,10 @@ model script
   → simulation_setup.create_palace(excite_ports, settings)
       writes config.json (Problem.Output = "output/<model_basename>") + <model>.msh + port_information.json
       into <script_dir>/palace_model/<model_basename>_data/
+      with port walls also config_cal_<side>_<L|2L>.json + meshes + <name>.key per standard, same folder
   → utilities.create_run_script(sim_path)
-      writes run_sim: "run_palace config.json" then "combine_snp"
+      writes run_sim: the standards first (skipped when output/<model>_cal_*/cal.key matches the key),
+      then "run_palace config.json" then "combine_snp"
 
 ./run_sim  (or the model script's own start_simulation=True auto-run)
   → run_palace config.json     [machine-specific, on PATH — repo's own dev version:

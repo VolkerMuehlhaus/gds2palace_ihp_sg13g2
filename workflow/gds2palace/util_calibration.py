@@ -1,0 +1,771 @@
+########################################################################
+#
+# Copyright 2026 Volker Muehlhaus and IHP PDK Authors
+#
+# Licensed under the GNU General Public License, Version 3.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    https://www.gnu.org/licenses/gpl-3.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+########################################################################
+
+"""Calibrated de-embedding of ports at a port wall.
+
+A port wall is a box side set to 'PORTWALL' in settings['boundary']: a PEC wall right at the layout edge, without
+dielectric oversize and without air, where lines are cut. Every in-plane port whose polygon lies on that edge is a wall
+port. Its polygon marks the line and the gap between the wall and the line, which is cut out of the metal here. All
+wall ports on one side form one calibration group.
+
+For each group, two standards are written into the device's _data folder: the layout's cross-section at the wall,
+extruded to thru lines of length L and 2 L with ports at both ends, with the device's stackup and mesh settings, solved
+at three frequencies. combine_extend_snp.py removes the port with the double delay method (Rautio) and writes the
+de-embedded Touchstone file.
+
+The rules come from test_data/port_deembedding_study (README.md, step 6):
+  D      = span of the group's lines + 2 x distance to the nearest ground metal at the cut
+  L      = 4 D, shortened to a fifth of the guided wavelength at the highest frequency (2 L <= 0.4 wavelengths), not
+           below 2 D
+  gap    = from the drawing, or D/32 when the line is drawn to the edge; a warning above D/10
+  ground = metal that reaches the port wall next to the lines; without it the model is not written
+
+Errors raise PortWallError; create_model() prints them and stops, setupEM shows them.
+"""
+
+import hashlib
+import json
+import math
+import os
+
+import numpy as np
+import shapely
+from shapely.affinity import affine_transform
+from shapely.geometry import LineString, Polygon
+from shapely.geometry import box as shapely_box
+
+from .util_stackup_reader import PEC_MATERIAL_NAME
+
+__version__ = "1.0.0"
+
+C0 = 299792458.0
+TOL = 1e-3                     # drawing units, the gmsh geometry tolerance
+CUT_OFFSET = 0.01              # the cut profile is taken this far past the gap, drawing units
+WALL_SIDES = ('xmin', 'xmax', 'ymin', 'ymax')
+BOX_SIDES = ('xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax')
+INWARD = {'xmin': 'x', 'xmax': '-x', 'ymin': 'y', 'ymax': '-y'}
+OPPOSITE = {'xmin': 'xmax', 'xmax': 'xmin', 'ymin': 'ymax', 'ymax': 'ymin'}
+TRANSVERSE = {'xmin': ('ymin', 'ymax'), 'xmax': ('ymin', 'ymax'), 'ymin': ('xmin', 'xmax'), 'ymax': ('xmin', 'xmax')}
+STANDARD_PORT_LAYER = 60001    # port layers of the standards, in memory only
+STANDARDS = (('L', 1), ('2L', 2))
+STANDARD_FREQUENCY_FRACTIONS = (1 / 20, 1 / 5, 1)
+
+# local frame per wall side: u from the wall into the layout, v along the wall (shapely affine parameters)
+_TO_LOCAL = {'xmin': lambda w: [1, 0, 0, 1, -w, 0], 'xmax': lambda w: [-1, 0, 0, 1, w, 0],
+             'ymin': lambda w: [0, 1, 1, 0, -w, 0], 'ymax': lambda w: [0, -1, 1, 0, w, 0]}
+_TO_GLOBAL = {'xmin': lambda w: [1, 0, 0, 1, w, 0], 'xmax': lambda w: [-1, 0, 0, 1, w, 0],
+              'ymin': lambda w: [0, 1, 1, 0, 0, w], 'ymax': lambda w: [0, 1, -1, 0, 0, w]}
+
+
+class PortWallError(Exception):
+    """A port wall that can't be calibrated: the message says why and what to change"""
+
+
+# ------------------------------------------------------------------------------------------------------- box settings
+
+def port_wall_sides(boundary):
+    """Sides set to 'PORTWALL' in settings['boundary'] (6 values: xmin, xmax, ymin, ymax, zmin, zmax)"""
+    sides = [side for side, value in zip(BOX_SIDES, boundary) if str(value).upper() == 'PORTWALL']
+    for side in sides:
+        if side not in WALL_SIDES:
+            raise PortWallError(f"boundary {side} = 'PORTWALL': a port wall cuts lines in the layout plane, so it can only be "
+                                f"xmin, xmax, ymin or ymax")
+    return sides
+
+
+def port_wall_box(sides, margin, air_around, boundary):
+    """A port wall is PEC at the layout edge: dielectric oversize 0 and air 0 on that side, whatever the settings say for
+    it (the margin and air lists always carry a value, so a conflict can't be told from the default).
+    margin: (xmin, xmax, ymin, ymax); air_around: number or 6 values. Returns margin, air (6 values), boundary, log lines."""
+    margin = list(margin)
+    air = list(air_around) if isinstance(air_around, (list, tuple)) else [air_around] * 6
+    boundary = ['PEC' if str(value).upper() == 'PORTWALL' else value for value in boundary]
+    log = []
+    for side in sides:
+        i = BOX_SIDES.index(side)
+        changed = []
+        if margin[i] != 0:
+            changed.append(f'dielectric oversize {margin[i]:g}')
+        if air[i] != 0:
+            changed.append(f'air {air[i]:g}')
+        margin[i] = 0
+        air[i] = 0
+        log.append(f'Port wall {side}: PEC at the layout edge, no dielectric oversize, no air'
+                   + (f" (the settings' {' and '.join(changed)} for {side} are not used)" if changed else ''))
+    return tuple(margin), air, boundary, log
+
+
+# ------------------------------------------------------------------------------------------------------- geometry
+
+def _local(geom, side, wall):
+    return affine_transform(geom, _TO_LOCAL[side](wall))
+
+
+def _global(geom, side, wall):
+    return affine_transform(geom, _TO_GLOBAL[side](wall))
+
+
+def _local_bounds(poly, side, wall):
+    """bounds (u0, v0, u1, v1) of a polygon in the local frame, from its points: works for zero-width port polygons"""
+    a, b, d, e, xoff, yoff = _TO_LOCAL[side](wall)
+    u = a * poly.pts_x + b * poly.pts_y + xoff
+    v = d * poly.pts_x + e * poly.pts_y + yoff
+    return float(u.min()), float(v.min()), float(u.max()), float(v.max())
+
+
+def _shape(poly):
+    shape = Polygon(np.column_stack((poly.pts_x, poly.pts_y)))
+    if not shape.is_valid:
+        shape = shape.buffer(0)
+    return shape
+
+
+class _Layers:
+    """The stackup layers' polygons in the local frame of one wall side, with a search tree per layer"""
+
+    def __init__(self, allpolygons, metals_list, side, wall):
+        self.metals = metals_list.metals
+        by_number = {}
+        for poly in allpolygons.polygons:
+            by_number.setdefault(int(poly.layernum), []).append(poly)
+        self.geoms = {}
+        self.trees = {}
+        for metal in self.metals:
+            number = int(metal.layernum)
+            if number in self.geoms or number not in by_number:
+                continue
+            geoms = [_local(_shape(p), side, wall) for p in by_number[number]]
+            geoms = [g for g in geoms if not g.is_empty]
+            if geoms:
+                self.geoms[number] = geoms
+                self.trees[number] = shapely.STRtree(geoms)
+
+    def cut(self, number, u, vlo, vhi):
+        """intervals in v of layer `number` on the line at distance u from the wall, merged, sorted"""
+        if number not in self.geoms:
+            return []
+        line = LineString([(u, vlo - 1.0), (u, vhi + 1.0)])
+        intervals = []
+        for i in self.trees[number].query(line):
+            part = self.geoms[number][i].intersection(line)
+            for piece in getattr(part, 'geoms', [part]):
+                if piece.is_empty or piece.geom_type not in ('LineString', 'LinearRing'):
+                    continue
+                _, v0, _, v1 = piece.bounds
+                if v1 - v0 > TOL:
+                    intervals.append((v0, v1))
+        return _merge(intervals)
+
+    def in_box(self, number, u0, v0, u1, v1):
+        """the parts of layer `number` inside the box (local frame)"""
+        if number not in self.geoms:
+            return []
+        region = shapely_box(u0, v0, u1, v1)
+        parts = []
+        for i in self.trees[number].query(region):
+            part = self.geoms[number][i].intersection(region)
+            if not part.is_empty and part.area > 0:
+                parts.append(part)
+        return parts
+
+    def projection(self, number, u0, u1, vlo, vhi):
+        """intervals in v covered by layer `number` anywhere between u0 and u1 (for via arrays)"""
+        return _merge([(p.bounds[1], p.bounds[3]) for p in self.in_box(number, u0, vlo - 1.0, u1, vhi + 1.0)])
+
+    def extent_beyond(self, u):
+        """v range of all polygons that reach further than u from the wall"""
+        lo, hi = math.inf, -math.inf
+        for geoms in self.geoms.values():
+            for g in geoms:
+                u0, v0, u1, v1 = g.bounds
+                if u1 > u + TOL:
+                    lo, hi = min(lo, v0), max(hi, v1)
+        return (lo, hi) if lo < hi else None
+
+
+def _merge(intervals):
+    out = []
+    for v0, v1 in sorted(intervals):
+        if out and v0 <= out[-1][1] + TOL:
+            out[-1] = (out[-1][0], max(out[-1][1], v1))
+        else:
+            out.append((v0, v1))
+    return [(round(a, 6), round(b, 6)) for a, b in out]
+
+
+def _overlap(a, b):
+    return min(a[1], b[1]) - max(a[0], b[0]) > TOL
+
+
+def _same_profile(p, q):
+    if set(p) != set(q):
+        return False
+    for key in p:
+        if len(p[key]) != len(q[key]):
+            return False
+        for (a0, a1), (b0, b1) in zip(p[key], q[key]):
+            if abs(a0 - b0) > 10 * TOL or abs(a1 - b1) > 10 * TOL:
+                return False
+    return True
+
+
+def _is_conductor(metal, materials_list):
+    if metal.is_metal or metal.is_via:
+        return True
+    if metal.is_sheet:
+        if metal.material is not None and metal.material.strip().upper() == PEC_MATERIAL_NAME.upper():
+            return True
+        material = materials_list.get_by_name(metal.material)
+        return material is not None and material.sigma > 1e4
+    return False
+
+
+def _z_touch(a, b):
+    return a.zmin <= b.zmax + TOL and b.zmin <= a.zmax + TOL
+
+
+# ------------------------------------------------------------------------------------------------------- analysis
+
+def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_list, simulation_ports, boundary, fmax,
+                       unit=1e-6, reference_plane_shift=None, deembedding_length=None):
+    """Find the wall ports and everything the standards need. Changes nothing (setupEM's "Check port walls" calls only
+    this). fmax in Hz, lengths in drawing units. Raises PortWallError.
+    Returns {'groups': [...], 'warnings': [...], 'notes': [...]}, JSON-friendly."""
+    sides = port_wall_sides(boundary)
+    result = {'groups': [], 'warnings': [], 'notes': []}
+    if not sides:
+        return result
+    reference_plane_shift = reference_plane_shift or {}
+    for side in reference_plane_shift:
+        if side not in sides:
+            raise PortWallError(f"reference_plane_shift has a value for {side}, which is not a port wall")
+    for dielectric in dielectrics_list.dielectrics:
+        if dielectric.gdsboundary is not None:
+            raise PortWallError(f"dielectric {dielectric.name} has its own Boundary layer in the stackup; port walls need the "
+                                f"dielectrics to end at the layout edge")
+    if simulation_ports is None or len(getattr(simulation_ports, 'ports', [])) == 0:
+        raise PortWallError("port walls are set, but the model has no ports")
+
+    bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+    walls = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}
+    transverse_range = {'xmin': (bymin, bymax), 'xmax': (bymin, bymax), 'ymin': (bxmin, bxmax), 'ymax': (bxmin, bxmax)}
+    depth = {'xmin': bxmax - bxmin, 'xmax': bxmax - bxmin, 'ymin': bymax - bymin, 'ymax': bymax - bymin}
+
+    # which ports lie on which layout edge
+    port_polys = {}
+    for poly in allpolygons.polygons:
+        port_polys.setdefault(int(poly.layernum), []).append(poly)
+    on_wall = {side: [] for side in sides}
+    for port in simulation_ports.ports:
+        polys = port_polys.get(int(port.source_layernum), [])
+        touching = set()
+        for poly in polys:
+            for side in WALL_SIDES:
+                if _local_bounds(poly, side, walls[side])[0] <= TOL:
+                    touching.add(side)
+        walls_touched = sorted(touching & set(sides), key=WALL_SIDES.index)
+        if not walls_touched:
+            others = sorted(touching, key=WALL_SIDES.index)
+            if others and port.target_layername is not None:
+                result['notes'].append(f"port {port.portnumber} lies on the layout edge at {others[0]}, which is not a port "
+                                       f"wall: it gets the estimated port inductance")
+            continue
+        if len(walls_touched) > 1:
+            raise PortWallError(f"port {port.portnumber} touches two port walls ({' and '.join(walls_touched)}) at a corner; "
+                                f"a wall port must lie on one side")
+        if port.target_layername is None:
+            raise PortWallError(f"port {port.portnumber} is a via port on port wall {walls_touched[0]}; port walls take in-plane "
+                                f"ports only (target_layername), drawn over the end of the line")
+        if len(polys) > 1:
+            raise PortWallError(f"port {port.portnumber} on port wall {walls_touched[0]} has {len(polys)} shapes on layer "
+                                f"{port.source_layernum}; a wall port is one shape over one line")
+        if abs(port.voltage) < 1e-6:
+            raise PortWallError(f"port {port.portnumber} on port wall {walls_touched[0]} is passive (voltage 0); the "
+                                f"calibration needs the full S-matrix, so every port must be excited")
+        on_wall[walls_touched[0]].append((port, polys[0]))
+
+    for side in sides:
+        if not on_wall[side]:
+            raise PortWallError(f"port wall {side} has no port: draw the port polygons on the layout edge at {side}, over "
+                                f"the ends of the lines")
+        result['groups'].append(_analyze_group(side, walls[side], on_wall[side], transverse_range[side], depth[side],
+                                               allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
+                                               reference_plane_shift.get(side, 0.0), deembedding_length))
+
+    # two port walls facing each other too close
+    for side in ('xmin', 'ymin'):
+        if side in sides and OPPOSITE[side] in sides:
+            D = max(g['D'] for g in result['groups'] if g['side'] in (side, OPPOSITE[side]))
+            if depth[side] < 2 * D:
+                result['warnings'].append(f"port walls {side} and {OPPOSITE[side]} are {depth[side]:g} apart, less than 2 D = "
+                                          f"{2 * D:g}: the coupling between them is not removed")
+    for group in result['groups']:
+        result['warnings'].extend(f"port wall {group['side']}: {w}" for w in group['warnings'])
+    return result
+
+
+def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
+                   shift, deembedding_length):
+    vlo, vhi = vrange
+    layers = _Layers(allpolygons, metals_list, side, wall)
+    metal_of = {}
+    for metal in metals_list.metals:
+        metal_of.setdefault(int(metal.layernum), metal)
+    conductors = {n: m for n, m in metal_of.items() if _is_conductor(m, materials_list)}
+    warnings = []
+
+    # 1. each port: the line, and the gap as drawn
+    details = []
+    for port, poly in ports:
+        _, pv0, u1, pv1 = _local_bounds(poly, side, wall)
+        depth_drawn = max(u1, 0.0)
+        if pv1 - pv0 < TOL:
+            pv0, pv1 = pv0 - TOL, pv1 + TOL
+        target = metals_list.getbylayername(port.target_layername)
+        if target is None:
+            raise PortWallError(f"port {port.portnumber}: target layer {port.target_layername} is not in the stackup")
+        number = int(target.layernum)
+        search = depth_drawn + max(10 * (pv1 - pv0), 0.1 * depth)
+        parts = layers.in_box(number, -TOL, pv0, search, pv1)
+        if not parts:
+            raise PortWallError(f"port {port.portnumber} on port wall {side}: no {target.name} line found at the port polygon; "
+                                f"draw the line to the layout edge and the port polygon over its end")
+        u_start = max(min(p.bounds[0] for p in parts), 0.0)
+        gap = max(depth_drawn, u_start)
+        cut = layers.cut(number, gap + CUT_OFFSET, vlo, vhi)
+        lines = [iv for iv in cut if _overlap(iv, (pv0, pv1)) or (iv[0] <= pv0 + TOL and iv[1] >= pv1 - TOL)]
+        if not lines:
+            raise PortWallError(f"port {port.portnumber} on port wall {side}: no {target.name} line found right behind the "
+                                f"port polygon")
+        if len(lines) > 1:
+            raise PortWallError(f"port {port.portnumber} on port wall {side} touches {len(lines)} separate {target.name} "
+                                f"regions; one port per line")
+        details.append({'portnumber': port.portnumber, 'target_layer': target.name, 'target_number': number,
+                        'depth_drawn': depth_drawn, 'u_start': u_start, 'gap': gap, 'line': list(lines[0])})
+    details.sort(key=lambda d: d['line'][0])
+    for a, b in zip(details, details[1:]):
+        if a['target_number'] == b['target_number'] and _overlap(a['line'], b['line']):
+            raise PortWallError(f"ports {a['portnumber']} and {b['portnumber']} on port wall {side} sit on the same line")
+
+    # 2. signal stacks: the line and every conductor connected to it at the cut (stacked lines)
+    u0 = max(d['gap'] for d in details) + CUT_OFFSET
+    width = max(d['line'][1] - d['line'][0] for d in details)
+    band = (u0, u0 + max(5 * width, 10 * CUT_OFFSET))
+    def intervals_of(number):
+        if conductors[number].is_via:
+            return layers.projection(number, band[0], band[1], vlo, vhi)
+        return layers.cut(number, u0, vlo, vhi)
+    for d in details:
+        stack = {d['target_number']: [tuple(d['line'])]}
+        todo = [d['target_number']]
+        while todo:
+            n = todo.pop()
+            for m, metal in conductors.items():
+                if m == n or not _z_touch(metal, conductors[n]):
+                    continue
+                found = [iv for iv in intervals_of(m) if any(_overlap(iv, s) for s in stack[n])]
+                new = [iv for iv in found if iv not in stack.get(m, [])]
+                if new:
+                    stack.setdefault(m, []).extend(new)
+                    todo.append(m)
+        d['stack'] = {n: _merge(ivs) for n, ivs in stack.items()}
+    signal = {}
+    for d in details:
+        for n, ivs in d['stack'].items():
+            signal.setdefault(n, []).extend(ivs)
+
+    # 3. ground: conductor metal at the cut that is not a line and reaches the wall
+    ground = []
+    for n, metal in conductors.items():
+        if metal.is_via:
+            continue
+        at_wall = layers.cut(n, CUT_OFFSET, vlo, vhi)
+        for iv in layers.cut(n, u0, vlo, vhi):
+            if any(_overlap(iv, s) for s in signal.get(n, [])):
+                continue
+            if any(_overlap(iv, w) for w in at_wall):
+                ground.append((n, iv))
+    port_names = ', '.join(str(d['portnumber']) for d in details)
+    if not ground:
+        raise PortWallError(f"port wall {side}: no ground metal reaches the wall next to ports {port_names}. The calibration "
+                            f"needs return metal at the cut, ground strips or a plane. Bring ground metal to the layout edge "
+                            f"there, move the cut, or don't use a port wall on {side}")
+
+    # 4. D: span of the lines + 2 x distance to the nearest ground
+    def rect(n, iv):
+        m = metal_of[n]
+        return iv[0], iv[1], m.zmin, m.zmax
+    def distance(a, b):
+        dv = max(0.0, b[0] - a[1], a[0] - b[1])
+        dz = max(0.0, b[2] - a[3], a[2] - b[3])
+        return math.hypot(dv, dz)
+    d_min = math.inf
+    zs = [math.inf, -math.inf]
+    for d in details:
+        rects = [rect(n, iv) for n, ivs in d['stack'].items() for iv in ivs]
+        box = (min(r[0] for r in rects), max(r[1] for r in rects), min(r[2] for r in rects), max(r[3] for r in rects))
+        zs = [min(zs[0], box[2]), max(zs[1], box[3])]
+        for n, iv in ground:
+            dist = distance(box, rect(n, iv))
+            if dist < TOL:
+                raise PortWallError(f"port {d['portnumber']} on port wall {side}: its line touches ground metal at the cut")
+            d_min = min(d_min, dist)
+    span = max(iv[1] for n, ivs in signal.items() for iv in ivs) - min(iv[0] for n, ivs in signal.items() for iv in ivs)
+    D = span + 2 * d_min
+
+    # 5. length of the standards, from D and the guided wavelength. n_eff is estimated from the permittivities within D of
+    # the lines, as the mean of the largest and the smallest: the largest alone (silicon) gave 3.45 where the study measured
+    # 1.9 to 2.3 on chip, and would shorten standards that work. The solved standard's own n_eff is reported afterwards.
+    eps = []
+    window = (zs[0] - D, zs[1] + D)
+    for dielectric in dielectrics_list.dielectrics:
+        if dielectric.zmin < window[1] and dielectric.zmax > window[0]:
+            material = materials_list.get_by_name(dielectric.material)
+            if material is not None:
+                eps.append(material.eps)
+    if dielectrics_list.dielectrics:
+        stack_lo = min(d.zmin for d in dielectrics_list.dielectrics)
+        stack_hi = max(d.zmax for d in dielectrics_list.dielectrics)
+        if window[0] < stack_lo or window[1] > stack_hi:
+            eps.append(1.0)                       # the air box around the stack
+    eps = eps or [1.0]
+    n_est = math.sqrt((max(eps) + min(eps)) / 2)
+    wavelength = C0 / (fmax * n_est) / unit
+    L4, Lcap = 4 * D, wavelength / 5
+    if deembedding_length:
+        L, rule = float(deembedding_length), 'user'
+        if L > Lcap:
+            warnings.append(f"the standards' length {L:g} is more than a fifth of the guided wavelength at the highest frequency "
+                            f"({Lcap:.4g}); the calibration is less accurate towards the top of the band")
+        if L < 2 * D:
+            warnings.append(f"the standards' length {L:g} is less than 2 D = {2 * D:.4g}; the port's field may not have settled")
+    elif L4 <= Lcap:
+        L, rule = L4, '4 D'
+    else:
+        L = max(Lcap, 2 * D)
+        rule = 'wavelength / 5' if Lcap >= 2 * D else '2 D'
+        warnings.append(f"standards shortened from 4 D = {L4:.4g} to {L:.4g}, to stay short against the guided wavelength; "
+                        f"the calibration is less accurate. A cut where the ground is closer to the lines makes D smaller")
+    L = round(L, 3)
+    f_valid = C0 / (n_est * 5 * L * unit)
+    if f_valid >= fmax * (1 - 1e-6):
+        f_valid = fmax
+    if f_valid < fmax * (1 - 1e-6):
+        warnings.append(f"the calibration is valid up to about {f_valid / 1e9:.3g} GHz (estimate); above, it is less accurate")
+    if D > wavelength / 10:
+        warnings.append(f"D = {D:.4g} is more than a tenth of the guided wavelength at the highest frequency: above about "
+                        f"{C0 / (n_est * 10 * D * unit) / 1e9:.3g} GHz the port is no longer a small lumped element")
+
+    # 6. gaps
+    for d in details:
+        if d['u_start'] - d['depth_drawn'] > D / 10:
+            raise PortWallError(f"port {d['portnumber']} on port wall {side}: the line starts {d['u_start'] - d['depth_drawn']:.4g} "
+                                f"behind the port polygon, more than D/10 = {D / 10:.4g}; draw the port polygon over the line end")
+        if d['gap'] < TOL:
+            d['gap'] = max(round(D / 32, 3), 5 * TOL)
+            d['gap_origin'] = 'tool'
+        else:
+            d['gap'] = round(d['gap'], 6)
+            d['gap_origin'] = 'drawing'
+            if d['gap'] > D / 10:
+                warnings.append(f"port {d['portnumber']}: the gap {d['gap']:g} is more than D/10 = {D / 10:.4g}; the calibration "
+                                f"is less accurate")
+
+    # 7. the cross-section the standards extrude: all stackup layers at the cut, via arrays as solid bars
+    up = max(d['gap'] for d in details) + CUT_OFFSET
+    profile = {}
+    for n, metal in metal_of.items():
+        if metal.is_via:
+            ivs = layers.projection(n, up, up + D, vlo, vhi)
+            above = [m for k, m in conductors.items() if not m.is_via and abs(m.zmin - metal.zmax) < TOL]
+            below = [m for k, m in conductors.items() if not m.is_via and abs(m.zmax - metal.zmin) < TOL]
+            for neighbours in (above, below):
+                if neighbours:
+                    cover = _merge([iv for m in neighbours for iv in layers.cut(int(m.layernum), up, vlo, vhi)])
+                    ivs = _merge([(max(a[0], b[0]), min(a[1], b[1])) for a in ivs for b in cover if _overlap(a, b)])
+            if ivs:
+                warnings.append(f"vias on {metal.name} at the cut are extruded as solid bars in the standards")
+        else:
+            ivs = layers.cut(n, up, vlo, vhi)
+        if ivs:
+            profile[n] = ivs
+    for d in details:
+        for n, ivs in d['stack'].items():
+            if n in profile:
+                d['stack'][n] = [iv for iv in profile[n] if any(_overlap(iv, s) for s in ivs)]
+
+    # 8. how far the cross-section stays the same: the device's distance from the wall
+    plain = {n: ivs for n, ivs in profile.items() if not metal_of[n].is_via}
+    scan_end = min(depth - TOL, max(2 * D, shift + D, 0.5 * (vhi - vlo) + D))
+    step = max(D / 8, scan_end / 400) if scan_end > up else None
+    u_dev = None
+    u = up
+    while step is not None and u + step <= scan_end:
+        u += step
+        here = {n: layers.cut(n, u, vlo, vhi) for n in plain}
+        here = {n: ivs for n, ivs in here.items() if ivs}
+        others = [n for n in layers.geoms if n not in plain and not metal_of[n].is_via and layers.cut(n, u, vlo, vhi)]
+        if not _same_profile(here, plain) or others:
+            u_dev = u - step
+            break
+    if u_dev is not None:
+        if u_dev < D / 4:
+            raise PortWallError(f"the cross-section at port wall {side} changes within D/4 = {D / 4:.4g} of the wall (a line at "
+                                f"an angle, a taper, or other metal close to the wall). The standards need a straight section: "
+                                f"lines that cross the wall at a right angle and stay unchanged for at least D/4")
+        if u_dev < D:
+            warnings.append(f"the cross-section changes {u_dev:.4g} from the wall, less than D = {D:.4g}: the device is inside "
+                            f"the port's fringe field, which adds a small error")
+        beyond = layers.extent_beyond(u_dev)
+        if beyond is not None and u_dev < 0.5 * (beyond[1] - beyond[0]):
+            warnings.append(f"the device is {u_dev:.4g} from the PEC port wall, less than half its size along the wall "
+                            f"({beyond[1] - beyond[0]:.4g}); the wall mirrors its field, which changes the result slightly")
+    if shift:
+        if shift > 0 and (u_dev is not None and shift > u_dev + TOL):
+            raise PortWallError(f"reference_plane_shift for {side} = {shift:g} moves the reference plane past the uniform feed, "
+                                f"which ends {u_dev:.4g} from the wall")
+        if shift > 0:
+            warnings.append(f"reference plane shifted {shift:g} into the layout along the feed: this is exact only if the feed "
+                            f"is the standards' line, including how its ground is connected at the far end")
+
+    ports_order = [d['portnumber'] for d in details]
+    return {
+        'side': side, 'wall': wall, 'ports': ports_order,
+        'port_details': [{'portnumber': d['portnumber'], 'target_layer': d['target_layer'], 'gap': d['gap'],
+                          'gap_origin': d['gap_origin'], 'line': d['line'],
+                          'stack': [[metal_of[n].name, iv[0], iv[1]] for n, ivs in d['stack'].items() for iv in ivs]}
+                         for d in details],
+        'D': round(D, 6), 'span': round(span, 6), 'distance_to_ground': round(d_min, 6),
+        'ground_layers': sorted({metal_of[n].name for n, iv in ground}),
+        'eps_max': max(eps), 'n_eff_estimate': round(n_est, 4), 'L': L, 'L_rule': rule, 'valid_to_GHz': round(f_valid / 1e9, 6), 'fmax_GHz': fmax / 1e9,
+        'uniform_from_wall': None if u_dev is None else round(u_dev, 6), 'shift': float(shift),
+        'transverse': [vlo, vhi],
+        'profile': [[metal_of[n].name, iv[0], iv[1]] for n, ivs in profile.items() for iv in ivs],
+        'warnings': warnings,
+    }
+
+
+def ports_on_layout_edge(allpolygons, simulation_ports):
+    """{portnumber: side} for the in-plane ports whose polygon lies on exactly one side of the layout edge, the place of
+    a port wall. Works without port walls: setupEM uses it to ask whether such a side should be one."""
+    bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+    walls = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}
+    polys = {}
+    for poly in allpolygons.polygons:
+        polys.setdefault(int(poly.layernum), []).append(poly)
+    out = {}
+    for port in getattr(simulation_ports, 'ports', []):
+        if port.target_layername is None:
+            continue
+        sides = {side for poly in polys.get(int(port.source_layernum), []) for side in WALL_SIDES
+                 if _local_bounds(poly, side, walls[side])[0] <= TOL}
+        if len(sides) == 1:
+            out[port.portnumber] = sides.pop()
+    return out
+
+
+def describe(result):
+    """log lines for the console and setupEM"""
+    lines = []
+    for g in result['groups']:
+        gaps = ', '.join(f"port {p['portnumber']} gap {p['gap']:g} ({'from the drawing' if p['gap_origin'] == 'drawing' else 'set by the tool'})"
+                         for p in g['port_details'])
+        lines.append(f"Port wall {g['side']}: ports {', '.join(str(p) for p in g['ports'])}, ground {', '.join(g['ground_layers'])}, "
+                     f"D = {g['D']:.4g}, standards {g['L']:g} and {2 * g['L']:g} ({g['L_rule']}), "
+                     f"valid to {g['valid_to_GHz']:.3g} GHz; {gaps}"
+                     + (f"; same standards as port wall {g['shared_with']}" if g.get('shared_with') else ''))
+    lines.extend('Note: ' + n for n in result['notes'])
+    lines.extend('WARNING: ' + w for w in result['warnings'])
+    return lines
+
+
+# ------------------------------------------------------------------------------------------------------- the device
+
+def apply_port_walls(result, allpolygons, metals_list, simulation_ports):
+    """Cut the gaps out of the lines (every layer of a stacked line), replace each wall port's polygon by the gap
+    rectangle across the line, and point the port into the layout. Changes allpolygons and the ports in place."""
+    for g in result['groups']:
+        side, wall = g['side'], g['wall']
+        for p in g['port_details']:
+            port = simulation_ports.get_port_by_number(p['portnumber'])
+            for layername, v0, v1 in p['stack']:
+                number = int(metals_list.getbylayername(layername).layernum)
+                cutter = _global(shapely_box(-1.0, v0 - TOL / 2, p['gap'], v1 + TOL / 2), side, wall)
+                _subtract(allpolygons, number, cutter)
+            allpolygons.polygons = [poly for poly in allpolygons.polygons if int(poly.layernum) != int(port.source_layernum)]
+            gap_rect = _global(shapely_box(0.0, p['line'][0], p['gap'], p['line'][1]), side, wall)
+            allpolygons.add_polygon([list(c) for c in gap_rect.exterior.coords[:-1]], int(port.source_layernum))
+            if port.direction.lower() != INWARD[side]:
+                print(f"Port {port.portnumber} on port wall {side}: direction {INWARD[side]} (into the layout) instead of "
+                      f"{port.direction}")
+            port.direction = INWARD[side]
+
+
+def _subtract(allpolygons, number, cutter):
+    keep, added = [], []
+    for poly in allpolygons.polygons:
+        if int(poly.layernum) != number:
+            keep.append(poly)
+            continue
+        shape = _shape(poly)
+        if not shape.intersects(cutter) or shape.intersection(cutter).area <= TOL * TOL:
+            keep.append(poly)
+            continue
+        rest = shape.difference(cutter)
+        for piece in getattr(rest, 'geoms', [rest]):
+            if piece.is_empty or piece.geom_type != 'Polygon' or piece.area <= TOL * TOL:
+                continue
+            if len(piece.interiors) > 0:
+                raise PortWallError(f"cutting a port gap left a hole in a polygon on layer {number}")
+            added.append(([[round(x, 6), round(y, 6)] for x, y in piece.exterior.coords[:-1]], poly.fill_factor))
+    allpolygons.polygons = keep
+    for xy, fill_factor in added:
+        allpolygons.add_polygon(xy, number)
+        allpolygons.polygons[-1].fill_factor = fill_factor
+
+
+# ------------------------------------------------------------------------------------------------------- the standards
+
+def standard_name(side, tag):
+    return f'cal_{side}_{tag}'
+
+
+def _signature(group, margin, air, boundary):
+    """what makes a group's standards: two walls with the same signature share one pair of standards (a thru line has
+    the same cross-section at both ends, so its two walls need the standards only once)"""
+    lo, hi = TRANSVERSE[group['side']]
+    i_lo, i_hi = BOX_SIDES.index(lo), BOX_SIDES.index(hi)
+    ports = [(p['target_layer'], p['gap'], p['line']) for p in group['port_details']]
+    box = (boundary[i_lo], boundary[i_hi], boundary[4], boundary[5], margin[i_lo], margin[i_hi], air[i_lo], air[i_hi], air[4], air[5])
+    return json.dumps([group['profile'], ports, group['L'], group['transverse'], box], sort_keys=True)
+
+
+def standard_records(result, model_basename, margin=None, air=None, boundary=None):
+    """the names, files and output folders of all standards, in the order they are written and solved. With the box
+    settings given, a wall whose standards would be the same as an earlier wall's uses those (shared_with)."""
+    seen = {}
+    for g in result['groups']:
+        if margin is not None:
+            signature = _signature(g, margin, air, boundary)
+            if signature in seen:
+                g['standards'] = seen[signature]['standards']
+                g['shared_with'] = seen[signature]['side']
+                continue
+            seen[signature] = g
+        g['standards'] = []
+        for tag, factor in STANDARDS:
+            name = standard_name(g['side'], tag)
+            g['standards'].append({'name': name, 'length': round(factor * g['L'], 6), 'config': f'config_{name}.json',
+                                   'model': f'{model_basename}_{name}', 'output': f'output/{model_basename}_{name}',
+                                   'key': f'{name}.key'})
+
+
+def standard_model(group, factor, metals_list):
+    """polygons and ports of one standard: the profile extruded along x from 0 to factor x L, the lines cut by their gaps
+    at both ends; ports 1..N at x = 0 in the group's order, N+1..2N at the far end"""
+    from .util_gds_reader import all_polygons_list
+    from .util_simulation_setup import all_simulation_ports, simulation_port
+    L = factor * group['L']
+    polygons = all_polygons_list()
+    signal = {}
+    for p in group['port_details']:
+        for layername, v0, v1 in p['stack']:
+            signal[(layername, v0, v1)] = p['gap']
+    for layername, v0, v1 in group['profile']:
+        number = int(metals_list.getbylayername(layername).layernum)
+        gap = signal.get((layername, v0, v1), 0.0)
+        polygons.add_rectangle(gap, v0, L - gap, v1, number)
+    ports = all_simulation_ports()
+    n = len(group['port_details'])
+    for j, p in enumerate(group['port_details']):
+        near, far = STANDARD_PORT_LAYER + j, STANDARD_PORT_LAYER + n + j
+        polygons.add_rectangle(0.0, p['line'][0], p['gap'], p['line'][1], near)
+        polygons.add_rectangle(L - p['gap'], p['line'][0], L, p['line'][1], far)
+        ports.add_port(simulation_port(portnumber=j + 1, voltage=1, port_Z0=50, source_layernum=near,
+                                       target_layername=p['target_layer'], direction='x'))
+        ports.add_port(simulation_port(portnumber=n + j + 1, voltage=1, port_Z0=50, source_layernum=far,
+                                       target_layername=p['target_layer'], direction='-x'))
+    vlo, vhi = group['transverse']
+    polygons.set_bounding_box(0.0, L, vlo, vhi)
+    return polygons, ports
+
+
+def standard_settings(settings, group, record, factor, margin, air, boundary, fmax):
+    """the device's settings for one standard: same stackup, mesh and solver settings, PEC walls at both ends, the
+    device's box on the two sides along the line, three frequencies, written into the device's _data folder"""
+    polygons, ports = standard_model(group, factor, settings['metals_list'])
+    lo, hi = TRANSVERSE[group['side']]
+    i_lo, i_hi = BOX_SIDES.index(lo), BOX_SIDES.index(hi)
+    out = dict(settings)
+    for key in ('fstart', 'fstop', 'fstep', 'fdump', 'save_gmsh_unrolled', 'preview_only'):
+        out.pop(key, None)
+    out.update({
+        'allpolygons': polygons, 'simulation_ports': ports,
+        'boundary': ['PEC', 'PEC', boundary[i_lo], boundary[i_hi], boundary[4], boundary[5]],
+        'margin': [0, 0, margin[i_lo], margin[i_hi]],
+        'air_around': [0, 0, air[i_lo], air[i_hi], air[4], air[5]],
+        'fpoint': [fmax * x for x in STANDARD_FREQUENCY_FRACTIONS], 'adaptive_sweep': False,
+        'model_basename': record['model'], 'config_suffix': '_' + record['name'],
+        'no_gui': True, 'no_preview': True, '_calibration_standard': True,
+    })
+    return out, ports
+
+
+def write_key(sim_path, record):
+    """a fingerprint of the standard's mesh and config: run_sim reuses an earlier result with the same key"""
+    h = hashlib.sha256()
+    for filename in (record['model'] + '.msh', record['config']):
+        with open(os.path.join(sim_path, filename), 'rb') as f:
+            h.update(f.read())
+    with open(os.path.join(sim_path, record['key']), 'w', newline='\n') as f:
+        f.write(h.hexdigest() + '\n')
+
+
+def port_information_record(result):
+    """what combine_extend_snp.py needs, stored in port_information.json"""
+    keep = ('side', 'ports', 'port_details', 'D', 'span', 'distance_to_ground', 'ground_layers', 'eps_max', 'n_eff_estimate',
+            'shared_with', 'L', 'L_rule',
+            'valid_to_GHz', 'fmax_GHz', 'uniform_from_wall', 'shift', 'standards', 'warnings')
+    return [{k: g[k] for k in keep if k in g} for g in result['groups']]
+
+
+def run_script_lines(sim_path):
+    """run_sim lines for the standards listed in port_information.json, before the device; an earlier result with the
+    same key is reused"""
+    filename = os.path.join(sim_path, 'port_information.json')
+    if not os.path.isfile(filename):
+        return []
+    with open(filename, encoding='utf-8') as f:
+        info = json.load(f)
+    records = []
+    for g in info.get('port_walls', []):
+        for s in g.get('standards', []):
+            if s['name'] not in [r['name'] for r in records]:
+                records.append(s)
+    lines = []
+    for i, s in enumerate(records):
+        out = s['output']
+        lines += [f'echo "calibration standard {i + 1} of {len(records)}: {s["name"]}, 3 frequencies"',
+                  f'if [ -f {out}/port-S.csv ] && cmp -s {s["key"]} {out}/cal.key; then',
+                  f'  echo "  reused, solved $(cat {out}/cal.date 2>/dev/null)"',
+                  'else',
+                  f'  run_palace {s["config"]} && cp {s["key"]} {out}/cal.key && date > {out}/cal.date',
+                  'fi']
+    if records:
+        lines.append('echo "device model"')
+    return lines
