@@ -17,6 +17,8 @@ A conductor that reaches the simulation boundary, with margin and `air_around` b
 
 Elmer thermal: a heat source that partly overlaps another volume (e.g. a heat source that reaches under a contact) lost its mesh refinement. The model was built and solved with a coarse mesh at that source, and the only sign was the message that its `refined_cellsize_override` entry is "neither a heat source nor a metal layer". Heat sources inside one volume or in the oxide are unchanged.
 
+A model whose metals are all sheets (zero thickness, e.g. a PEC line on a PEC ground sheet) stopped with the gmsh error "Difference failed - BOPAlgo_AlertTooFewArguments": there was no metal volume to cut out of the dielectrics. The dielectrics are now left as they are in that case. Other models are unchanged.
+
 ## 5 November-2026
 gds2palace 0.9.4
 

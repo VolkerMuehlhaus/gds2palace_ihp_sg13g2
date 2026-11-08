@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.22.0"
+__version__ = "1.22.1"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -1830,7 +1830,11 @@ def create_model (excite_ports, settings):
     # passivation stackup in a thermal model (all metals are volumes there): every piece keeps the
     # name of its dielectric, so all pieces end up in the same physical group and material
     dielectric_names = {tag: gmsh.model.getEntityName(dim=3, tag=tag) for _, tag in dielectric_volume_dimtags}
-    outDimTags, outDimTagsMap = gmsh.model.occ.cut(dielectric_volume_dimtags, metal_volume_dimtags, -1, removeTool=False)
+    if metal_volume_dimtags:
+        outDimTags, outDimTagsMap = gmsh.model.occ.cut(dielectric_volume_dimtags, metal_volume_dimtags, -1, removeTool=False)
+    else:
+        # only sheet metals: no volume to cut, every dielectric stays one piece (gmsh refuses a cut without tools)
+        outDimTagsMap = [[dimtag] for dimtag in dielectric_volume_dimtags]
 
     gmsh.model.occ.synchronize()
 
