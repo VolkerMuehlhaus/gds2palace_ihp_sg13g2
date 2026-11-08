@@ -604,7 +604,7 @@ The length follows from the size of the cross-section at the cut:
 
 **D = the span of the lines + 2 × the distance to the nearest ground metal**
 
-That is w + 2h for a strip over a plate, and the inner ground-to-ground spacing for coplanar lines. The port's fringing field settles over a few D, so L = 4 D. Longer standards are worse, not better: L and 2 L are meshed separately, and their small difference in phase grows with length. So L is also kept below a fifth of the guided wavelength at the highest frequency, but not below 2 D. The log then gives the frequency up to which the calibration is fully valid. With L = 4 D, this limits D to about a twentieth of the guided wavelength, on SG13G2 about 75 µm at 100 GHz. A cut where the ground is close to the lines, like a GSG pad feed, is always fine.
+That is w + 2h for a strip over a plate, and the inner ground-to-ground spacing for coplanar lines. The port's fringing field settles over a few D, so L = 4 D. Longer standards are worse, not better: L and 2 L are meshed separately, and their small difference in phase grows with length. So L is also kept below a fifth of the guided wavelength at the highest frequency, but not below 2 D. The log then gives the frequency up to which the calibration is fully valid. With L = 4 D, this limits D to about a twentieth of the guided wavelength, for lines with an effective index of about 2, like TopMetal2 lines on SG13G2, about 75 µm at 100 GHz. A cut where the ground is close to the lines, like a GSG pad feed, is always fine.
 
 ![How D is calculated](./images/portwall_D.png)
 
@@ -624,12 +624,18 @@ Check the line: if its Z0 and n_eff are not what you expect for the line you dre
 
 `settings['reference_plane_shift'] = {'xmin': 60}` moves the reference plane 60 µm into the layout along the feed, using the line from the standards. The shift must stay within the part of the feed that has the wall's cross-section.
 
-The shift is exact only if the feed is the standards' line, including how its ground is connected at the far end. In the standards, the ground strips reach a PEC wall at both ends, so a current can circulate through them. Ground strips that end open before the device make the feed a different line: in the study's GSSG feed, about 8 % more inductance per length.
+The shift is exact only if the feed is the standards' line, including how its ground is connected at the far end. In the standards, the ground strips reach a PEC wall at both ends, so a current can circulate through them. Ground strips that end open before the device make the feed a different line, by an amount that depends on the geometry. One example: in the de-embedding study's GSSG feed (TopMetal2 lines 10 µm wide and 10 µm apart, ground strips 40 µm wide at 10 µm), the feed's inductance per length was about 8 % higher than the standards' line.
+
+#### Moving the port wall outward
+
+A device close to the port wall sits in the port's fringe field, and the PEC wall mirrors its field. When the layout can't be cut further out, `settings['port_wall_extension'] = {'ymin': 'auto'}` moves the port wall outward instead: the feed is extended by the cross-section at the wall, the port moves to the new wall, and the reference plane is shifted back to the layout edge. The result is at the layout edge as before, but the device is further from the wall. `'auto'` extends until the device is at least D and half its own size away from the wall; a number extends by that length. A reference plane shift still counts from the layout edge.  
+
+The extended feed is a copy of the cross-section at the wall, so it is exactly the standards' line where the return current flows the same way, e.g. in a plane under the lines. With ground strips beside the lines that end open before the device, the extended feed is not the standards' line, and the error grows with the length of the extension; how large it is depends on the geometry (see the example under "Reference plane shift"). The setupEM preview shades the extension, which is not in the drawing.  
 
 #### Warnings while the model is written
 
-- **"the device is inside the port's fringe field"**: keep the device at least D away from the port wall.
-- **"the wall mirrors its field"**: a PEC wall acts as a mirror for the device's field. Keep the device at least half its own size away from the wall.
+- **"the device is inside the port's fringe field"**: keep the device at least D away from the port wall, or move the port wall outward (above).
+- **"the wall mirrors its field"**: a PEC wall acts as a mirror for the device's field. Keep the device at least half its own size away from the wall, or move the port wall outward. The device's size is measured along the wall, without the ground metal that reaches the wall.
 - **"standards shortened"**: D is large compared to the wavelength. Cut where the ground is closer to the lines.
 - **"vias ... are extruded as solid bars"**: the standards replace a via array at the cut by a solid via bar. This was not tested in the study.
 
@@ -637,6 +643,7 @@ The shift is exact only if the feed is the standards' line, including how its gr
 
 **settings['boundary']:** `'PORTWALL'` on a side makes it a port wall (xmin, xmax, ymin or ymax).
 **settings['reference_plane_shift']:** Dictionary with a distance per port wall, e.g. `{'xmin': 60}`, in drawing units, positive into the layout. Default: no shift
+**settings['port_wall_extension']:** Dictionary per port wall, e.g. `{'ymin': 'auto'}`: `'auto'` or a length in drawing units by which the port wall is moved outward, the feed extended by the cross-section at the wall. Default: none  
 **settings['deembedding_length']:** The length L of the shorter standard, in drawing units. Default: 4 D, shortened to a fifth of the guided wavelength at the highest frequency, at least 2 D
 **settings['deembedding']:** `'none'` writes no de-embedded file. Default: calibrated at port walls, estimated port inductance at the other ports
 

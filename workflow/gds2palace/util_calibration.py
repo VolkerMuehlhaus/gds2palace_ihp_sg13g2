@@ -187,14 +187,29 @@ class _Layers:
         """intervals in v covered by layer `number` anywhere between u0 and u1 (for via arrays)"""
         return _merge([(p.bounds[1], p.bounds[3]) for p in self.in_box(number, u0, vlo - 1.0, u1, vhi + 1.0)])
 
-    def extent_beyond(self, u):
-        """v range of all polygons that reach further than u from the wall"""
+    def device_extent(self, u, ground):
+        """v range of the device: the metal further than u from the wall, without the ground metal that reaches the wall
+        (a ground plane spans the whole layout, but the wall mirrors the device's field, not the plane's).
+        ground: {layer number: [intervals at the wall]}"""
         lo, hi = math.inf, -math.inf
-        for geoms in self.geoms.values():
+        wall_line = LineString([(CUT_OFFSET, -1e12), (CUT_OFFSET, 1e12)])
+        beyond = shapely_box(u + TOL, -1e12, 1e12, 1e12)
+        for number, geoms in self.geoms.items():
+            if number in ground:
+                # a plane with openings is stored as several pieces: merge them, so that the whole connected plane
+                # counts as ground when one piece of it reaches the wall
+                merged = shapely.union_all(geoms)
+                geoms = list(getattr(merged, 'geoms', [merged]))
             for g in geoms:
-                u0, v0, u1, v1 = g.bounds
-                if u1 > u + TOL:
-                    lo, hi = min(lo, v0), max(hi, v1)
+                if g.is_empty or g.bounds[2] <= u + TOL:
+                    continue
+                if number in ground and g.intersects(wall_line):
+                    cut = g.intersection(wall_line).bounds
+                    if any(_overlap((cut[1], cut[3]), iv) for iv in ground[number]):
+                        continue
+                part = g.intersection(beyond)
+                if not part.is_empty:
+                    lo, hi = min(lo, part.bounds[1]), max(hi, part.bounds[3])
         return (lo, hi) if lo < hi else None
 
 
@@ -242,7 +257,8 @@ def _z_touch(a, b):
 # ------------------------------------------------------------------------------------------------------- analysis
 
 def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_list, simulation_ports, boundary, fmax,
-                       unit=1e-6, reference_plane_shift=None, deembedding_length=None, collect_errors=False):
+                       unit=1e-6, reference_plane_shift=None, deembedding_length=None, collect_errors=False,
+                       port_wall_extension=None):
     """Find the wall ports and everything the standards need. Changes nothing (setupEM's "Check port walls" calls only
     this). fmax in Hz, lengths in drawing units. Raises PortWallError; with collect_errors, an error that belongs to one
     port wall goes into result['errors'][side] instead, and the other walls are still analysed (setupEM).
@@ -255,6 +271,12 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
     for side in reference_plane_shift:
         if side not in sides:
             raise PortWallError(f"reference_plane_shift has a value for {side}, which is not a port wall")
+    port_wall_extension = port_wall_extension or {}
+    for side, value in port_wall_extension.items():
+        if side not in sides:
+            raise PortWallError(f"port_wall_extension has a value for {side}, which is not a port wall")
+        if value != 'auto' and not (isinstance(value, (int, float)) and value >= 0):
+            raise PortWallError(f"port_wall_extension for {side} must be 'auto' or a length of 0 or more, not {value!r}")
     for dielectric in dielectrics_list.dielectrics:
         if dielectric.gdsboundary is not None:
             raise PortWallError(f"dielectric {dielectric.name} has its own Boundary layer in the stackup; port walls need the "
@@ -322,26 +344,34 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
             result['groups'].append(_analyze_group(side, walls[side], on_wall[side], transverse_range[side], depth[side],
                                                    allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
                                                    reference_plane_shift.get(side, 0.0), deembedding_length,
-                                                   layers_of.get(side)))
+                                                   layers_of.get(side), port_wall_extension.get(side)))
         except PortWallError as error:
             if not collect_errors:
                 raise
             result['errors'][side] = str(error)
 
+    # an extension makes the box larger along the perpendicular walls: their standards need the same transverse box
+    extended = {g['side']: g.get('extension', 0.0) for g in result['groups']}
+    for g in result['groups']:
+        lo, hi = TRANSVERSE[g['side']]
+        g['transverse'] = [g['transverse'][0] - extended.get(lo, 0.0), g['transverse'][1] + extended.get(hi, 0.0)]
+
     # two port walls facing each other too close
     for side in ('xmin', 'ymin'):
         if side in sides and OPPOSITE[side] in sides:
             D = max((g['D'] for g in result['groups'] if g['side'] in (side, OPPOSITE[side])), default=0.0)
-            if D and depth[side] < 2 * D:
-                result['warnings'].append(f"port walls {side} and {OPPOSITE[side]} are {depth[side]:g} apart, less than 2 D = "
+            apart = depth[side] + extended.get(side, 0.0) + extended.get(OPPOSITE[side], 0.0)
+            if D and apart < 2 * D:
+                result['warnings'].append(f"port walls {side} and {OPPOSITE[side]} are {apart:g} apart, less than 2 D = "
                                           f"{2 * D:g}: the coupling between them is not removed")
     for group in result['groups']:
         result['warnings'].extend(f"port wall {group['side']}: {w}" for w in group['warnings'])
+        result['notes'].extend(f"port wall {group['side']}: {n}" for n in group.get('notes', []))
     return result
 
 
 def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
-                   shift, deembedding_length, layers=None):
+                   shift, deembedding_length, layers=None, extension=None):
     vlo, vhi = vrange
     if layers is None:
         layers = _Layers(allpolygons, metals_list, side, wall)
@@ -382,6 +412,7 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
                                 f"regions; one port per line")
         details.append({'portnumber': port.portnumber, 'target_layer': target.name, 'target_number': number,
                         'depth_drawn': depth_drawn, 'u_start': u_start, 'gap': gap, 'line': list(lines[0]),
+                        'line_start': u_start,
                         'converted': converted})
     details.sort(key=lambda d: d['line'][0])
     for a, b in zip(details, details[1:]):
@@ -554,6 +585,7 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
     scan_end = min(depth - TOL, max(2 * D, shift + D, 0.5 * (vhi - vlo) + D))
     step = max(D / 8, scan_end / 400) if scan_end > up else None
     u_dev = None
+    device_size = None
     u = up
     while step is not None and u + step <= scan_end:
         u += step
@@ -568,13 +600,32 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             raise PortWallError(f"the cross-section at port wall {side} changes within D/4 = {D / 4:.4g} of the wall (a line at "
                                 f"an angle, a taper, or other metal close to the wall). The standards need a straight section: "
                                 f"lines that cross the wall at a right angle and stay unchanged for at least D/4")
-        if u_dev < D:
-            warnings.append(f"the cross-section changes {u_dev:.4g} from the wall, less than D = {D:.4g}: the device is inside "
-                            f"the port's fringe field, which adds a small error")
-        beyond = layers.extent_beyond(u_dev)
-        if beyond is not None and u_dev < 0.5 * (beyond[1] - beyond[0]):
-            warnings.append(f"the device is {u_dev:.4g} from the PEC port wall, less than half its size along the wall "
-                            f"({beyond[1] - beyond[0]:.4g}); the wall mirrors its field, which changes the result slightly")
+        ground_at_wall = {}
+        for n, iv in ground:
+            ground_at_wall.setdefault(n, []).append(iv)
+        beyond = layers.device_extent(u_dev, ground_at_wall)
+        device_size = None if beyond is None else beyond[1] - beyond[0]
+    # the port wall can be moved outward: the feed is extended by the wall's cross-section, the reference plane shifted
+    # back to the layout edge. 'auto': until the device is at least D and half its size from the wall
+    needed = 0.0
+    if u_dev is not None:
+        needed = max(0.0, max(D, 0.5 * device_size if device_size else 0.0) - u_dev)
+    E = math.ceil(needed * 100) / 100 if extension == 'auto' else float(extension or 0.0)
+    if u_dev is not None:
+        hint = "" if E else "; port_wall_extension = 'auto' moves the port wall away"
+        if u_dev + E < D:
+            warnings.append(f"the cross-section changes {u_dev + E:.4g} from the port wall, less than D = {D:.4g}: the device "
+                            f"is inside the port's fringe field, which adds a small error{hint}")
+        if device_size is not None and u_dev + E < 0.5 * device_size:
+            warnings.append(f"the device is {u_dev + E:.4g} from the PEC port wall, less than half its size along the wall "
+                            f"({device_size:.4g}); the wall mirrors its field, which changes the result slightly{hint}")
+    notes = []
+    if E:
+        notes.append(f"port wall moved {E:g} outward: the feed is extended by the cross-section at the wall and the "
+                        f"reference plane shifted back to the layout edge. This is exact where the return current flows like "
+                        f"in the standards, e.g. in a plane under the lines. With ground strips beside the lines that end "
+                        f"open before the device, the extended feed is not the standards' line, and the error grows with the "
+                        f"length of the extension")
     if shift:
         if shift > 0 and (u_dev is not None and shift > u_dev + TOL):
             raise PortWallError(f"reference_plane_shift for {side} = {shift:g} moves the reference plane past the uniform feed, "
@@ -588,12 +639,15 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
         'side': side, 'wall': wall, 'ports': ports_order,
         'port_details': [{'portnumber': d['portnumber'], 'target_layer': d['target_layer'], 'gap': d['gap'],
                           'gap_origin': d['gap_origin'], 'line': d['line'], 'converted': d['converted'],
+                          'line_start': round(d['line_start'], 6),
                           'stack': [[metal_of[n].name, iv[0], iv[1]] for n, ivs in d['stack'].items() for iv in ivs]}
                          for d in details],
         'D': round(D, 6), 'span': round(span, 6), 'distance_to_ground': round(d_min, 6),
         'ground_layers': sorted({metal_of[n].name for n, iv in ground}),
         'eps_max': max(eps), 'n_eff_estimate': round(n_est, 4), 'L': L, 'L_rule': rule, 'valid_to_GHz': round(f_valid / 1e9, 6), 'fmax_GHz': fmax / 1e9,
-        'uniform_from_wall': None if u_dev is None else round(u_dev, 6), 'shift': float(shift),
+        'uniform_from_wall': None if u_dev is None else round(u_dev, 6),
+        'device_size': None if device_size is None else round(device_size, 6), 'shift': float(shift),
+        'extension': round(E, 6), 'notes': notes,
         'transverse': [vlo, vhi],
         'profile': [[metal_of[n].name, iv[0], iv[1]] for n, ivs in profile.items() for iv in ivs],
         'warnings': warnings,
@@ -664,7 +718,9 @@ def describe(result):
         lines.append(f"Port wall {g['side']}: ports {', '.join(str(p) for p in g['ports'])}, ground {', '.join(g['ground_layers'])}, "
                      f"D = {g['D']:.4g}, standards {g['L']:g} and {2 * g['L']:g} ({g['L_rule']}), "
                      f"valid to {g['valid_to_GHz']:.3g} GHz; {gaps}"
-                     + (f"; same standards as port wall {g['shared_with']}" if g.get('shared_with') else ''))
+                     + (f"; same standards as port wall {g['shared_with']}" if g.get('shared_with') else '')
+                     + (f"; port wall moved {g['extension']:g} outward, reference plane back at the layout edge"
+                        if g.get('extension') else ''))
     lines.extend('Note: ' + n for n in result['notes'])
     lines.extend('WARNING: ' + w for w in result['warnings'])
     return lines
@@ -677,14 +733,29 @@ def apply_port_walls(result, allpolygons, metals_list, simulation_ports):
     rectangle across the line, and point the port into the layout. Changes allpolygons and the ports in place."""
     for g in result['groups']:
         side, wall = g['side'], g['wall']
+        E = g.get('extension', 0.0)
+        if E:
+            # the cross-section at the wall extruded outward by E: the lines from their new gap to where they start in
+            # the layout (no gap is cut at the layout edge), everything else from the new wall to the layout edge
+            signal = {}
+            for p in g['port_details']:
+                for layername, v0, v1 in p['stack']:
+                    signal[(layername, v0, v1)] = p
+            for layername, v0, v1 in g['profile']:
+                number = int(metals_list.getbylayername(layername).layernum)
+                p = signal.get((layername, v0, v1))
+                u0, u1 = (-E + p['gap'], max(p.get('line_start', 0.0), 0.0)) if p else (-E, 0.0)
+                piece = _global(shapely_box(u0, v0, u1, v1), side, wall)
+                allpolygons.add_polygon([list(c) for c in piece.exterior.coords[:-1]], number)
         for p in g['port_details']:
             port = simulation_ports.get_port_by_number(p['portnumber'])
-            for layername, v0, v1 in p['stack']:
-                number = int(metals_list.getbylayername(layername).layernum)
-                cutter = _global(shapely_box(-1.0, v0 - TOL / 2, p['gap'], v1 + TOL / 2), side, wall)
-                _subtract(allpolygons, number, cutter)
+            if not E:
+                for layername, v0, v1 in p['stack']:
+                    number = int(metals_list.getbylayername(layername).layernum)
+                    cutter = _global(shapely_box(-1.0, v0 - TOL / 2, p['gap'], v1 + TOL / 2), side, wall)
+                    _subtract(allpolygons, number, cutter)
             allpolygons.polygons = [poly for poly in allpolygons.polygons if int(poly.layernum) != int(port.source_layernum)]
-            gap_rect = _global(shapely_box(0.0, p['line'][0], p['gap'], p['line'][1]), side, wall)
+            gap_rect = _global(shapely_box(-E, p['line'][0], -E + p['gap'], p['line'][1]), side, wall)
             allpolygons.add_polygon([list(c) for c in gap_rect.exterior.coords[:-1]], int(port.source_layernum))
             if p.get('converted'):
                 print(p['converted'])
@@ -839,8 +910,8 @@ def write_key(sim_path, record):
 def port_information_record(result):
     """what combine_extend_snp.py needs, stored in port_information.json"""
     keep = ('side', 'ports', 'port_details', 'D', 'span', 'distance_to_ground', 'ground_layers', 'eps_max', 'n_eff_estimate',
-            'shared_with', 'L', 'L_rule',
-            'valid_to_GHz', 'fmax_GHz', 'uniform_from_wall', 'shift', 'standards', 'warnings')
+            'shared_with', 'extension', 'L', 'L_rule',
+            'valid_to_GHz', 'fmax_GHz', 'uniform_from_wall', 'device_size', 'shift', 'standards', 'warnings')
     return [{k: g[k] for k in keep if k in g} for g in result['groups']]
 
 

@@ -1694,7 +1694,8 @@ def create_model (excite_ports, settings):
                     print(line)
                 port_walls = util_calibration.analyze_port_walls(
                     allpolygons, metals_list, materials_list, dielectrics_list, simulation_ports, original_boundary, fmax, unit,
-                    get_optional_setting(settings, 'reference_plane_shift', None), get_optional_setting(settings, 'deembedding_length', None))
+                    get_optional_setting(settings, 'reference_plane_shift', None), get_optional_setting(settings, 'deembedding_length', None),
+                    port_wall_extension=get_optional_setting(settings, 'port_wall_extension', None))
                 util_calibration.apply_port_walls(port_walls, allpolygons, metals_list, simulation_ports)
                 util_calibration.standard_records(port_walls, model_basename, margin, air_around, boundary_condition)
                 for line in util_calibration.describe(port_walls):

@@ -344,3 +344,43 @@ def test_walls_a_few_nm_apart_share_the_standards(stack):
     margin, air, bc, _ = calibration.port_wall_box(['xmin', 'xmax'], (100, 100, 100, 100), 50, boundary)
     calibration.standard_records(r, 'line', margin, air, bc)
     assert r['groups'][1].get('shared_with') == 'xmin'
+
+
+def coil_like():
+    """lines over the SUBGND plate, a device 20 from the wall: inside the fringe field and the wall's mirror range"""
+    ap = all_polygons_list()
+    for k, (y0, y1) in enumerate(GSSG_LINES):
+        ap.add_rectangle(0, y0, 20, y1, TM2)
+        ap.add_rectangle(0, y0, 0, y1, 201 + k)
+    ap.add_rectangle(20, -40, 120, 40, TM2)                 # the device
+    ap.add_rectangle(0, -60, 120, 60, SUBGND)
+    return ap
+
+
+def test_auto_extension_moves_the_port_wall(stack):
+    materials, dielectrics, metals = stack
+    ap, ports = coil_like(), ports_for([1, 2])
+    plain = analyze(stack, coil_like(), ports_for([1, 2]))['groups'][0]
+    assert any('fringe field' in w and "'auto'" in w for w in plain['warnings'])
+    r = analyze(stack, ap, ports, port_wall_extension={'xmin': 'auto'})
+    g = r['groups'][0]
+    need = max(g['D'], 0.5 * g['device_size']) - g['uniform_from_wall']
+    assert g['extension'] == pytest.approx(need, abs=0.011) and g['extension'] > 0
+    assert not any('fringe field' in w or 'mirrors' in w for w in g['warnings'])
+    assert any('port wall moved' in n for n in g['notes']) and not any('port wall moved' in w for w in g['warnings'])
+    calibration.apply_port_walls(r, ap, metals, ports)
+    E, gap = g['extension'], g['port_details'][0]['gap']
+    assert ap.get_bounding_box()[0] == pytest.approx(-E)
+    port = [p for p in ap.polygons if p.layernum == 201][0]
+    assert (port.xmin, port.xmax) == (pytest.approx(-E), pytest.approx(-E + gap))
+    lines = [p for p in ap.polygons if p.layernum == TM2 and p.ymin == -15]
+    assert min(p.xmin for p in lines) == pytest.approx(-E + gap) and max(p.xmax for p in lines) == pytest.approx(20)
+    assert any(p.xmin == pytest.approx(0) for p in lines), "no gap cut at the layout edge"
+    assert calibration.port_information_record(r)[0]['extension'] == E
+
+
+def test_extension_value_is_checked(stack):
+    with pytest.raises(calibration.PortWallError, match="'auto' or a length"):
+        analyze(stack, coil_like(), ports_for([1, 2]), port_wall_extension={'xmin': -5})
+    with pytest.raises(calibration.PortWallError, match='not a port wall'):
+        analyze(stack, coil_like(), ports_for([1, 2]), port_wall_extension={'ymin': 10})

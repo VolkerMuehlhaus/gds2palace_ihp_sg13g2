@@ -567,7 +567,11 @@ def _error_network(f, N, port_info, groups_cal, unit):
         Ys = _interp_per_omega(cal['f'], cal['Ys'], f)
         Zs = _interp_per_omega(cal['f'], cal['Zs'], f)
         E = shunt_t(Ys) @ series_t(Zs)
-        shift = float(group.get('shift', 0.0))
+        # the reference plane from the port wall: the user's shift from the layout edge, plus the extension that moved
+        # the port wall outward
+        extension = float(group.get('extension', 0.0))
+        user_shift = float(group.get('shift', 0.0))
+        shift = user_shift + extension
         if shift:
             A = _interp_per_omega(cal['f'], cal['A'], f)
             E = E @ _eig_fun(A * shift, np.exp)
@@ -579,7 +583,12 @@ def _error_network(f, N, port_info, groups_cal, unit):
                 Se[:, pi, N + pj] = e[:, i, n + j]
                 Se[:, N + pi, pj] = e[:, n + i, j]
                 Se[:, N + pi, N + pj] = e[:, n + i, n + j]
-        where = 'at the wall' if not shift else f'{shift:g} {unit_name} into the layout' if shift > 0 else f'{-shift:g} {unit_name} outside the wall'
+        if extension:
+            where = (('at the layout edge' if not user_shift else f'{user_shift:g} {unit_name} into the layout')
+                     + f' (port wall moved {extension:g} {unit_name} outward, feed extended)')
+        else:
+            where = ('at the wall' if not shift else f'{shift:g} {unit_name} into the layout' if shift > 0
+                     else f'{-shift:g} {unit_name} outside the wall')
         for p in group['ports']:
             method[p] = f"calibrated at port wall {group['side']}, reference plane {where}"
     estimated = {}
@@ -633,6 +642,7 @@ def calibrated_deembedding(snp_filename, port_info, sim_path):
     for g, cal in groups_cal:
         w = 2 * np.pi * cal['f']
         entry = {'side': g['side'], 'ports': g['ports'], 'D': g.get('D'), 'L': g['L'], 'shift': g.get('shift', 0.0),
+                 'extension': g.get('extension', 0.0),
                  'gaps': {str(p['portnumber']): p['gap'] for p in g.get('port_details', [])},
                  'frequencies_GHz': (cal['f'] / 1e9).tolist(),
                  'port_C_fF': (cal['Ys'].imag / w[:, None, None] * 1e15).round(4).tolist(),

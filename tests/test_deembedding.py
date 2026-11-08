@@ -70,7 +70,7 @@ def write_palace_csv(path, f, S):
             fh.write(', '.join(row) + ',\n')
 
 
-def make_case(tmp_path, shift=0.0, loss=False, interior=False):
+def make_case(tmp_path, shift=0.0, loss=False, interior=False, extension=0.0):
     """sim folder with port_information.json, the two standards' results and the device's result"""
     sim = tmp_path / 'dev_data'
     L = 200.0
@@ -80,7 +80,7 @@ def make_case(tmp_path, shift=0.0, loss=False, interior=False):
         T = P @ line_t(F_STD, factor * L, loss) @ ce.rev_t(P)
         write_palace_csv(str(sim / 'output' / f'dev_{name}' / 'port-S.csv'), F_STD, ce.t2s(T))
     Ys, Zs = port_elements(F_DEV)
-    E = ce.shunt_t(Ys) @ ce.series_t(Zs) @ line_t(F_DEV, shift, loss)
+    E = ce.shunt_t(Ys) @ ce.series_t(Zs) @ line_t(F_DEV, shift + extension, loss)
     S_dut = dut_s(F_DEV)
     if interior:
         # 3-port device: ports 1 and 3 on the wall, port 2 interior with the estimated port inductance
@@ -105,7 +105,7 @@ def make_case(tmp_path, shift=0.0, loss=False, interior=False):
     write_palace_csv(str(sim / 'output' / 'dev' / 'port-S.csv'), F_DEV, S_meas)
     ports = [{'portnumber': p, 'Z0': 50, 'length': 1.0, 'width': 10.0, 'element': 1} for p in range(1, S_dut.shape[-1] + 1)]
     info = {'ports': ports, 'unit': UNIT, 'name': 'dev', 'port_walls': [{
-        'side': 'xmin', 'ports': ports_wall, 'D': 50.0, 'L': L, 'shift': shift, 'eps_max': 11.9,
+        'side': 'xmin', 'ports': ports_wall, 'D': 50.0, 'L': L, 'shift': shift, 'extension': extension, 'eps_max': 11.9,
         'port_details': [{'portnumber': p, 'gap': 1.0} for p in ports_wall], 'warnings': [],
         'standards': [{'name': n, 'model': f'dev_{n}', 'output': f'output/dev_{n}', 'length': L * k}
                       for n, k in (('cal_xmin_L', 1), ('cal_xmin_2L', 2))]}]}
@@ -188,3 +188,13 @@ def test_missing_standards_write_no_deembedded_file(tmp_path, capsys):
     run_combine(sim)
     assert not (sim / 'output' / 'dev' / 'dev_deembedded.s2p').exists()
     assert 'calibrated de-embedding not possible' in capsys.readouterr().out
+
+
+def test_extension_puts_the_reference_plane_back_at_the_layout_edge(tmp_path):
+    """the port wall moved 40 outward: the extended feed is removed like a shift"""
+    sim, S_dut = make_case(tmp_path, extension=40.0)
+    run_combine(sim)
+    out = rf.Network(str(sim / 'output' / 'dev' / 'dev_deembedded.s2p'))
+    assert np.max(np.abs(out.s - S_dut)) < 1e-6
+    text = (sim / 'output' / 'dev' / 'dev_deembedded.s2p').read_text()
+    assert 'reference plane at the layout edge (port wall moved 40 um outward, feed extended)' in text
