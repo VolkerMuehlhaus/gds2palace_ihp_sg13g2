@@ -242,12 +242,13 @@ def _z_touch(a, b):
 # ------------------------------------------------------------------------------------------------------- analysis
 
 def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_list, simulation_ports, boundary, fmax,
-                       unit=1e-6, reference_plane_shift=None, deembedding_length=None):
+                       unit=1e-6, reference_plane_shift=None, deembedding_length=None, collect_errors=False):
     """Find the wall ports and everything the standards need. Changes nothing (setupEM's "Check port walls" calls only
-    this). fmax in Hz, lengths in drawing units. Raises PortWallError.
-    Returns {'groups': [...], 'warnings': [...], 'notes': [...]}, JSON-friendly."""
+    this). fmax in Hz, lengths in drawing units. Raises PortWallError; with collect_errors, an error that belongs to one
+    port wall goes into result['errors'][side] instead, and the other walls are still analysed (setupEM).
+    Returns {'groups': [...], 'warnings': [...], 'notes': [...], 'errors': {...}}, JSON-friendly."""
     sides = port_wall_sides(boundary)
-    result = {'groups': [], 'warnings': [], 'notes': []}
+    result = {'groups': [], 'warnings': [], 'notes': [], 'errors': {}}
     if not sides:
         return result
     reference_plane_shift = reference_plane_shift or {}
@@ -300,18 +301,23 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
         on_wall[walls_touched[0]].append((port, polys[0]))
 
     for side in sides:
-        if not on_wall[side]:
-            raise PortWallError(f"port wall {side} has no port: draw the port polygons on the layout edge at {side}, over "
-                                f"the ends of the lines")
-        result['groups'].append(_analyze_group(side, walls[side], on_wall[side], transverse_range[side], depth[side],
-                                               allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
-                                               reference_plane_shift.get(side, 0.0), deembedding_length))
+        try:
+            if not on_wall[side]:
+                raise PortWallError(f"port wall {side} has no port: draw the port polygons on the layout edge at {side}, "
+                                    f"over the ends of the lines")
+            result['groups'].append(_analyze_group(side, walls[side], on_wall[side], transverse_range[side], depth[side],
+                                                   allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
+                                                   reference_plane_shift.get(side, 0.0), deembedding_length))
+        except PortWallError as error:
+            if not collect_errors:
+                raise
+            result['errors'][side] = str(error)
 
     # two port walls facing each other too close
     for side in ('xmin', 'ymin'):
         if side in sides and OPPOSITE[side] in sides:
-            D = max(g['D'] for g in result['groups'] if g['side'] in (side, OPPOSITE[side]))
-            if depth[side] < 2 * D:
+            D = max((g['D'] for g in result['groups'] if g['side'] in (side, OPPOSITE[side])), default=0.0)
+            if D and depth[side] < 2 * D:
                 result['warnings'].append(f"port walls {side} and {OPPOSITE[side]} are {depth[side]:g} apart, less than 2 D = "
                                           f"{2 * D:g}: the coupling between them is not removed")
     for group in result['groups']:
@@ -339,6 +345,9 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
         target = metals_list.getbylayername(port.target_layername)
         if target is None:
             raise PortWallError(f"port {port.portnumber}: target layer {port.target_layername} is not in the stackup")
+        if target.is_via or not _is_conductor(target, materials_list):
+            raise PortWallError(f"port {port.portnumber}: target layer {target.name} is not a metal layer; the target of "
+                                f"a wall port is the metal of the line, e.g. TopMetal2")
         number = int(target.layernum)
         search = depth_drawn + max(10 * (pv1 - pv0), 0.1 * depth)
         parts = layers.in_box(number, -TOL, pv0, search, pv1)
@@ -363,13 +372,13 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             raise PortWallError(f"ports {a['portnumber']} and {b['portnumber']} on port wall {side} sit on the same line")
 
     # 2. signal stacks: the line and every conductor connected to it at the cut (stacked lines)
+    # A via array under a stacked line is found within one line width of the cut (vias don't lie on the cut line),
+    # and counts only if the metal on its other side is at the cut too: vias further in, where a line steps down to
+    # the device, are not part of the line at the wall (they made D too small).
     u0 = max(d['gap'] for d in details) + CUT_OFFSET
     width = max(d['line'][1] - d['line'][0] for d in details)
-    band = (u0, u0 + max(5 * width, 10 * CUT_OFFSET))
-    def intervals_of(number):
-        if conductors[number].is_via:
-            return layers.projection(number, band[0], band[1], vlo, vhi)
-        return layers.cut(number, u0, vlo, vhi)
+    band = (u0, u0 + max(width, 10 * CUT_OFFSET))
+    plain = {n: m for n, m in conductors.items() if not m.is_via}
     for d in details:
         stack = {d['target_number']: [tuple(d['line'])]}
         todo = [d['target_number']]
@@ -378,11 +387,25 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             for m, metal in conductors.items():
                 if m == n or not _z_touch(metal, conductors[n]):
                     continue
-                found = [iv for iv in intervals_of(m) if any(_overlap(iv, s) for s in stack[n])]
-                new = [iv for iv in found if iv not in stack.get(m, [])]
-                if new:
-                    stack.setdefault(m, []).extend(new)
-                    todo.append(m)
+                if metal.is_via:
+                    vias = [iv for iv in layers.projection(m, band[0], band[1], vlo, vhi)
+                            if any(_overlap(iv, s) for s in stack[n])]
+                    # the metal on the via's other side, at the cut and over the via
+                    for k, other in plain.items():
+                        if k == n or not _z_touch(other, metal):
+                            continue
+                        beyond = [iv for iv in layers.cut(k, u0, vlo, vhi) if any(_overlap(iv, v) for v in vias)]
+                        new = [iv for iv in beyond if iv not in stack.get(k, [])]
+                        if new:
+                            stack.setdefault(m, []).extend(v for v in vias if v not in stack.get(m, []))
+                            stack.setdefault(k, []).extend(new)
+                            todo.append(k)
+                else:
+                    found = [iv for iv in layers.cut(m, u0, vlo, vhi) if any(_overlap(iv, s) for s in stack[n])]
+                    new = [iv for iv in found if iv not in stack.get(m, [])]
+                    if new:
+                        stack.setdefault(m, []).extend(new)
+                        todo.append(m)
         d['stack'] = {n: _merge(ivs) for n, ivs in stack.items()}
     signal = {}
     for d in details:

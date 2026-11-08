@@ -258,3 +258,28 @@ def test_ports_on_the_layout_edge_without_port_walls():
     ap.add_rectangle(150, -5, 150, 5, 204)          # inside the layout
     ports = ports_for([1, 2, 3, 4])
     assert calibration.ports_on_layout_edge(ap, ports) == {1: 'xmin', 2: 'xmin', 3: 'ymax'}
+
+
+def test_vias_away_from_the_wall_are_not_part_of_the_line(stack):
+    """a line that steps down to TopMetal1 further in (60 GHz PA layout): D must come from the line at the wall"""
+    ap = gssg()
+    for y0, y1 in GSSG_LINES:
+        ap.add_rectangle(60, y0, 300, y1, TM1)
+        ap.add_rectangle(62, y0 + 1, 64, y1 - 1, TV2)
+    g = analyze(stack, ap, ports_for([1, 2]))['groups'][0]
+    assert g['D'] == pytest.approx(50.0) and {s[0] for s in g['port_details'][0]['stack']} == {'TopMetal2'}
+
+
+def test_target_that_is_not_a_metal(stack):
+    with pytest.raises(calibration.PortWallError, match='LBE is not a metal layer'):
+        analyze(stack, gssg(), ports_for([1, 2], target='LBE'))
+
+
+def test_errors_per_wall_with_collect_errors(stack):
+    ap = gssg()
+    for k, (y0, y1) in enumerate(GSSG_LINES):
+        ap.add_rectangle(300, y0, 300, y1, 203 + k)
+    ports = ports_for([1, 2, 3, 4])
+    ports.ports[0].target_layername = 'LBE'
+    r = analyze(stack, ap, ports, boundary=['PORTWALL', 'PORTWALL', 'ABC', 'ABC', 'ABC', 'ABC'], collect_errors=True)
+    assert [g['side'] for g in r['groups']] == ['xmax'] and 'LBE is not a metal layer' in r['errors']['xmin']
