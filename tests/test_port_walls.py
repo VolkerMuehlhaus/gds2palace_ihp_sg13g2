@@ -6,6 +6,7 @@ small line with gmsh (no Palace).
 """
 import json
 import os
+import re
 
 import pytest
 
@@ -384,3 +385,40 @@ def test_extension_value_is_checked(stack):
         analyze(stack, coil_like(), ports_for([1, 2]), port_wall_extension={'xmin': -5})
     with pytest.raises(calibration.PortWallError, match='not a port wall'):
         analyze(stack, coil_like(), ports_for([1, 2]), port_wall_extension={'ymin': 10})
+
+
+def line_over_plane_with_slot(slot, closes_at=3.0, length=300.0):
+    """a 10 um TopMetal2 line at y = -5..5 over a Metal1 plane that reaches the wall at x = 0, with a slot at
+    y = slot (y0, y1) from the wall to x = closes_at; port 1 drawn on the wall"""
+    ap = all_polygons_list()
+    ap.add_rectangle(0, -5, length, 5, TM2)
+    ap.add_rectangle(0, -5, 0, 5, 201)
+    y0, y1 = slot
+    ap.add_rectangle(0, -100, length, y0, M1)
+    ap.add_rectangle(closes_at, y0, length, y1, M1)
+    ap.add_rectangle(0, y1, length, 100, M1)
+    return ap
+
+
+def test_plane_slot_far_from_the_line_is_reported_not_an_error(stack):
+    # the slot closes 3 um from the wall, within D/4, but it is farther from the line than D: outside the port's region
+    r = analyze(stack, line_over_plane_with_slot((60, 70)), ports_for([1]))
+    g = r['groups'][0]
+    assert g['D'] < 60 - 5
+    far = [w for w in r['warnings'] if 'away from the lines changes' in w]
+    assert far and 0 < float(re.search(r'changes ([\d.]+) from', far[0]).group(1)) <= 3
+    assert not any('fringe field' in w for w in r['warnings'])      # no device seen within D along the line
+
+
+def test_plane_slot_near_the_line_is_an_error(stack):
+    with pytest.raises(calibration.PortWallError, match='within D/4'):
+        analyze(stack, line_over_plane_with_slot((12, 20)), ports_for([1]))
+
+
+def test_plane_slot_far_and_the_device_distance(stack):
+    # the far slot does not count as the device: the device distance is where the line's own neighbourhood changes
+    ap = line_over_plane_with_slot((60, 70))
+    ap.add_rectangle(20, -40, 100, -20, TM2)                        # other metal 15 um beside the line, 20 um in (< D)
+    r = analyze(stack, ap, ports_for([1]))
+    dev = [w for w in r['warnings'] if 'fringe field' in w]
+    assert dev and 10 < float(re.search(r'changes ([\d.]+) from', dev[0]).group(1)) <= 20

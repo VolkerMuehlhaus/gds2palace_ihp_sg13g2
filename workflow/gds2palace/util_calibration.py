@@ -223,6 +223,12 @@ def _merge(intervals):
     return [(round(a, 6), round(b, 6)) for a, b in out]
 
 
+def _clip(intervals, lo, hi):
+    """the intervals cut to [lo, hi], empty ones dropped"""
+    out = [(max(a, lo), min(b, hi)) for a, b in intervals]
+    return [(a, b) for a, b in out if b - a > TOL]
+
+
 def _overlap(a, b):
     return min(a[1], b[1]) - max(a[0], b[0]) > TOL
 
@@ -580,21 +586,34 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             if n in profile:
                 d['stack'][n] = [iv for iv in profile[n] if any(_overlap(iv, s) for s in ivs)]
 
-    # 8. how far the cross-section stays the same: the device's distance from the wall
+    # 8. how far the cross-section stays the same: the device's distance from the wall. Compared within the port's
+    # region, the lines' span widened by D on both sides (u_dev); a change farther from the lines, e.g. a slot in a
+    # plane that closes or a pad frame ending, is only reported (u_far)
     plain = {n: ivs for n, ivs in profile.items() if not metal_of[n].is_via}
+    s_lo = min(iv[0] for ivs in signal.values() for iv in ivs)
+    s_hi = max(iv[1] for ivs in signal.values() for iv in ivs)
+    wlo, whi = max(vlo, s_lo - D), min(vhi, s_hi + D)
+    core = {n: _clip(ivs, wlo, whi) for n, ivs in plain.items()}
+    core = {n: ivs for n, ivs in core.items() if ivs}
     scan_end = min(depth - TOL, max(2 * D, shift + D, 0.5 * (vhi - vlo) + D))
     step = max(D / 8, scan_end / 400) if scan_end > up else None
     u_dev = None
+    u_far = None
     device_size = None
     u = up
-    while step is not None and u + step <= scan_end:
+    while step is not None and u + step <= scan_end and (u_dev is None or u_far is None):
         u += step
         here = {n: layers.cut(n, u, vlo, vhi) for n in plain}
         here = {n: ivs for n, ivs in here.items() if ivs}
-        others = [n for n in layers.geoms if n not in plain and not metal_of[n].is_via and layers.cut(n, u, vlo, vhi)]
-        if not _same_profile(here, plain) or others:
-            u_dev = u - step
-            break
+        others = {n: layers.cut(n, u, vlo, vhi) for n in layers.geoms if n not in plain and not metal_of[n].is_via}
+        others = {n: ivs for n, ivs in others.items() if ivs}
+        if u_dev is None:
+            here_core = {n: _clip(ivs, wlo, whi) for n, ivs in here.items()}
+            here_core = {n: ivs for n, ivs in here_core.items() if ivs}
+            if not _same_profile(here_core, core) or any(_clip(ivs, wlo, whi) for ivs in others.values()):
+                u_dev = u - step
+        if u_far is None and (not _same_profile(here, plain) or others):
+            u_far = u - step
     if u_dev is not None:
         if u_dev < D / 4:
             raise PortWallError(f"the cross-section at port wall {side} changes within D/4 = {D / 4:.4g} of the wall (a line at "
@@ -605,6 +624,10 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             ground_at_wall.setdefault(n, []).append(iv)
         beyond = layers.device_extent(u_dev, ground_at_wall)
         device_size = None if beyond is None else beyond[1] - beyond[0]
+    if u_far is not None and u_far < D / 4 and (u_dev is None or u_far < u_dev):
+        warnings.append(f"metal more than D = {D:.4g} away from the lines changes {u_far:.4g} from the port wall (a slot in a "
+                        f"plane, a pad frame or other metal ending): the standards copy the cross-section at the wall there, "
+                        f"the layout differs; outside the port's region")
     # the port wall can be moved outward: the feed is extended by the wall's cross-section, the reference plane shifted
     # back to the layout edge. 'auto': until the device is at least D and half its size from the wall
     needed = 0.0
