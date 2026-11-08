@@ -594,6 +594,8 @@ Top view at the port wall, as drawn (left) and as modelled (right). Top: a GSSG 
 
 All ports on one port wall are calibrated together, so the coupling between the two ports of a pair is removed too. The lines must cross the wall at a right angle and keep their cross-section for a while: the tool stops with an error when the cross-section changes within D/4 of the wall. A stacked line, e.g. TopMetal1 and TopMetal2 joined by a via array, is cut on all its layers, and the via array becomes a solid via bar in the standards.
 
+A via port on a port wall, e.g. from a layout tool's export, can't stay a via port: its sheet would lie in the PEC wall. It is used as a gap port instead, when one end of the via port is the line at the port (one piece of metal about as wide as the port) and the other end is not (a ground plane, or no metal at all). The port then sits on the line's metal and points from ground to the line, like every wall port, and the log says so for each port, also when this reverses the via port's drawn polarity. If both ends or neither end is a line, the model is not written: draw an in-plane port on the line instead.
+
 #### The standards
 
 For each port wall, the tool writes two standards into the model's `_data` folder: the layout's cross-section at the wall, extruded to thru lines of length L and 2 L. They use the model's stackup, conductor model and mesh settings, because each mesh has its own small line error, and the calibration only removes it when model and standards share it. They are solved at three frequencies (fstop/20, fstop/5 and fstop). Both ends of a line have the same cross-section, so two such port walls share one pair of standards.

@@ -141,13 +141,57 @@ def test_passive_port_on_a_wall(stack):
         analyze(stack, gssg(), ports_for([1, 2], voltage=0))
 
 
-def test_via_port_on_a_wall(stack):
-    ap = gssg()
+def via_ports(numbers, from_layer, to_layer, direction='z'):
     ports = simulation_setup.all_simulation_ports()
-    ports.add_port(simulation_setup.simulation_port(portnumber=1, voltage=1, port_Z0=50, source_layernum=201,
-                                                    from_layername='TopMetal1', to_layername='TopMetal2', direction='z'))
-    with pytest.raises(calibration.PortWallError, match='via port'):
-        analyze(stack, ap, ports)
+    for n in numbers:
+        ports.add_port(simulation_setup.simulation_port(portnumber=n, voltage=1, port_Z0=50, source_layernum=200 + n,
+                                                        from_layername=from_layer, to_layername=to_layer, direction=direction))
+    return ports
+
+
+M3 = 30
+
+
+def gssg_over_metal3():
+    """the 60 GHz PA case: TopMetal2 lines over a Metal3 plane, via ports Metal3 -> TopMetal2 along the edge"""
+    ap = gssg()
+    ap.add_rectangle(0, -65, 300, 65, M3)
+    return ap
+
+
+def test_via_port_on_a_wall_becomes_a_gap_port(stack):
+    materials, dielectrics, metals = stack
+    ap, ports = gssg_over_metal3(), via_ports([1, 2], 'Metal3', 'TopMetal2')
+    r = analyze(stack, ap, ports)
+    g = r['groups'][0]
+    assert [p['target_layer'] for p in g['port_details']] == ['TopMetal2', 'TopMetal2']
+    assert any('via port Metal3 -> TopMetal2 on port wall xmin, used as a gap port on TopMetal2' in n for n in r['notes'])
+    assert not any('polarity' in n for n in r['notes'])
+    calibration.apply_port_walls(r, ap, metals, ports)
+    port = ports.get_port_by_number(1)
+    assert (port.target_layername, port.from_layername, port.direction) == ('TopMetal2', None, 'x')
+
+
+def test_via_port_drawn_from_the_line_to_ground_is_reversed(stack):
+    r = analyze(stack, gssg_over_metal3(), via_ports([1, 2], 'Metal3', 'TopMetal2', direction='-z'))
+    assert any('polarity was from the line to ground' in n for n in r['notes'])
+
+
+def test_via_port_with_a_line_at_both_ends_is_refused(stack):
+    ap = gssg()
+    for y0, y1 in GSSG_LINES:
+        ap.add_rectangle(0, y0, 300, y1, TM1)          # a TopMetal1 line under each TopMetal2 line
+    with pytest.raises(calibration.PortWallError, match='both ends'):
+        analyze(stack, ap, via_ports([1, 2], 'TopMetal1', 'TopMetal2'))
+
+
+def test_via_port_drawn_as_a_point_is_refused(stack):
+    ap = gssg_over_metal3()
+    ap.polygons = [p for p in ap.polygons if p.layernum not in (201, 202)]
+    ap.add_rectangle(0, -10, 0, -10, 201)
+    ap.add_rectangle(0, 10, 0, 10, 202)
+    with pytest.raises(calibration.PortWallError, match='drawn as a point'):
+        analyze(stack, ap, via_ports([1, 2], 'Metal3', 'TopMetal2'))
 
 
 def test_port_wall_without_port(stack):
@@ -283,3 +327,20 @@ def test_errors_per_wall_with_collect_errors(stack):
     ports.ports[0].target_layername = 'LBE'
     r = analyze(stack, ap, ports, boundary=['PORTWALL', 'PORTWALL', 'ABC', 'ABC', 'ABC', 'ABC'], collect_errors=True)
     assert [g['side'] for g in r['groups']] == ['xmax'] and 'LBE is not a metal layer' in r['errors']['xmin']
+
+
+def test_walls_a_few_nm_apart_share_the_standards(stack):
+    """layout tools leave a few nm between the two ends of a line (60 GHz PA layout: 15 nm)"""
+    ap = all_polygons_list()
+    for k, (y0, y1) in enumerate(GSSG_LINES):
+        ap.add_rectangle(0, y0, 150, y1, TM2)
+        ap.add_rectangle(150, y0 + 0.015, 300, y1 + 0.015, TM2)
+        ap.add_rectangle(0, y0, 0, y1, 201 + k)
+        ap.add_rectangle(300, y0 + 0.015, 300, y1 + 0.015, 203 + k)
+    for y0, y1 in GSSG_GROUNDS:
+        ap.add_rectangle(0, y0, 300, y1, TM2)
+    boundary = ['PORTWALL', 'PORTWALL', 'ABC', 'ABC', 'ABC', 'ABC']
+    r = analyze(stack, ap, ports_for([1, 2, 3, 4]), boundary=boundary)
+    margin, air, bc, _ = calibration.port_wall_box(['xmin', 'xmax'], (100, 100, 100, 100), 50, boundary)
+    calibration.standard_records(r, 'line', margin, air, bc)
+    assert r['groups'][1].get('shared_with') == 'xmin'

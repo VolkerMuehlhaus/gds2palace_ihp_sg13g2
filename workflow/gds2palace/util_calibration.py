@@ -272,6 +272,7 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
     for poly in allpolygons.polygons:
         port_polys.setdefault(int(poly.layernum), []).append(poly)
     on_wall = {side: [] for side in sides}
+    layers_of = {}
     for port in simulation_ports.ports:
         polys = port_polys.get(int(port.source_layernum), [])
         touching = set()
@@ -289,25 +290,39 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
         if len(walls_touched) > 1:
             raise PortWallError(f"port {port.portnumber} touches two port walls ({' and '.join(walls_touched)}) at a corner; "
                                 f"a wall port must lie on one side")
-        if port.target_layername is None:
-            raise PortWallError(f"port {port.portnumber} is a via port on port wall {walls_touched[0]}; port walls take in-plane "
-                                f"ports only (target_layername), drawn over the end of the line")
         if len(polys) > 1:
             raise PortWallError(f"port {port.portnumber} on port wall {walls_touched[0]} has {len(polys)} shapes on layer "
                                 f"{port.source_layernum}; a wall port is one shape over one line")
         if abs(port.voltage) < 1e-6:
             raise PortWallError(f"port {port.portnumber} on port wall {walls_touched[0]} is passive (voltage 0); the "
                                 f"calibration needs the full S-matrix, so every port must be excited")
-        on_wall[walls_touched[0]].append((port, polys[0]))
+        side = walls_touched[0]
+        target, converted = port.target_layername, None
+        if target is None:
+            try:
+                if side not in layers_of:
+                    layers_of[side] = _Layers(allpolygons, metals_list, side, walls[side])
+                target, converted = _via_port_as_gap_port(port, polys[0], side, walls[side], layers_of[side], metals_list,
+                                                          transverse_range[side])
+                result['notes'].append(converted)
+            except PortWallError as error:
+                if not collect_errors:
+                    raise
+                result['errors'].setdefault(side, str(error))
+                continue
+        on_wall[side].append((port, polys[0], target, converted))
 
     for side in sides:
+        if side in result['errors']:
+            continue
         try:
             if not on_wall[side]:
                 raise PortWallError(f"port wall {side} has no port: draw the port polygons on the layout edge at {side}, "
                                     f"over the ends of the lines")
             result['groups'].append(_analyze_group(side, walls[side], on_wall[side], transverse_range[side], depth[side],
                                                    allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
-                                                   reference_plane_shift.get(side, 0.0), deembedding_length))
+                                                   reference_plane_shift.get(side, 0.0), deembedding_length,
+                                                   layers_of.get(side)))
         except PortWallError as error:
             if not collect_errors:
                 raise
@@ -326,9 +341,10 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
 
 
 def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, materials_list, dielectrics_list, fmax, unit,
-                   shift, deembedding_length):
+                   shift, deembedding_length, layers=None):
     vlo, vhi = vrange
-    layers = _Layers(allpolygons, metals_list, side, wall)
+    if layers is None:
+        layers = _Layers(allpolygons, metals_list, side, wall)
     metal_of = {}
     for metal in metals_list.metals:
         metal_of.setdefault(int(metal.layernum), metal)
@@ -337,14 +353,14 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
 
     # 1. each port: the line, and the gap as drawn
     details = []
-    for port, poly in ports:
+    for port, poly, target_name, converted in ports:
         _, pv0, u1, pv1 = _local_bounds(poly, side, wall)
         depth_drawn = max(u1, 0.0)
         if pv1 - pv0 < TOL:
             pv0, pv1 = pv0 - TOL, pv1 + TOL
-        target = metals_list.getbylayername(port.target_layername)
+        target = metals_list.getbylayername(target_name)
         if target is None:
-            raise PortWallError(f"port {port.portnumber}: target layer {port.target_layername} is not in the stackup")
+            raise PortWallError(f"port {port.portnumber}: target layer {target_name} is not in the stackup")
         if target.is_via or not _is_conductor(target, materials_list):
             raise PortWallError(f"port {port.portnumber}: target layer {target.name} is not a metal layer; the target of "
                                 f"a wall port is the metal of the line, e.g. TopMetal2")
@@ -365,7 +381,8 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             raise PortWallError(f"port {port.portnumber} on port wall {side} touches {len(lines)} separate {target.name} "
                                 f"regions; one port per line")
         details.append({'portnumber': port.portnumber, 'target_layer': target.name, 'target_number': number,
-                        'depth_drawn': depth_drawn, 'u_start': u_start, 'gap': gap, 'line': list(lines[0])})
+                        'depth_drawn': depth_drawn, 'u_start': u_start, 'gap': gap, 'line': list(lines[0]),
+                        'converted': converted})
     details.sort(key=lambda d: d['line'][0])
     for a, b in zip(details, details[1:]):
         if a['target_number'] == b['target_number'] and _overlap(a['line'], b['line']):
@@ -570,7 +587,7 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
     return {
         'side': side, 'wall': wall, 'ports': ports_order,
         'port_details': [{'portnumber': d['portnumber'], 'target_layer': d['target_layer'], 'gap': d['gap'],
-                          'gap_origin': d['gap_origin'], 'line': d['line'],
+                          'gap_origin': d['gap_origin'], 'line': d['line'], 'converted': d['converted'],
                           'stack': [[metal_of[n].name, iv[0], iv[1]] for n, ivs in d['stack'].items() for iv in ivs]}
                          for d in details],
         'D': round(D, 6), 'span': round(span, 6), 'distance_to_ground': round(d_min, 6),
@@ -600,6 +617,42 @@ def ports_on_layout_edge(allpolygons, simulation_ports):
         if len(sides) == 1:
             out[port.portnumber] = sides.pop()
     return out
+
+
+def _via_port_as_gap_port(port, poly, side, wall, layers, metals_list, vrange):
+    """A via port on a port wall can't stay one: its sheet would lie in the PEC wall. If one end is the line at the port
+    and the other is not (a plane, or nothing), it becomes a gap port on the line's metal. Returns the line's layer name
+    and a note, or raises PortWallError when it is not clear which end is the line."""
+    _, pv0, _, pv1 = _local_bounds(poly, side, wall)
+    if pv1 - pv0 < TOL:
+        raise PortWallError(f"port {port.portnumber} is a via port drawn as a point on port wall {side}; draw it as a "
+                            f"line along the edge across the line it feeds, or as an in-plane port")
+    width = pv1 - pv0
+    slack = max(0.25 * width, 10 * TOL)
+    ends = {}
+    for name in (port.from_layername, port.to_layername):
+        metal = metals_list.getbylayername(name)
+        if metal is None:
+            raise PortWallError(f"port {port.portnumber}: layer {name} is not in the stackup")
+        cut = layers.cut(int(metal.layernum), CUT_OFFSET, vrange[0], vrange[1])
+        over = [iv for iv in cut if _overlap(iv, (pv0, pv1))]
+        # a line: one piece of metal under the port that is not much wider than the port
+        is_line = len(over) == 1 and over[0][0] >= pv0 - slack and over[0][1] <= pv1 + slack
+        ends[name] = (metal, is_line)
+    lines = [name for name, (metal, is_line) in ends.items() if is_line]
+    if len(lines) != 1:
+        which = ('both ends' if len(lines) == 2 else 'neither end') + f" ({port.from_layername}, {port.to_layername})"
+        raise PortWallError(f"port {port.portnumber} is a via port on port wall {side}, and {which} is a line at the port, "
+                            f"so it can't be used as a gap port. Draw an in-plane port on the line instead (target layer = "
+                            f"the line's metal)")
+    line = lines[0]
+    other = [name for name in ends if name != line][0]
+    upward = '-' not in port.direction
+    line_on_top = ends[line][0].zmin >= ends[other][0].zmax - TOL
+    reversed_note = '' if upward == line_on_top else '; its polarity was from the line to ground, it is now from ground to the line like every wall port'
+    note = (f"port {port.portnumber}: via port {port.from_layername} -> {port.to_layername} on port wall {side}, used as a "
+            f"gap port on {line}{reversed_note}")
+    return line, note
 
 
 def describe(result):
@@ -633,7 +686,11 @@ def apply_port_walls(result, allpolygons, metals_list, simulation_ports):
             allpolygons.polygons = [poly for poly in allpolygons.polygons if int(poly.layernum) != int(port.source_layernum)]
             gap_rect = _global(shapely_box(0.0, p['line'][0], p['gap'], p['line'][1]), side, wall)
             allpolygons.add_polygon([list(c) for c in gap_rect.exterior.coords[:-1]], int(port.source_layernum))
-            if port.direction.lower() != INWARD[side]:
+            if p.get('converted'):
+                print(p['converted'])
+                port.target_layername = p['target_layer']
+                port.from_layername = port.to_layername = None
+            elif port.direction.lower() != INWARD[side]:
                 print(f"Port {port.portnumber} on port wall {side}: direction {INWARD[side]} (into the layout) instead of "
                       f"{port.direction}")
             port.direction = INWARD[side]
@@ -668,28 +725,48 @@ def standard_name(side, tag):
     return f'cal_{side}_{tag}'
 
 
-def _signature(group, margin, air, boundary):
-    """what makes a group's standards: two walls with the same signature share one pair of standards (a thru line has
-    the same cross-section at both ends, so its two walls need the standards only once)"""
+def _box_of(group, margin, air, boundary):
     lo, hi = TRANSVERSE[group['side']]
     i_lo, i_hi = BOX_SIDES.index(lo), BOX_SIDES.index(hi)
-    ports = [(p['target_layer'], p['gap'], p['line']) for p in group['port_details']]
-    box = (boundary[i_lo], boundary[i_hi], boundary[4], boundary[5], margin[i_lo], margin[i_hi], air[i_lo], air[i_hi], air[4], air[5])
-    return json.dumps([group['profile'], ports, group['L'], group['transverse'], box], sort_keys=True)
+    return (boundary[i_lo], boundary[i_hi], boundary[4], boundary[5], margin[i_lo], margin[i_hi], air[i_lo], air[i_hi],
+            air[4], air[5])
+
+
+def _same_standards(a, b, margin, air, boundary):
+    """two walls whose standards would be the same: same box on the sides along the line, same layers, and positions
+    within D/1000 (a thru line has the same cross-section at both ends; layout tools leave a few nm between them)"""
+    if _box_of(a, margin, air, boundary) != _box_of(b, margin, air, boundary):
+        return False
+    tol = max(10 * TOL, min(a['D'], b['D']) / 1000)
+    close = lambda x, y: abs(x - y) <= tol
+    # L = 4 D: a position difference of tol in D is 4 tol in L (and more where the length cap acts)
+    if not (abs(a['L'] - b['L']) <= 8 * tol and all(map(close, a['transverse'], b['transverse']))):
+        return False
+    if len(a['profile']) != len(b['profile']) or len(a['port_details']) != len(b['port_details']):
+        return False
+    for (la, a0, a1), (lb, b0, b1) in zip(a['profile'], b['profile']):
+        if la != lb or not close(a0, b0) or not close(a1, b1):
+            return False
+    for pa, pb in zip(a['port_details'], b['port_details']):
+        if pa['target_layer'] != pb['target_layer'] or not close(pa['gap'], pb['gap']):
+            return False
+        if not (close(pa['line'][0], pb['line'][0]) and close(pa['line'][1], pb['line'][1])):
+            return False
+    return True
 
 
 def standard_records(result, model_basename, margin=None, air=None, boundary=None):
     """the names, files and output folders of all standards, in the order they are written and solved. With the box
     settings given, a wall whose standards would be the same as an earlier wall's uses those (shared_with)."""
-    seen = {}
+    written = []
     for g in result['groups']:
         if margin is not None:
-            signature = _signature(g, margin, air, boundary)
-            if signature in seen:
-                g['standards'] = seen[signature]['standards']
-                g['shared_with'] = seen[signature]['side']
+            same = next((w for w in written if _same_standards(w, g, margin, air, boundary)), None)
+            if same is not None:
+                g['standards'] = same['standards']
+                g['shared_with'] = same['side']
                 continue
-            seen[signature] = g
+            written.append(g)
         g['standards'] = []
         for tag, factor in STANDARDS:
             name = standard_name(g['side'], tag)
