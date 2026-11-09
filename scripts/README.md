@@ -16,6 +16,8 @@ If port geometry information is available, as created by the latest version of g
 
 **combine_snp** is the shell script to run the combine_extend_snp.py Python script, if a Python venv named "palace" exists will all the Python libraries required for the gds2palace workflow, including scikit-rf. Please modify this as required for your environment.
 
+Since gds2palace 0.10.0, every model's `_data` folder carries its own copy of `combine_extend_snp.py`, written by the gds2palace that built the model, and `combine_snp` runs that copy when it is there (older models: the copy in `~/scripts`). So the result conversion and port de-embedding always match the model, whatever is installed on the Linux side; only the wrapper itself must be current, and `run_sim` prints a warning when the wrapper would still run `~/scripts/combine_extend_snp.py`. The script prints its version and path as its first line.
+
 **run_palace** is the script that was used during development to run Palace from an apptainer (container) file ~/palace.sif, using 8 core parallel simulation. Please modify this as required for your environment.  
 
 If you prefer to install and run Palace in a different way, no problem! The gds2palace workflow creates the input files for Palace, and it is entirely your choice how you run the simulator with these model files, local or on a sophisticated HPC cluster.

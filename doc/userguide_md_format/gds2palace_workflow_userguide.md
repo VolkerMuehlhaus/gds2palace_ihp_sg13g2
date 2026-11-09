@@ -352,6 +352,8 @@ run_palace config.json
 combine_snp
 ```
 
+(The `run_sim` of a model with port walls first solves the calibration standards, and since gds2palace 0.10.0 the `_data` folder also holds a copy of `combine_extend_snp.py`, the result script matching this gds2palace, which `combine_snp` runs when present.)
+
 
 This starts a script *run_palace* where you can define in detail how to run Palace. It is recommended that you place this run_palace script in your PATH, configured for the actual machine where you want to run Palace.  
 

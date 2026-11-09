@@ -676,7 +676,11 @@ def _standard_folder_of(found_filename, port_info_data):
     return None
 
 
+__version__ = "1.3"      # 1.3: port wall calibration (gds2palace 0.10.0); printed at the start so a log shows which copy ran
+
+
 def main():
+    print(f"combine_extend_snp.py {__version__} ({os.path.abspath(__file__)})")
     global found_datafiles
 
     workdir = os.getcwd()

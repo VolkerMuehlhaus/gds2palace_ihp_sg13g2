@@ -278,6 +278,12 @@ def test_model_files_and_run_script(stack, tmp_path):
     assert std['Problem']['Output'] == 'output/line_cal_xmin_L' and len(std['Boundaries']['LumpedPort']) == 4
     run = open(os.path.join(sim_path, 'run_sim')).read()
     assert run.index('config_cal_xmin_L.json') < run.index('config_cal_xmin_2L.json') < run.index('run_palace config.json')
+    # the model carries the combine script of the gds2palace that wrote it; run_sim warns about a wrapper that
+    # would not use it
+    assert 'combine_extend_snp.py' in files
+    assert run.index('run_palace config.json') < run.index('WARNING: your combine_snp') < run.rindex('combine_snp\n')
+    assert open(os.path.join(sim_path, 'combine_extend_snp.py')).read() == \
+        open(os.path.join(utilities.get_scripts_dir(), 'combine_extend_snp.py')).read()
 
 
 def test_both_ends_of_a_line_share_the_standards(stack, tmp_path):

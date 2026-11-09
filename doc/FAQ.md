@@ -427,7 +427,11 @@ requirements and [`building-palace-apptainer.md`](building-palace-apptainer.md)/
 
 Every generated `_data` directory gets a `run_sim` script
 (`utilities.create_run_script()`), which calls a `run_palace config.json`-
-style wrapper followed by `combine_snp` for Touchstone conversion — see
+style wrapper followed by `combine_snp` for Touchstone conversion. The
+directory also holds `combine_extend_snp.py`, the result script of the
+gds2palace that wrote the model, and the `combine_snp` wrapper from
+`scripts/` runs that copy, so a stale `~/scripts` copy can't silently skip
+e.g. the port wall calibration (`run_sim` warns about a wrapper that would) — see
 [`scripts/README.md`](../scripts/README.md) for `run_palace` (local/
 apptainer) and `run_palace_remote` (scp the model over, run it, scp results
 back over SSH). Passwordless SSH (key-based auth) is required for the
