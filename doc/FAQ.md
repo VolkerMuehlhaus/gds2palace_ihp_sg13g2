@@ -221,7 +221,10 @@ without an overlap or an estimated correction.
 What the joined result leaves out: coupling between the pieces other than through
 the lines that cross the cuts, because the cut is a metal wall in both models. Cut
 across simple feed lines, at least D from devices (the same rule as for any port
-wall), not between parts that couple. In a test with a 480 µm coplanar line on
+wall), not between parts that couple. The wall runs through the whole stack, the
+substrate included, so a line whose return current flows in the substrate (no
+ground metal near it at the cut) sees a changed return path; the join was checked
+with ground metal along the cut lines. In a test with a 480 µm coplanar line on
 TopMetal2 with a wide and a narrow section, cut in the middle, the joined result
 agreed with the full model within 0.01 in |S| up to 50 GHz; joining the uncalibrated
 results was off by 0.1.
