@@ -209,6 +209,23 @@ No — Palace itself supports wave ports, but this workflow only implements
 lumped ports; see [the user's guide](userguide_md_format/gds2palace_workflow_userguide.md#using-wave-ports-instead-of-lumped-ports-not-supported).
 For a calibrated reference plane, use ports at a port wall (previous question).
 
+### Can I split a large layout into smaller models and combine the results?
+
+Yes, at port walls. The KLayout plug-in klayout_em_export splits the region into
+pieces (several region boxes) and exports each piece as its own model; setupEM
+runs them and joins their results. Where two pieces meet, a line crossing the cut
+gets a port wall port in each piece. Both are calibrated with the reference plane
+on the cut, so the two results meet at the same plane and connect directly,
+without an overlap or an estimated correction.
+
+What the joined result leaves out: coupling between the pieces other than through
+the lines that cross the cuts, because the cut is a metal wall in both models. Cut
+across simple feed lines, at least D from devices (the same rule as for any port
+wall), not between parts that couple. In a test with a 480 µm coplanar line on
+TopMetal2 with a wide and a narrow section, cut in the middle, the joined result
+agreed with the full model within 0.01 in |S| up to 50 GHz; joining the uncalibrated
+results was off by 0.1.
+
 ## Frequencies
 
 ### What is the adaptive frequency sweep, and how does it compare to HFSS's interpolating sweep?

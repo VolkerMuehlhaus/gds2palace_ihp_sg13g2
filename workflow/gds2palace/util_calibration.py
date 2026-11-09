@@ -155,6 +155,23 @@ class _Layers:
                 self.geoms[number] = geoms
                 self.trees[number] = shapely.STRtree(geoms)
 
+    def vertex_us(self, u0, u1, vlo, vhi):
+        """the distances from the wall of all polygon vertices with u0 < u < u1 and v in [vlo, vhi], sorted: where a
+        cross-section can start to change (Manhattan geometry changes only there; an edge at an angle starts at one)"""
+        found = set()
+        region = shapely_box(u0, vlo, u1, vhi)
+        for number, tree in self.trees.items():
+            for i in tree.query(region):
+                geom = self.geoms[number][i]
+                for poly in getattr(geom, 'geoms', [geom]):
+                    if poly.geom_type != 'Polygon':
+                        continue
+                    for ring in [poly.exterior] + list(poly.interiors):
+                        for u, v in ring.coords:
+                            if u0 < u < u1 and vlo - TOL <= v <= vhi + TOL:
+                                found.add(round(u, 9))
+        return sorted(found)
+
     def cut(self, number, u, vlo, vhi):
         """intervals in v of layer `number` on the line at distance u from the wall, merged, sorted"""
         if number not in self.geoms:
@@ -385,7 +402,10 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
     for metal in metals_list.metals:
         metal_of.setdefault(int(metal.layernum), metal)
     conductors = {n: m for n, m in metal_of.items() if _is_conductor(m, materials_list)}
+    # warnings: what makes the result wrong unless you act (shown in setupEM's status); notes: everything else that is
+    # good to know (tooltip and log only). Few warnings, or nobody reads them
     warnings = []
+    notes = []
 
     # 1. each port: the line, and the gap as drawn
     details = []
@@ -536,8 +556,7 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
     else:
         L = max(Lcap, 2 * D)
         rule = 'wavelength / 5' if Lcap >= 2 * D else '2 D'
-        warnings.append(f"standards shortened from 4 D = {L4:.4g} to {L:.4g}, to stay short against the guided wavelength; "
-                        f"the calibration is less accurate. A cut where the ground is closer to the lines makes D smaller")
+        notes.append(f"standards shortened from 4 D = {L4:.4g} to {L:.4g}, to stay short against the guided wavelength")
     L = round(L, 3)
     f_valid = C0 / (n_est * 5 * L * unit)
     if f_valid >= fmax * (1 - 1e-6):
@@ -560,12 +579,12 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             d['gap'] = round(d['gap'], 6)
             d['gap_origin'] = 'drawing'
             if d['gap'] > D / 10:
-                warnings.append(f"port {d['portnumber']}: the gap {d['gap']:g} is more than D/10 = {D / 10:.4g}; the calibration "
-                                f"is less accurate")
+                notes.append(f"port {d['portnumber']}: the gap {d['gap']:g} is more than D/10 = {D / 10:.4g}")
 
     # 7. the cross-section the standards extrude: all stackup layers at the cut, via arrays as solid bars
     up = max(d['gap'] for d in details) + CUT_OFFSET
     profile = {}
+    solid_vias = []
     for n, metal in metal_of.items():
         if metal.is_via:
             ivs = layers.projection(n, up, up + D, vlo, vhi)
@@ -576,11 +595,13 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
                     cover = _merge([iv for m in neighbours for iv in layers.cut(int(m.layernum), up, vlo, vhi)])
                     ivs = _merge([(max(a[0], b[0]), min(a[1], b[1])) for a in ivs for b in cover if _overlap(a, b)])
             if ivs:
-                warnings.append(f"vias on {metal.name} at the cut are extruded as solid bars in the standards")
+                solid_vias.append(metal.name)
         else:
             ivs = layers.cut(n, up, vlo, vhi)
         if ivs:
             profile[n] = ivs
+    if solid_vias:
+        notes.append(f"vias at the cut ({', '.join(solid_vias)}) are solid bars in the standards")
     for d in details:
         for n, ivs in d['stack'].items():
             if n in profile:
@@ -600,9 +621,25 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
     u_dev = None
     u_far = None
     device_size = None
-    u = up
-    while step is not None and u + step <= scan_end and (u_dev is None or u_far is None):
-        u += step
+    # samples: a grid of D/8, and just past every polygon vertex, so that a feature narrower than the grid (a coil's
+    # outer turn of 3 um next to the wall) is not stepped over; a change found at a sample began at the last vertex
+    # before it, else at the previous sample
+    samples, events = [], []
+    if step is not None:
+        k = 1
+        while up + k * step <= scan_end:
+            samples.append(up + k * step)
+            k += 1
+        events = layers.vertex_us(up, scan_end, vlo, vhi)
+        samples = sorted(set(samples) | {e + 10 * TOL for e in events if e + 10 * TOL <= scan_end})
+
+    def onset(before, at):
+        return max([e for e in events if before < e < at], default=before)
+
+    previous = up
+    for u in samples:
+        if u_dev is not None and u_far is not None:
+            break
         here = {n: layers.cut(n, u, vlo, vhi) for n in plain}
         here = {n: ivs for n, ivs in here.items() if ivs}
         others = {n: layers.cut(n, u, vlo, vhi) for n in layers.geoms if n not in plain and not metal_of[n].is_via}
@@ -611,51 +648,56 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
             here_core = {n: _clip(ivs, wlo, whi) for n, ivs in here.items()}
             here_core = {n: ivs for n, ivs in here_core.items() if ivs}
             if not _same_profile(here_core, core) or any(_clip(ivs, wlo, whi) for ivs in others.values()):
-                u_dev = u - step
+                u_dev = onset(previous, u)
         if u_far is None and (not _same_profile(here, plain) or others):
-            u_far = u - step
+            u_far = onset(previous, u)
+        previous = u
     if u_dev is not None:
-        if u_dev < D / 4:
-            raise PortWallError(f"the cross-section at port wall {side} changes within D/4 = {D / 4:.4g} of the wall (a line at "
-                                f"an angle, a taper, or other metal close to the wall). The standards need a straight section: "
-                                f"lines that cross the wall at a right angle and stay unchanged for at least D/4")
         ground_at_wall = {}
         for n, iv in ground:
             ground_at_wall.setdefault(n, []).append(iv)
         beyond = layers.device_extent(u_dev, ground_at_wall)
         device_size = None if beyond is None else beyond[1] - beyond[0]
+    far_note = None
     if u_far is not None and u_far < D / 4 and (u_dev is None or u_far < u_dev):
-        warnings.append(f"metal more than D = {D:.4g} away from the lines changes {u_far:.4g} from the port wall (a slot in a "
-                        f"plane, a pad frame or other metal ending): the standards copy the cross-section at the wall there, "
-                        f"the layout differs; outside the port's region")
+        # a note, not a warning: such a change outside the port's region was below the mesh noise in the study
+        # (test_data/port_deembedding_study/far_change)
+        far_note = (f"metal more than D = {D:.4g} away from the lines changes {u_far:.4g} from the port wall (a slot in a "
+                    f"plane, a pad frame or other metal ending): the standards copy the cross-section at the wall there; "
+                    f"outside the port's region this does not matter")
     # the port wall can be moved outward: the feed is extended by the wall's cross-section, the reference plane shifted
     # back to the layout edge. 'auto': until the device is at least D and half its size from the wall
     needed = 0.0
     if u_dev is not None:
         needed = max(0.0, max(D, 0.5 * device_size if device_size else 0.0) - u_dev)
     E = math.ceil(needed * 100) / 100 if extension == 'auto' else float(extension or 0.0)
+    # the standards need a straight section of D/4 in front of the port: the layout's own feed, or the extension (the
+    # port wall moved outward extends the feed by the wall's cross-section, so that much of it is straight by
+    # construction). With the extension, metal close to the layout edge is part of the device, next to the reference
+    # plane: accepted
+    if u_dev is not None and u_dev + E < D / 4:
+        raise PortWallError(f"the cross-section at port wall {side} changes within D/4 = {D / 4:.4g} of the wall (a line at "
+                            f"an angle, a taper, or other metal close to the wall). The standards need a straight section: "
+                            f"lines that cross the wall at a right angle and stay unchanged for at least D/4, or a port wall "
+                            f"moved outward by at least {D / 4 - u_dev:.4g} (port_wall_extension, 'auto' finds a length)")
     if u_dev is not None:
         hint = "" if E else "; port_wall_extension = 'auto' moves the port wall away"
         if u_dev + E < D:
-            warnings.append(f"the cross-section changes {u_dev + E:.4g} from the port wall, less than D = {D:.4g}: the device "
-                            f"is inside the port's fringe field, which adds a small error{hint}")
-        if device_size is not None and u_dev + E < 0.5 * device_size:
-            warnings.append(f"the device is {u_dev + E:.4g} from the PEC port wall, less than half its size along the wall "
-                            f"({device_size:.4g}); the wall mirrors its field, which changes the result slightly{hint}")
-    notes = []
+            notes.append(f"the device is {u_dev + E:.4g} from the port wall, less than D = {D:.4g} (a small error){hint}")
+        if device_size is not None and not E and u_dev < 0.5 * device_size:
+            notes.append(f"the device is {u_dev:.4g} from the port wall, less than half its size ({device_size:.4g}): the "
+                         f"wall mirrors it slightly{hint}")
+    if far_note:
+        notes.append(far_note)
     if E:
-        notes.append(f"port wall moved {E:g} outward: the feed is extended by the cross-section at the wall and the "
-                        f"reference plane shifted back to the layout edge. This is exact where the return current flows like "
-                        f"in the standards, e.g. in a plane under the lines. With ground strips beside the lines that end "
-                        f"open before the device, the extended feed is not the standards' line, and the error grows with the "
-                        f"length of the extension")
+        notes.append(f"port wall moved {E:g} outward, the reference plane back at the layout edge (exact with a ground plane "
+                     f"under the lines; with ground strips that end before the device, keep the extension short)")
     if shift:
         if shift > 0 and (u_dev is not None and shift > u_dev + TOL):
             raise PortWallError(f"reference_plane_shift for {side} = {shift:g} moves the reference plane past the uniform feed, "
                                 f"which ends {u_dev:.4g} from the wall")
         if shift > 0:
-            warnings.append(f"reference plane shifted {shift:g} into the layout along the feed: this is exact only if the feed "
-                            f"is the standards' line, including how its ground is connected at the far end")
+            notes.append(f"reference plane shifted {shift:g} into the layout: exact only if the feed is the standards' line")
 
     ports_order = [d['portnumber'] for d in details]
     return {

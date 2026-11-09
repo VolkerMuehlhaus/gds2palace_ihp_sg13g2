@@ -127,7 +127,7 @@ def test_stacked_line_with_via_array(stack):
     r = analyze(stack, ap, ports_for([1, 2]))
     stack_layers = {s[0] for s in r['groups'][0]['port_details'][0]['stack']}
     assert stack_layers == {'TopMetal2', 'TopVia2', 'TopMetal1'}
-    assert any('solid bars' in w for w in r['warnings'])
+    assert any('solid bars' in n for n in r['notes']) and not any('solid bars' in w for w in r['warnings'])
     # the gap is cut out of all three layers
     _, _, metals = stack
     calibration.apply_port_walls(r, ap, metals, ports_for([1, 2]))
@@ -214,18 +214,54 @@ def test_port_on_an_edge_that_is_not_a_port_wall(stack):
 
 
 def test_device_close_to_the_wall(stack):
-    """the coil of the study: the ground strips end 50 from the wall, the coil is 130 wide"""
+    """the coil of the study: the ground strips end 45 from the wall (less than D = 50), the coil is 130 wide"""
     ap = gssg(length=60)
     ap.polygons = [p for p in ap.polygons if not (p.layernum == TM2 and abs(p.ymin) > 20)]
     for y0, y1 in GSSG_GROUNDS:
-        ap.add_rectangle(0, y0, 50, y1, TM2)
+        ap.add_rectangle(0, y0, 45, y1, TM2)
     ap.add_rectangle(60, -60, 180, 60, TM2)
     r = analyze(stack, ap, ports_for([1, 2]))
-    assert any('less than D' in w for w in r['warnings']) and any('mirrors' in w for w in r['warnings'])
+    assert any('less than D' in n for n in r['notes']) and any('mirrors' in n for n in r['notes']) and r['warnings'] == []
     with pytest.raises(calibration.PortWallError, match='past the uniform feed'):
         analyze(stack, ap, ports_for([1, 2]), reference_plane_shift={'xmin': 55})
     r = analyze(stack, ap, ports_for([1, 2]), reference_plane_shift={'xmin': 30})
-    assert r['groups'][0]['shift'] == 30 and any('reference plane shifted' in w for w in r['warnings'])
+    assert r['groups'][0]['shift'] == 30 and any('reference plane shifted' in n for n in r['notes'])
+
+
+def coil_turn_next_to_the_wall(gap_to_turn=3.0, turn_width=1.0):
+    """a strip over a Metal3 plane from the wall, and a coil's outer turn along the wall: a bar narrower than the
+    scan's D/8 grid, gap_to_turn from the wall (the intra_matching_diff case)"""
+    ap = all_polygons_list()
+    ap.add_rectangle(0, -60, 200, 60, M3)
+    ap.add_rectangle(0, -1.5, 100, 1.5, TM2)
+    ap.add_rectangle(0, -1.5, 0, 1.5, 201)
+    ap.add_rectangle(gap_to_turn, 1.5, gap_to_turn + turn_width, 50, TM2)       # the turn, joined to the strip
+    ap.add_rectangle(gap_to_turn, -50, gap_to_turn + turn_width, -1.5, TM2)
+    return ap
+
+
+def test_a_narrow_turn_next_to_the_wall_is_found(stack):
+    """the scan samples just past every vertex: a 1 um bar 3 from the wall (D/4 = 4.6, the grid D/8 = 2.3) is not
+    stepped over"""
+    ap = coil_turn_next_to_the_wall()
+    with pytest.raises(calibration.PortWallError, match='changes within D/4'):
+        analyze(stack, ap, via_ports([1], 'Metal3', 'TopMetal2'))
+
+
+def test_an_extension_accepts_metal_close_to_the_wall(stack):
+    """with the port wall moved outward, the extension is the straight feed the standards need: metal close to the
+    layout edge belongs to the device next to the reference plane, accepted without a warning"""
+    ap = coil_turn_next_to_the_wall()
+    r = analyze(stack, ap, via_ports([1], 'Metal3', 'TopMetal2'), port_wall_extension={'xmin': 50})
+    g = r['groups'][0]
+    assert g['uniform_from_wall'] == pytest.approx(3.0, abs=0.01) and g['extension'] == 50
+    assert r['warnings'] == [] and not r['errors']
+    r = analyze(stack, ap, via_ports([1], 'Metal3', 'TopMetal2'), port_wall_extension={'xmin': 'auto'})
+    assert r['groups'][0]['extension'] > 0 and not r['errors']
+    # an extension shorter than what is missing to D/4 is still an error, and the message names the length needed
+    D = g['D']
+    with pytest.raises(calibration.PortWallError, match='moved outward by at least'):
+        analyze(stack, ap, via_ports([1], 'Metal3', 'TopMetal2'), port_wall_extension={'xmin': D / 4 - 3.0 - 0.5})
 
 
 def test_standards_shortened_at_high_frequency(stack):
@@ -368,12 +404,12 @@ def test_auto_extension_moves_the_port_wall(stack):
     materials, dielectrics, metals = stack
     ap, ports = coil_like(), ports_for([1, 2])
     plain = analyze(stack, coil_like(), ports_for([1, 2]))['groups'][0]
-    assert any('fringe field' in w and "'auto'" in w for w in plain['warnings'])
+    assert any('less than D' in n and "'auto'" in n for n in plain['notes'])
     r = analyze(stack, ap, ports, port_wall_extension={'xmin': 'auto'})
     g = r['groups'][0]
     need = max(g['D'], 0.5 * g['device_size']) - g['uniform_from_wall']
     assert g['extension'] == pytest.approx(need, abs=0.011) and g['extension'] > 0
-    assert not any('fringe field' in w or 'mirrors' in w for w in g['warnings'])
+    assert not any('less than D' in n or 'mirrors' in n for n in g['notes']) and g['warnings'] == []
     assert any('port wall moved' in n for n in g['notes']) and not any('port wall moved' in w for w in g['warnings'])
     calibration.apply_port_walls(r, ap, metals, ports)
     E, gap = g['extension'], g['port_details'][0]['gap']
@@ -407,13 +443,15 @@ def line_over_plane_with_slot(slot, closes_at=3.0, length=300.0):
 
 
 def test_plane_slot_far_from_the_line_is_reported_not_an_error(stack):
-    # the slot closes 3 um from the wall, within D/4, but it is farther from the line than D: outside the port's region
+    # the slot closes 3 um from the wall, within D/4, but it is farther from the line than D: outside the port's region,
+    # a note (the far_change study: below the mesh noise), not a warning
     r = analyze(stack, line_over_plane_with_slot((60, 70)), ports_for([1]))
     g = r['groups'][0]
     assert g['D'] < 60 - 5
-    far = [w for w in r['warnings'] if 'away from the lines changes' in w]
+    assert not any('away from the lines changes' in w for w in r['warnings'])
+    far = [n for n in r['notes'] if 'away from the lines changes' in n]
     assert far and 0 < float(re.search(r'changes ([\d.]+) from', far[0]).group(1)) <= 3
-    assert not any('fringe field' in w for w in r['warnings'])      # no device seen within D along the line
+    assert not any('less than D' in n for n in r['notes'])      # no device seen within D along the line
 
 
 def test_plane_slot_near_the_line_is_an_error(stack):
@@ -426,5 +464,5 @@ def test_plane_slot_far_and_the_device_distance(stack):
     ap = line_over_plane_with_slot((60, 70))
     ap.add_rectangle(20, -40, 100, -20, TM2)                        # other metal 15 um beside the line, 20 um in (< D)
     r = analyze(stack, ap, ports_for([1]))
-    dev = [w for w in r['warnings'] if 'fringe field' in w]
-    assert dev and 10 < float(re.search(r'changes ([\d.]+) from', dev[0]).group(1)) <= 20
+    dev = [n for n in r['notes'] if 'less than D' in n]
+    assert dev and 10 < float(re.search(r'device is ([\d.]+) from', dev[0]).group(1)) <= 20
