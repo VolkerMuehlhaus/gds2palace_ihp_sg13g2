@@ -30,6 +30,7 @@
     <Material Name="RSIL" Type="Resistor" Rs="7" Color="d0d0d0" />
     <Material Name="RPPD" Type="Resistor" Rs="260" Color="d0d0d0" />
     <Material Name="RHIGH" Type="Resistor" Rs="1360" Color="d0d0d0" />
+    <Material Name="PolyRes" Type="Conductor" ThermalConductivity="20" Color="c08040" />
   </Materials>
   <ELayers LengthUnit="um">
     <Dielectrics>
@@ -57,6 +58,10 @@
       <Layer Name="RSIL" Type="sheet" Reference="Activ" ReferenceEdge="Top" Material="RSIL" Layer="314" Zmin="0.0000" Zmax="0.0000" />
       <Layer Name="REF_FOR_TRANSISTOR" Type="sheet" Reference="SiO2" ReferenceEdge="Bottom" Material="PEC" Layer="300" Zmin="0.4" Zmax="0.4" />
       <Layer Name="Activ" Type="conductor" Reference="SiO2" ReferenceEdge="Bottom" Material="Activ" Layer="1" Zmin="0.0000" Zmax="0.4000" />
+      <!-- Heat source targets for thermal models: z range and material of a heat source. Nothing is drawn on
+           these GDS layers, so they add no geometry to EM models. -->
+      <Layer Name="HEAT_TRANSISTOR" Type="conductor" Reference="Activ" ReferenceEdge="Top" Material="Activ" Layer="320" Zmin="-0.0400" Zmax="0.0000" />
+      <Layer Name="HEAT_RESISTOR" Type="conductor" Reference="Activ" ReferenceEdge="Top" Material="PolyRes" Layer="321" Zmin="0.0000" Zmax="0.1600" />
       <Layer Name="SUBGND" Type="sheet" Reference="EPI" ReferenceEdge="Top" Material="PEC" Layer="250" Zmin="0.0000" Zmax="0" />
       <Layer Name="LBE" Type="dielectric" Reference="Substrate" ReferenceEdge="Bottom" Material="AIR" Layer="157" Zmin="0.0000" Zmax="=bulk_thickness + 3.7500" />
       <Layer Name="BACKSIDEGND" Type="sheet" Reference="Substrate" ReferenceEdge="Bottom" Material="PEC" Layer="251" Zmin="0" Zmax="0" />

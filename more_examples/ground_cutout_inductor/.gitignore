@@ -1,0 +1,24 @@
+# Local run output. The tables and figures only read port-S.csv, so only that is kept of each run.
+results/**
+!results/**/
+!results/**/port-S.csv
+logs/
+
+# Runs the report does not use: tuning the coils, first tests, and AMR beyond the two runs it quotes.
+results/tune*/
+results/xcheck*/
+results/t_*/
+results/s_*_g100_tied_data/
+results/s_*_g10_tied_data/
+results/d_*_g10_noPEC_data/
+results/amr_L0n5_planeM3_*/
+results/amr_L2n0_*/
+
+layouts/*.png
+layouts/L0n5_D85_*
+layouts/L0n5_D88_*
+layouts/L2n0_D146_*
+layouts/L2n0_D148.5_*
+layouts/*_gap100_tied.gds
+layouts/*_gap10_tied.gds
+layouts/*_gap10_tie_noPEC.gds

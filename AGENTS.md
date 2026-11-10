@@ -146,6 +146,9 @@ clone, it is [`workflow/gds2palace/`](workflow/gds2palace/).
     rhigh and rppd come out about 10 % below their PDK value (small ones
     most), rsil within about 2 %. When the value matters, put ports at the
     resistor's Metal1 heads and use the PDK model in the circuit instead.
+  - `HEAT_TRANSISTOR` (GDS 320) and `HEAT_RESISTOR` (GDS 321): target layers
+    for heat sources in thermal models (the top 40 nm of Activ; a 0.16 µm
+    polysilicon body above the Activ level). Nothing is drawn on them.
 
   These layers only appear in the model if the layout has shapes on them (or,
   for derived layers, on their source layers).
@@ -252,7 +255,8 @@ Use `simulation_setup.create_elmer(excite_ports, settings)` instead of
 ### Settings
 
 Required: `unit`, `margin`, `fstart`, `fstop`, `refined_cellsize`, plus the
-model data keys set at the end of the template. Optional keys and defaults
+model data keys set at the end of the template. `margin` is one value, or 4
+values `[xmin, xmax, ymin, ymax]`, all 0 or more. Optional keys and defaults
 (from `util_simulation_setup.py`; check there for the current list):
 
 | Key | Default | Meaning |
@@ -273,7 +277,7 @@ model data keys set at the end of the template. Optional keys and defaults
 | `complex_coarse_solve` | `True` | Full complex coarse solve; keep it on unless RAM runs out |
 | `solver_maxits` / `solver_tol` | `400` / `1e-6` | Palace linear solver limits |
 | `boundary` | 6 × `'ABC'` | xmin, xmax, ymin, ymax, zmin, zmax: `ABC`, `PEC` or `PMC` |
-| `air_around` | `margin` | Air around the dielectrics, one value or 6 values; 0 is allowed |
+| `air_around` | `margin` (a 4-value `margin`: per side, z sides the largest value) | Air around the dielectrics, one value or 6 values; 0 is allowed |
 | `conductor_model` | `'surface'` | Conductor model: `'surface'` (surface impedance on all conductor faces, fastest, Q of top metal coils 18-30 % high), `'solve_inside'` (conductors meshed as volumes), `'solve_inside_skin'` (volumes with thin layers along the faces for the skin effect, most accurate loss). See the FAQ "Which conductor model should I use?". Scripts from before 0.9.0 use `filled_metals` (`True` = `'solve_inside'`, `False` = `'surface'`), which still works |
 | `fill_factor_correction` | `False` | Scale the conductivity of merged via arrays by their fill factor (needs `merge_polygon_size > 0`) |
 | `no_gui` / `no_preview` / `preview_only` | `False` | gmsh windows: none at all / skip the unmeshed preview / preview and stop |
@@ -392,7 +396,11 @@ Simplify GDS), the original vias are gone and no correction is possible.
   ```
 
   - The power of a heat source is the total for all its polygons.
-  - A heat source needs a target layer with a thickness (not a sheet).
+  - A heat source needs a target layer with a thickness (not a sheet). It takes
+    the z range and the material of the target layer, not its shapes. In the
+    latest IHP stackups use `HEAT_TRANSISTOR` for transistors and
+    `HEAT_RESISTOR` for resistors, not `Activ`: see "Heat source targets" in
+    [`XML_stackup/latest/IHP/README.md`](XML_stackup/latest/IHP/README.md).
   - A constant-temperature boundary uses only the z position of its target
     layer, so a PEC sheet such as `BACKSIDEGND` works.
   - All materials need `ThermalConductivity` in the stackup; the latest IHP

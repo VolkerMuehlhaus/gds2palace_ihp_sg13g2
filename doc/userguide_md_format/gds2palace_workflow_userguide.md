@@ -352,6 +352,8 @@ run_palace config.json
 combine_snp
 ```
 
+(The `run_sim` of a model with port walls first solves the calibration standards, and since gds2palace 0.10.0 the `_data` folder also holds a copy of `combine_extend_snp.py`, the result script matching this gds2palace, which `combine_snp` runs when present.)
+
 
 This starts a script *run_palace* where you can define in detail how to run Palace. It is recommended that you place this run_palace script in your PATH, configured for the actual machine where you want to run Palace.  
 
@@ -440,7 +442,7 @@ settings for meshing and simulation control are implemented as a Python dictiona
 These settings are always required:  
 
 **settings['unit']:** Unit of values in mesh, typically 1E-6  
-**settings['margin']:** Oversize of dielectrics from bounding box of drawing in xy plane  
+**settings['margin']:** Oversize of dielectrics from bounding box of drawing in xy plane. Can be a single value (all sides) or a list of 4 values [margin_xmin, margin_xmax, margin_ymin, margin_ymax]. All values must be 0 or more.  
 **settings['fstart']:** Start frequency in Hz  
 **settings['fstop']:** Stop frequency in Hz  
 **settings['fstep']:** Frequency step in Hz for output, not all of them need to be EM simulated due to adaptive frequency sweep  
@@ -480,8 +482,8 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 
 #### Simulation boundary
 
-**settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC. Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  
-**settings['air_around']:** Other spacing of air around dielectrics, default is same as margin. Can be a single value or a list of 6 values [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 is allowed on any side, placing the simulation boundary flush with the dielectric/metal stack on that side (e.g. a backside ground plane serving directly as the PEC/ABC boundary, with no wasted air layer below it).  
+**settings['boundary']:** List with 6 values for boundary at xmin,xmax,ymin,ymax,zmin,zmax. Values can be ABC/PML, PEC or PMC, and PORTWALL on xmin, xmax, ymin or ymax for calibrated ports at the layout edge (see "Calibrated de-embedding at port walls"). Default: ['ABC','ABC','ABC','ABC','ABC','ABC']  
+**settings['air_around']:** Other spacing of air around dielectrics, default is same as margin (with a list of 4 margin values: the margin of each side, and the largest margin for zmin and zmax). Can be a single value or a list of 6 values [air_xmin, air_xmax, air_ymin, air_ymax, air_zmin, air_zmax]. A value of 0 is allowed on any side, placing the simulation boundary flush with the dielectric/metal stack on that side (e.g. a backside ground plane serving directly as the PEC/ABC boundary, with no wasted air layer below it).  
 
 #### Conductor modelling
 
@@ -555,7 +557,99 @@ To get the full S-parameter file, all ports must be defined with non-zero voltag
 
 **Composite ports** (multiple EM ports grouped into one port in the final output file) are not yet supported by this workflow. All ports with non-zero voltage are simulated one after another, resulting in n-port S-parameters.  
 
-**Port parasitics in results, lumped port vs. wave port:** This workflow creates lumped ports, which introduce some physical length into the simulation model, leading to extra path length (? inductance) in results. Other 3D volume meshing EM tools behave the same for lumped ports. If port size is not small compared to the device under test, one possible solution is to estimate these parasitics and remove them in postprocessing (or result use) by cascading negative inductance or negative length at each port.  
+**Port parasitics in results:** A lumped port is a small sheet with a physical size, so it adds a little capacitance and inductance to the result. Other 3D volume meshing EM tools behave the same for lumped ports. For ports at the layout edge, gds2palace removes them by calibration, see "Calibrated de-embedding at port walls" below. For other ports, `combine_snp` removes an estimated port inductance, calculated from the port's size.
+
+### Calibrated de-embedding at port walls ###
+
+#### Why a port needs calibration
+
+A lumped port drives the line through a small sheet. Its field fringes around the sheet, so the port adds a capacitance to ground and a short piece of inductance. Both depend on the line and the stackup. A formula can only estimate them: for a via port in the de-embedding study, the estimated inductance was about 45 % too low.
+
+A calibration measures the port instead. The same port drives short lines of known length, the standards. Two of them, of length L and 2 L, differ only by a piece of line, and comparing them leaves the port alone. This is how planar EM solvers remove their box wall ports (J. C. Rautio, "double delay"). In the study, it removed the port 30 to 100 times better than the estimate.
+
+#### Port walls
+
+gds2palace calibrates the ports on a port wall. A port wall is a box side set to `'PORTWALL'` in `settings['boundary']`: a PEC wall right at the layout edge, where the lines leave the layout. The PEC wall is the ports' ground.
+
+```python
+settings['boundary'] = ['PORTWALL', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']   # xmin is a port wall
+simulation_ports.add_port(simulation_setup.simulation_port(
+    portnumber=1, voltage=1, port_Z0=50, source_layernum=201,
+    target_layername='TopMetal2', direction='x'))
+```
+
+A port wall has no dielectric oversize and no air, so the tool sets both to 0 on that side, whatever `settings['margin']` and `settings['air_around']` say there, and logs it. It also sets the direction of each port on the wall to point into the layout, so that both ports of a pair have the same polarity. Every port on a port wall must be excited (voltage 1), because the calibration needs the full S-matrix.
+
+![Gap port at the port wall, side view](./images/portwall_sideview.png)
+
+The port in side view, cut through a line. The line stops a small gap before the PEC wall, and the port is a sheet across that gap at the bottom of the line, so the PEC wall is the port's ground. Left: a strip over the SUBGND plate, which touches the wall. Right: a GSSG line on silicon without a plate; its ground strips run beside the line and touch the wall.
+
+#### What to draw
+
+1. Draw the line to the layout edge.
+2. Draw the port polygon on the layout edge, over the end of the line. Its depth into the layout is the gap between the PEC wall and the line, and the tool cuts it out of the line. A zero-width line along the edge is fine too: the tool then cuts a gap of D/32 (D is defined below). The polygon's width doesn't matter, the port takes the line's width. One port per line: a polygon that also covers a ground strip or a second line is an error.
+3. Ground metal must reach the layout edge next to the lines: ground strips beside them, or a ground plane under them. Without it, the model is not written. Over bare silicon, the return current has no fixed path near the wall, and the port's capacitance then grows with the length of the standards instead of settling.
+
+![What to draw and what gds2palace makes of it, top view](./images/portwall_topview.png)
+
+Top view at the port wall, as drawn (left) and as modelled (right). Top: a GSSG pair with port rectangles 1 µm deep and wider than the lines; the model keeps the 1 µm gap and makes each port as wide as its line. Bottom: a strip over the SUBGND plate, drawn to the edge with a zero-width port line along the edge; the tool cuts a gap of D/32. The x axis is stretched to show the gap.
+
+All ports on one port wall are calibrated together, so the coupling between the two ports of a pair is removed too. The lines must cross the wall at a right angle and keep their cross-section for a while: the tool stops with an error when the cross-section changes within D/4 of the wall, unless the port wall is moved outward (`port_wall_extension`) far enough that the extended feed gives the standards those D/4 of straight line: then metal close to the layout edge, e.g. the outer turn of a coil, belongs to the device next to the reference plane and is accepted. That looks at the metal within D of the lines, the port's region; a pad frame or a slot in a ground plane farther away that ends or closes near the wall is only noted, since the standards extrude the cross-section at the wall there while the layout differs. A stacked line, e.g. TopMetal1 and TopMetal2 joined by a via array, is cut on all its layers, and the via array becomes a solid via bar in the standards.
+
+A via port on a port wall, e.g. from a layout tool's export, can't stay a via port: its sheet would lie in the PEC wall. It is used as a gap port instead, when one end of the via port is the line at the port (one piece of metal about as wide as the port) and the other end is not (a ground plane, or no metal at all). The port then sits on the line's metal and points from ground to the line, like every wall port, and the log says so for each port, also when this reverses the via port's drawn polarity. If both ends or neither end is a line, the model is not written: draw an in-plane port on the line instead.
+
+#### The standards
+
+For each port wall, the tool writes two standards into the model's `_data` folder: the layout's cross-section at the wall, extruded to thru lines of length L and 2 L. They use the model's stackup, conductor model and mesh settings, because each mesh has its own small line error, and the calibration only removes it when model and standards share it. They are solved at three frequencies (fstop/20, fstop/5 and fstop). Both ends of a line have the same cross-section, so two such port walls share one pair of standards.
+
+The length follows from the size of the cross-section at the cut:
+
+**D = the span of the lines + 2 × the distance to the nearest ground metal**
+
+That is w + 2h for a strip over a plate, and the inner ground-to-ground spacing for coplanar lines. The port's fringing field settles over a few D, so L = 4 D. Longer standards are worse, not better: L and 2 L are meshed separately, and their small difference in phase grows with length. So L is also kept below a fifth of the guided wavelength at the highest frequency, but not below 2 D. The log then gives the frequency up to which the calibration is fully valid. With L = 4 D, this limits D to about a twentieth of the guided wavelength, for lines with an effective index of about 2, like TopMetal2 lines on SG13G2, about 75 µm at 100 GHz. A cut where the ground is close to the lines, like a GSG pad feed, is always fine.
+
+![How D is calculated](./images/portwall_D.png)
+
+D in the cross-section at the port wall, as gds2palace calculates it. With a plate under the lines, the distance to ground is the height h above the plate: D = w + 2 h for one strip, the span of both lines + 2 h for a pair. With ground strips beside the lines, it is the gap to the ground strips, so D is the inner ground-to-ground spacing. gds2palace takes the nearest ground metal that reaches the wall, in any direction, and prints D in the log and in the setupEM Ports tab.
+
+These rules come from a study with nine cross-sections from 14 µm to 2 mm, on chip and on a PCB: `test_data/port_deembedding_study`.
+
+`run_sim` solves the standards before the model, and skips a standard whose result is still there for the same mesh and settings.
+
+#### Results
+
+`combine_snp` writes `<model>_deembedded.sNp` as before. Its first lines say what was done at each port, e.g. `!port 1: calibrated at port wall xmin, reference plane at the wall`, or `!port 3: estimated port inductance 2.1 pH` for a port inside the layout. The file `<model>_deembedding.json` next to it lists the port's elements, the line at each port wall (Z0, n_eff and loss per mm per mode), the frequency up to which the calibration is valid, and warnings.
+
+Check the line: if its Z0 and n_eff are not what you expect for the line you drew, the calibration isn't right either. The script warns "calibration doubtful" when the port's capacitance is negative, the line's n_eff is outside the possible range, or the port loses more power than it stores.
+
+#### Reference plane shift
+
+`settings['reference_plane_shift'] = {'xmin': 60}` moves the reference plane 60 µm into the layout along the feed, using the line from the standards. The shift must stay within the part of the feed that has the wall's cross-section.
+
+The shift is exact only if the feed is the standards' line, including how its ground is connected at the far end. In the standards, the ground strips reach a PEC wall at both ends, so a current can circulate through them. Ground strips that end open before the device make the feed a different line, by an amount that depends on the geometry. One example: in the de-embedding study's GSSG feed (TopMetal2 lines 10 µm wide and 10 µm apart, ground strips 40 µm wide at 10 µm), the feed's inductance per length was about 8 % higher than the standards' line.
+
+#### Moving the port wall outward
+
+A device close to the port wall sits in the port's fringe field, and the PEC wall mirrors its field. When the layout can't be cut further out, `settings['port_wall_extension'] = {'ymin': 'auto'}` moves the port wall outward instead: the feed is extended by the cross-section at the wall, the port moves to the new wall, and the reference plane is shifted back to the layout edge. The result is at the layout edge as before, but the device is further from the wall. `'auto'` extends until the device is at least D and half its own size away from the wall; a number extends by that length. A reference plane shift still counts from the layout edge.  
+
+The extended feed is a copy of the cross-section at the wall, so it is exactly the standards' line where the return current flows the same way, e.g. in a plane under the lines. With ground strips beside the lines that end open before the device, the extended feed is not the standards' line, and the error grows with the length of the extension; how large it is depends on the geometry (see the example under "Reference plane shift"). The setupEM preview shades the extension, which is not in the drawing.  
+
+#### Warnings while the model is written
+
+- **"the device is inside the port's fringe field"**: keep the device at least D away from the port wall, or move the port wall outward (above).
+- **"the wall mirrors its field"**: a PEC wall acts as a mirror for the device's field. Keep the device at least half its own size away from the wall, or move the port wall outward. The device's size is measured along the wall, without the ground metal that reaches the wall.
+- **"standards shortened"**: D is large compared to the wavelength. Cut where the ground is closer to the lines.
+- **"vias ... are extruded as solid bars"**: the standards replace a via array at the cut by a solid via bar. This was not tested in the study.
+
+#### Settings
+
+**settings['boundary']:** `'PORTWALL'` on a side makes it a port wall (xmin, xmax, ymin or ymax).
+**settings['reference_plane_shift']:** Dictionary with a distance per port wall, e.g. `{'xmin': 60}`, in drawing units, positive into the layout. Default: no shift
+**settings['port_wall_extension']:** Dictionary per port wall, e.g. `{'ymin': 'auto'}`: `'auto'` or a length in drawing units by which the port wall is moved outward, the feed extended by the cross-section at the wall. Default: none  
+**settings['deembedding_length']:** The length L of the shorter standard, in drawing units. Default: 4 D, shortened to a fifth of the guided wavelength at the highest frequency, at least 2 D
+**settings['deembedding']:** `'none'` writes no de-embedded file. Default: calibrated at port walls, estimated port inductance at the other ports
+
+Limits: coupling between different ports on different walls is not removed. Port walls are for Palace; Elmer doesn't support them yet.
 
 ### Filenames and flow control ###
 
@@ -937,9 +1031,21 @@ Palace's `Conductivity` boundary uses the surface impedance Zs = (γ/σ)·coth(�
 
 The option `"External": true` doubles h. Then Zs tends to 1/(σh), the full sheet resistance on one face. This is meant for a conductor with only one face in the mesh, such as a metal wall that forms the outer boundary of the model.
 
-gds2palace models each conductor as a hollow body with all its faces in the mesh, and does not set `External`. This is exact when both faces carry the same current, for example a Metal1 line at low frequency. It makes no difference for conductors much thicker than the skin depth: with or without `External`, Zs is then nearly the same. For a ground plane with current on one face, it doubles the loss.
+gds2palace models each conductor as a hollow body with all its faces in the mesh, and does not set `External`, except for a conductor at the simulation boundary (see below). This is exact when both faces carry the same current, for example a Metal1 line at low frequency. It makes no difference for conductors much thicker than the skin depth: with or without `External`, Zs is then nearly the same. For a ground plane with current on one face, it doubles the loss.
 
 Setting `External` by hand on a ground plane would fix that case. But it would halve the loss of conductors that carry current on both faces, and gds2palace puts all faces of a conductor in one group. So no setting of the surface model is right for all conductors. Meshing the thin layers as volumes is the better fix: a thin layer is only one or two cells thick, so this costs little, and the current in it is then right. The volume models `'solve_inside'` and `'solve_inside_skin'` do this.
+
+#### Conductors at the simulation boundary
+
+With `margin` and `air_around` both 0 on a side, a conductor can reach the simulation boundary. In the `'surface'` model the conductor is hollow, so its face on the boundary has no mesh on either side. gds2palace leaves this face out of the model. What this means for the loss depends on which face it is.
+
+**A side wall or end face (x and y sides).** The top and bottom faces remain and share the current as before, so Zs stays the same. For a line 5 µm wide and 0.49 µm thick along the boundary, R at low frequency is 4 % below `'solve_inside'`. A line away from the boundary is 8 % below it, because it has one more side wall.
+
+**A top or bottom face (z sides).** One main face is left, and it carries all the current. gds2palace sets `External` on this conductor. For a thin ground plane as the outer wall of the model, the loss is then about 15 % too high, compared with about 2 times too high without `External`.
+
+**A sheet resistor.** Rs is the sheet resistance itself, for one face or two, so `External` plays no role. With a `PMC` boundary, the resistance is correct when an edge of the sheet is on the boundary, and when the sheet lies in the top or bottom boundary plane. With a `PEC` boundary, a sheet that ends on the boundary is a correct resistor to that wall. An absorbing boundary is different, see below.
+
+**An absorbing boundary right at a conductor changes the result, in every conductor model.** At low frequency it acts as a resistive sheet between the conductor and its surroundings. Keep some air between a conductor and an absorbing boundary, unless you have checked that this doesn't matter for your structure.
 
 ## Dielectric loss modelling 
 
@@ -1001,7 +1107,7 @@ After running Palace with this config file, you will find a refined mesh file in
 
 ### Using wave ports instead of lumped ports not supported 
 
-This gds2palace workflow creates lumped ports, which introduce some physical size and thus some parasitic series impedance. The Palace solver also supports using wave ports, but that is not implemented in the gds2gmsh workflow. 
+This gds2palace workflow creates lumped ports. The Palace solver also supports wave ports, but they are not implemented here: in Palace 0.18, two wave ports can't share one face, which a differential pair needs, and the line's mode index changes with frequency on silicon. To remove the port parasitics, use calibrated ports at a port wall instead, see "Calibrated de-embedding at port walls". 
 
 ## Using S-Parameter output, model extraction 
 

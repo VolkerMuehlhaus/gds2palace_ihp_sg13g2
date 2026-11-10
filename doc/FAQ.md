@@ -188,18 +188,46 @@ derivation method for a mixed single-ended/differential port set.
 
 ### Are results de-embedded to the port reference plane, like a calibration standard would do?
 
-Not through a calibration structure such as TRL or SOLT — there are none in
-this flow. Instead, `combine_extend_snp.py` (see [Output and
-results](#output-and-results)) estimates the parasitic series inductance the
-lumped port geometry introduces from a flat-ribbon calculation and cascades
-a negative version of it onto the result, written as a separate
-`_deembedded` Touchstone file. Treat it as a geometric correction, not a
-calibrated de-embedding.
+Yes, for ports at a port wall: a box side set to `'PORTWALL'`, where the
+lines leave the layout. gds2palace writes two calibration standards per port
+wall (thru lines of length L and 2 L with the layout's cross-section at the
+wall), `run_sim` solves them, and `combine_snp` removes the port and the
+coupling between the ports on that wall. See "Calibrated de-embedding at port
+walls" in [the user's guide](userguide_md_format/gds2palace_workflow_userguide.md#calibrated-de-embedding-at-port-walls).
+
+Ports inside the layout get an estimate instead: `combine_extend_snp.py`
+calculates the port's series inductance from its size and removes it. That is
+a geometric correction, not a calibration; for a via port in the de-embedding
+study it was about 45 % too low.
+
+The `_deembedded` Touchstone file says in its first lines which method was
+used at each port.
 
 ### Can I use wave ports for a more accurately calibrated reference plane?
 
 No — Palace itself supports wave ports, but this workflow only implements
 lumped ports; see [the user's guide](userguide_md_format/gds2palace_workflow_userguide.md#using-wave-ports-instead-of-lumped-ports-not-supported).
+For a calibrated reference plane, use ports at a port wall (previous question).
+
+### Can I split a large layout into smaller models and combine the results?
+
+Yes, at port walls. The KLayout plug-in klayout_em_export splits the region into
+pieces (several region boxes) and exports each piece as its own model; setupEM
+runs them and joins their results. Where two pieces meet, a line crossing the cut
+gets a port wall port in each piece. Both are calibrated with the reference plane
+on the cut, so the two results meet at the same plane and connect directly,
+without an overlap or an estimated correction.
+
+What the joined result leaves out: coupling between the pieces other than through
+the lines that cross the cuts, because the cut is a metal wall in both models. Cut
+across simple feed lines, at least D from devices (the same rule as for any port
+wall), not between parts that couple. The wall runs through the whole stack, the
+substrate included, so a line whose return current flows in the substrate (no
+ground metal near it at the cut) sees a changed return path; the join was checked
+with ground metal along the cut lines. In a test with a 480 µm coplanar line on
+TopMetal2 with a wide and a narrow section, cut in the middle, the joined result
+agreed with the full model within 0.01 in |S| up to 50 GHz; joining the uncalibrated
+results was off by 0.1.
 
 ## Frequencies
 
@@ -419,7 +447,11 @@ requirements and [`building-palace-apptainer.md`](building-palace-apptainer.md)/
 
 Every generated `_data` directory gets a `run_sim` script
 (`utilities.create_run_script()`), which calls a `run_palace config.json`-
-style wrapper followed by `combine_snp` for Touchstone conversion — see
+style wrapper followed by `combine_snp` for Touchstone conversion. The
+directory also holds `combine_extend_snp.py`, the result script of the
+gds2palace that wrote the model, and the `combine_snp` wrapper from
+`scripts/` runs that copy, so a stale `~/scripts` copy can't silently skip
+e.g. the port wall calibration (`run_sim` warns about a wrapper that would) — see
 [`scripts/README.md`](../scripts/README.md) for `run_palace` (local/
 apptainer) and `run_palace_remote` (scp the model over, run it, scp results
 back over SSH). Passwordless SSH (key-based auth) is required for the
@@ -490,8 +522,11 @@ calls this automatically as its last step. See [`scripts/README.md`](../scripts/
 ### What are the `_dc` and `_deembedded` files next to my main result?
 
 `_dc` is the DC-extrapolated variant (see [Frequencies](#frequencies)
-above); `_deembedded` has the estimated port series inductance removed (see
-[Ports](#ports)). The plain result has neither suffix.
+above); `_deembedded` has the port parasitics removed: calibrated at port
+walls, an estimated port inductance at the other ports (see
+[Ports](#ports)). Its first lines say which, per port, and with port walls a
+`_deembedding.json` next to it has the details. The plain result has neither
+suffix.
 
 ### How do I check whether a run actually finished, from a script?
 

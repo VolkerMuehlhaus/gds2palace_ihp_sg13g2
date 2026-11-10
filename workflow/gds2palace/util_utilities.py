@@ -21,7 +21,7 @@
 import os, tempfile, platform, sys, importlib
 from . import util_elmer 
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 # ============================== filename and path  =================================
 
@@ -101,6 +101,24 @@ def get_stackup_dir ():
     return None
 
 
+def copy_combine_script (destination_path):
+    """Copy combine_extend_snp.py (the version shipped with this gds2palace) next to the model, for run_sim.
+    Returns:
+        bool: True when the file was written
+    """
+    scripts_dir = get_scripts_dir()
+    if scripts_dir is None:
+        return False
+    source = os.path.join(scripts_dir, 'combine_extend_snp.py')
+    if not os.path.isfile(source):
+        return False
+    with open(source, 'r', encoding='utf-8') as f:
+        txt = f.read()
+    with open(os.path.join(destination_path, 'combine_extend_snp.py'), 'w', encoding='utf-8', newline='\n') as f:
+        f.write(txt)
+    return True
+
+
 def get_scripts_dir ():
     """Folder with the result tools combine_extend_snp.py (Palace/Elmer results to
     Touchstone) and palace_summary.py (run summary), which ship with gds2palace.
@@ -147,12 +165,25 @@ def get_stackup_path (filename=None):
 
 
 def create_run_script (destination_path):
-    """Create run script that can be used to start Palace simulation and then run postprocessing
+    """Create run script that can be used to start Palace simulation and then run postprocessing.
+    With port walls, the calibration standards listed in port_information.json are solved first (an earlier result
+    with the same key is reused), then the device.
     Args:
         destination_path (string): target path for run script file
     """
+    from . import util_calibration
     txt = '#!/bin/bash\n'
+    for line in util_calibration.run_script_lines(destination_path):
+        txt = txt + line + '\n'
     txt = txt + 'run_palace config.json\n'
+    # the model's own copy of combine_extend_snp.py, from the gds2palace that wrote the model: the combine_snp
+    # wrapper runs it when it is there, so the result conversion can't be older than the model (a wrapper from
+    # before gds2palace 0.10.0 runs the copy in ~/scripts instead, which may lack e.g. the port wall calibration)
+    if copy_combine_script(destination_path):
+        txt = txt + 'wrapper=$(command -v combine_snp)\n'
+        txt = txt + ('if [ -n "$wrapper" ] && ! grep -q "\\./combine_extend_snp.py" "$wrapper"; then echo "WARNING: your '
+                     'combine_snp runs the copy of combine_extend_snp.py in ~/scripts, not the one written next to '
+                     'this model; update combine_snp from gds2palace/scripts (see scripts/README.md)"; fi\n')
     txt = txt + 'combine_snp\n'
 
     cmd_filename = os.path.join(destination_path, 'run_sim')
