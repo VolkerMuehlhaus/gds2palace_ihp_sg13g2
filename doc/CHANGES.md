@@ -7,6 +7,8 @@ This is an (incomplete) list of changes and new features.
 **New features**  
 `settings['wall_extension']`: a dictionary per side, e.g. `{'xmax': 2000}`, for a side that is not a port wall. The layout's cross-section at that edge (every metal layer that reaches it, no vias) is continued outward by the length, so that the wall sits there. Written by setupEM for the pieces of a split region: where the region has a port wall with a `port_wall_extension`, a piece without a port on that side gets the same box as the piece with the port.
 
+Port walls with several lines: D (and with it the gap and the standards' length) is that of the largest group of coupled lines, not of the whole span of the lines on the wall. Neighbouring lines closer than twice their distance to ground form a group; a differential pair is one group, as before. A cut across the 8 resonator arms of a PCB hairpin filter (lines 1 mm wide, 0.45 mm above the plane, spread over 17.5 mm) had D = 18.4 mm, 74 mm standards and a calibration valid to 1.1 GHz; now D = 3.4 mm and valid to 3.5 GHz, and the joined pieces agree with the full model. Checked against D per line for a PCB pair over a plane and an on-chip GSSG pair (`port_wall_cluster_study`, 2026-11-11).
+
 **Fix**  
 A via port drawn in the plane of a PEC wall (boundary `'PEC'`, no dielectric oversize and no air on that side) is shorted by the wall; the result showed nearly total reflection, with no message. The model is no longer written: the error names the port and the side (make the side a port wall, move the wall away, or use another boundary).
 

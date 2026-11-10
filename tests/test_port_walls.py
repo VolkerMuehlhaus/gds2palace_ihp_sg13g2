@@ -532,3 +532,34 @@ def test_standards_of_a_wall_next_to_an_extended_wall_continue_the_metal(stack):
     line = [entry for entry in ymin['profile'] if entry[0] == 'TopMetal2']
     assert line == [['TopMetal2', pytest.approx(250.0), pytest.approx(260.0)]] and ymin['port_details'][0]['stack'] == line
 
+
+def lines_over_plate(lines, length=3000.0):
+    """TopMetal2 lines (y0, y1) over a Metal1 plate, drawn to the layout edge at x = 0, ports on 201.."""
+    ap = all_polygons_list()
+    for k, (y0, y1) in enumerate(lines):
+        ap.add_rectangle(0, y0, length, y1, TM2)
+        ap.add_rectangle(0, y0, 0, y1, 201 + k)
+    ap.add_rectangle(0, min(y for y, _ in lines) - 200, length, max(y for _, y in lines) + 200, M1)
+    return ap
+
+
+def test_D_of_lines_far_apart_is_not_their_span(stack):
+    """Lines far from each other against their distance to ground (resonator arms cut by a split region) each settle
+    over their own cross-section: D is that of the largest group of coupled lines."""
+    single = analyze(stack, lines_over_plate([(0, 10)]), ports_for([1]), fmax=10e9)['groups'][0]
+    d = single['distance_to_ground']
+    assert single['D'] == pytest.approx(10 + 2 * d) and len(single['clusters']) == 1
+    # a close pair (gap d): one cluster, D from the common span, as before
+    pair = analyze(stack, lines_over_plate([(0, 10), (10 + d, 20 + d)]), ports_for([1, 2]), fmax=10e9)['groups'][0]
+    assert pair['D'] == pytest.approx(20 + d + 2 * d) and [c['ports'] for c in pair['clusters']] == [[1, 2]]
+    # eight lines 10 d apart: every line on its own, D that of one line
+    far = [(k * (10 + 10 * d), k * (10 + 10 * d) + 10) for k in range(8)]
+    g = analyze(stack, lines_over_plate(far), ports_for(range(1, 9)), fmax=10e9)['groups'][0]
+    assert g['D'] == pytest.approx(single['D']) and len(g['clusters']) == 8
+    assert g['span'] == pytest.approx(far[-1][1]) and g['L'] == pytest.approx(single['L'])
+    assert any('groups of coupled lines' in n for n in g['notes'])
+    # mixed, as hairpin resonators: a close pair among far lines gives the pair's D
+    mixed = [(0, 10), (10 + 10 * d, 20 + 10 * d), (20 + 11 * d, 30 + 11 * d), (30 + 21 * d, 40 + 21 * d)]
+    g = analyze(stack, lines_over_plate(mixed), ports_for(range(1, 5)), fmax=10e9)['groups'][0]
+    assert [c['ports'] for c in g['clusters']] == [[1], [2, 3], [4]]
+    assert g['D'] == pytest.approx(pair['D'])

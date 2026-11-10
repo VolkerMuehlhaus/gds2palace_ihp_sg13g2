@@ -610,6 +610,8 @@ That is w + 2h for a strip over a plate, and the inner ground-to-ground spacing 
 
 ![How D is calculated](./images/portwall_D.png)
 
+**Several lines on one port wall.** All ports on a wall are calibrated together, and the standards always carry the whole cross-section, so the coupling between the lines is removed in any case. D only sets the gap and the length of the standards, and for that only lines that are coupled count together: two neighbouring lines whose spacing is less than twice their distance to ground form one group, and D is that of the largest group. A differential pair is one group, as before. Lines far apart against their distance to ground, such as the resonator arms of a filter cut by a split region, each have their own D, so a wide cut no longer gets long standards and a low frequency limit. The log names the groups when there is more than one.
+
 D in the cross-section at the port wall, as gds2palace calculates it. With a plate under the lines, the distance to ground is the height h above the plate: D = w + 2 h for one strip, the span of both lines + 2 h for a pair. With ground strips beside the lines, it is the gap to the ground strips, so D is the inner ground-to-ground spacing. gds2palace takes the nearest ground metal that reaches the wall, in any direction, and prints D in the log and in the setupEM Ports tab.
 
 These rules come from a study with nine cross-sections from 14 µm to 2 mm, on chip and on a PCB: `test_data/port_deembedding_study`.

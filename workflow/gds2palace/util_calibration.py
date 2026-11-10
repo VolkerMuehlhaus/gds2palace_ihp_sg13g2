@@ -51,11 +51,16 @@ from shapely.geometry import box as shapely_box
 
 from .util_stackup_reader import PEC_MATERIAL_NAME
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 C0 = 299792458.0
 TOL = 1e-3                     # drawing units, the gmsh geometry tolerance
 CUT_OFFSET = 0.01              # the cut profile is taken this far past the gap, drawing units
+# neighbouring lines on one port wall count as coupled (one cluster, D from their common span) when they are closer
+# than this many times their distance to ground (port_wall_cluster_study, 2026-11-11: a PCB pair over a plane and an
+# on-chip GSSG pair, D per line against D as a pair: the differential mode agrees within the mesh noise, the common mode
+# on chip within 4 x; a split hairpin filter joined from its pieces agrees with the full model)
+COUPLED_WITHIN = 2.0
 WALL_SIDES = ('xmin', 'xmax', 'ymin', 'ymax')
 BOX_SIDES = ('xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax')
 INWARD = {'xmin': 'x', 'xmax': '-x', 'ymin': 'y', 'ymax': '-y'}
@@ -512,7 +517,9 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
                             f"needs return metal at the cut, ground strips or a plane. Bring ground metal to the layout edge "
                             f"there, move the cut, or don't use a port wall on {side}")
 
-    # 4. D: span of the lines + 2 x distance to the nearest ground
+    # 4. D: span of the lines + 2 x distance to the nearest ground, per cluster of coupled lines; the largest counts.
+    # Lines far from each other against their distance to ground (resonator arms over a plane, cut by a split) each
+    # settle over their own cross-section: their common span is no measure of the port's size
     def rect(n, iv):
         m = metal_of[n]
         return iv[0], iv[1], m.zmin, m.zmax
@@ -526,13 +533,27 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
         rects = [rect(n, iv) for n, ivs in d['stack'].items() for iv in ivs]
         box = (min(r[0] for r in rects), max(r[1] for r in rects), min(r[2] for r in rects), max(r[3] for r in rects))
         zs = [min(zs[0], box[2]), max(zs[1], box[3])]
+        d_line = math.inf
         for n, iv in ground:
             dist = distance(box, rect(n, iv))
             if dist < TOL:
                 raise PortWallError(f"port {d['portnumber']} on port wall {side}: its line touches ground metal at the cut")
-            d_min = min(d_min, dist)
+            d_line = min(d_line, dist)
+        d['box'], d['d_ground'] = box, d_line
+        d_min = min(d_min, d_line)
     span = max(iv[1] for n, ivs in signal.items() for iv in ivs) - min(iv[0] for n, ivs in signal.items() for iv in ivs)
-    D = span + 2 * d_min
+    clusters = [[details[0]]]
+    for a, b in zip(details, details[1:]):
+        if distance(a['box'], b['box']) < COUPLED_WITHIN * max(a['d_ground'], b['d_ground']):
+            clusters[-1].append(b)
+        else:
+            clusters.append([b])
+    cluster_D = [max(d['box'][1] for d in c) - min(d['box'][0] for d in c) + 2 * min(d['d_ground'] for d in c)
+                 for c in clusters]
+    D = max(cluster_D)
+    if len(clusters) > 1:
+        notes.append(f"{len(details)} lines in {len(clusters)} groups of coupled lines: D = {D:.4g} is that of the largest "
+                     f"group, not of the whole span {span:.4g}")
 
     # 5. length of the standards, from D and the guided wavelength. n_eff is estimated from the permittivities within D of
     # the lines, as the mean of the largest and the smallest: the largest alone (silicon) gave 3.45 where the study measured
@@ -717,6 +738,7 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
                           'stack': [[metal_of[n].name, iv[0], iv[1]] for n, ivs in d['stack'].items() for iv in ivs]}
                          for d in details],
         'D': round(D, 6), 'span': round(span, 6), 'distance_to_ground': round(d_min, 6),
+        'clusters': [{'ports': [d['portnumber'] for d in c], 'D': round(x, 6)} for c, x in zip(clusters, cluster_D)],
         'ground_layers': sorted({metal_of[n].name for n, iv in ground}),
         'eps_max': max(eps), 'n_eff_estimate': round(n_est, 4), 'L': L, 'L_rule': rule, 'valid_to_GHz': round(f_valid / 1e9, 6), 'fmax_GHz': fmax / 1e9,
         'uniform_from_wall': None if u_dev is None else round(u_dev, 6),
