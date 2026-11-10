@@ -166,3 +166,6 @@ test_data/
 
 # generated Palace model/simulation output (run artifacts, not source content)
 more_examples/**/palace_model/
+more_examples/**/elmer_model/
+workflow/palace_model/
+workflow/elmer_model/
