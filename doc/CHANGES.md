@@ -2,7 +2,7 @@
 
 This is an (incomplete) list of changes and new features.
 
-## Not released yet
+## 10 November-2026
 gds2palace 0.10.0
 
 **New features**  
