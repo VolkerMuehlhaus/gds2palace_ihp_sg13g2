@@ -18,7 +18,7 @@
 
 # -*- coding: utf-8 -*-
 
-__version__ = "1.22.1"
+__version__ = "1.23.0"
 
 # solvers where settings['fill_factor_correction'] is applied (checked by setupEM)
 FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
@@ -2501,6 +2501,13 @@ def create_model (excite_ports, settings):
             "Order": order,
             "Device": "CPU"
             }
+
+    # Without adaptive mesh refinement, the error estimate after each field solution is only reported
+    # (error-indicators.csv); with Palace's default tolerance of 1e-6 it took 22..52 % of the run time
+    # in tests. With 1e-2 it takes a tenth of that, the reported value changes by about 2 % and the
+    # S-parameters not at all. With refinement the estimate steers the mesh: Palace's default is kept.
+    if adaptive_mesh_iterations == 0:
+        solver["Linear"]["EstimatorTol"] = 1e-2
 
     solver['Driven'] = allsamples
     print(f"Palace linear solver: ComplexCoarseSolve={complex_coarse_solve}, MaxIts={solver_maxits}, Tol={solver_tol:g}")

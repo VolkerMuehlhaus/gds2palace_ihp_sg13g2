@@ -2,6 +2,11 @@
 
 This is an (incomplete) list of changes and new features.
 
+## Not released yet
+
+**Changes**  
+Shorter Palace runs without adaptive mesh refinement (`settings['adaptive_mesh_iterations'] = 0`, the default): the config file now sets `EstimatorTol` to 1e-2. After every field solution Palace computes an error estimate. Without mesh refinement it is only reported (`error-indicators.csv`), but with Palace's default tolerance of 1e-6 it took a large part of the run time. Examples on 16 processes with Palace 0.18: a Butler matrix with 8 ports at one frequency (1.4 million unknowns) took 254 s instead of 507 s, and a transformer with 5 ports and an adaptive sweep (0.39 million unknowns) took 127 s instead of 163 s. The S-parameters were the same (differences below 0.001 dB) and the reported error estimate changed by about 2 %. Peak memory is unchanged. With adaptive mesh refinement the estimate steers the refinement, and Palace's default is kept.
+
 ## 11 November-2026
 gds2palace 0.10.1
 
