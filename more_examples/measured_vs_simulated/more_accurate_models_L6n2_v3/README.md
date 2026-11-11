@@ -1,5 +1,7 @@
 # Stackup and Conductor Model Study: L6n2 Inductor vs. Measurement (IHP SG13G2), v3
 
+> **There is a newer version of this study:** [v4](../more_accurate_models_L6n2_v4/README.md) repeats the same models with gds2palace 0.10.2. The results are the same; the run times are about a third of those reported here.
+
 ![(model)](results/plots/visualize_pointingvector.png)
 
 **Abstract.** A 4-turn inductor in IHP SG13G2 is simulated with AWS Palace in 11 model variants and compared to its measured differential L, Q and SRF.
