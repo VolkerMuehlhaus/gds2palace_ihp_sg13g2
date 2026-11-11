@@ -646,6 +646,7 @@ The extended feed is a copy of the cross-section at the wall, so it is exactly t
 **settings['boundary']:** `'PORTWALL'` on a side makes it a port wall (xmin, xmax, ymin or ymax).
 **settings['reference_plane_shift']:** Dictionary with a distance per port wall, e.g. `{'xmin': 60}`, in drawing units, positive into the layout. Default: no shift
 **settings['port_wall_extension']:** Dictionary per port wall, e.g. `{'ymin': 'auto'}`: `'auto'` or a length in drawing units by which the port wall is moved outward, the feed extended by the cross-section at the wall. Default: none  
+**settings['wall_extension']:** Dictionary per side that is not a port wall, e.g. `{'xmax': 2000}`: a length in drawing units by which the layout's cross-section at that edge (the metal layers that reach it) is continued outward. For the pieces of a split region, where another piece has a port wall with an extension on that side. Default: none  
 **settings['deembedding_length']:** The length L of the shorter standard, in drawing units. Default: 4 D, shortened to a fifth of the guided wavelength at the highest frequency, at least 2 D
 **settings['deembedding']:** `'none'` writes no de-embedded file. Default: calibrated at port walls, estimated port inductance at the other ports
 

@@ -466,3 +466,69 @@ def test_plane_slot_far_and_the_device_distance(stack):
     r = analyze(stack, ap, ports_for([1]))
     dev = [n for n in r['notes'] if 'less than D' in n]
     assert dev and 10 < float(re.search(r'device is ([\d.]+) from', dev[0]).group(1)) <= 20
+
+
+def test_wall_extension_continues_the_layout_edge(stack):
+    """settings['wall_extension']: a wall that is not a port wall moved outward, for the pieces of a split region"""
+    _, _, metals = stack
+    ap = gssg()
+    ap.add_rectangle(100, -200, 300, 200, M1)                   # a plane that doesn't reach xmin: not continued
+    boundary = ['PEC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+    log = calibration.extend_walls(ap, metals, {'xmin': 20.0}, boundary)
+    assert ap.get_bounding_box()[0] == pytest.approx(-20.0)
+    added = [p for p in ap.polygons if min(p.pts_x) == pytest.approx(-20.0)]
+    assert len(added) == 4 and all(int(p.layernum) == TM2 and max(p.pts_x) == pytest.approx(0.0) for p in added)
+    assert sorted((min(p.pts_y), max(p.pts_y)) for p in added) == sorted(GSSG_LINES + GSSG_GROUNDS)
+    assert 'moved 20 outward' in log[0] and 'TopMetal2' in log[0] and 'Metal1' not in log[0]
+    assert calibration.extend_walls(gssg(), metals, None, boundary) == []
+    assert calibration.extend_walls(gssg(), metals, {'xmin': 0}, boundary) == []
+    for value, side, bc, message in ((-1, 'xmin', boundary, 'length of 0 or more'), ('auto', 'xmin', boundary, 'length of 0 or more'),
+                                     (20.0, 'zmax', boundary, 'can only be'), (20.0, 'xmin', BOUNDARY, 'use port_wall_extension')):
+        with pytest.raises(calibration.PortWallError, match=message):
+            calibration.extend_walls(gssg(), metals, {side: value}, bc)
+
+
+def test_via_port_in_the_plane_of_a_pec_wall(stack, tmp_path, capsys):
+    """a PEC wall at the layout edge shorts a via port drawn on that edge: found, and the model is not written"""
+    materials, dielectrics, metals = stack
+    ap = gssg()
+    ap.add_rectangle(0, -200, 300, 200, M1)
+    ap.add_rectangle(150, -5, 150, 5, 203)                      # a via port inside the layout
+    ports = via_ports([1, 3], 'Metal1', 'TopMetal2')
+    pec = ['PEC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+    found = lambda bc, margin, air, p=ports: calibration.via_ports_in_pec_walls(ap, p, dielectrics, bc, margin, air)
+    assert found(pec, (0, 100, 100, 100), [0, 50, 50, 50, 50, 50]) == [(1, 'xmin')]
+    assert found(pec, (100, 100, 100, 100), 50) == [], "a wall away from the layout edge"
+    assert found(pec, (0, 100, 100, 100), 50) == [], "air between the layout edge and the wall"
+    assert found(['PMC'] + pec[1:], (0, 100, 100, 100), [0, 50, 50, 50, 50, 50]) == [], "a PMC wall doesn't short it"
+    assert found(pec, (0, 100, 100, 100), [0, 50, 50, 50, 50, 50], ports_for([1])) == [], "an in-plane port: a gap port to the wall"
+    sim_path = utilities.create_sim_path(str(tmp_path), 'line', dirname='palace_model')
+    settings = dict(unit=1e-6, margin=[0, 100, 100, 100], air_around=[0, 50, 50, 50, 50, 50], boundary=pec, fstart=0, fstop=100e9,
+                    fstep=5e9, refined_cellsize=4, meshsize_max=70, order=1, no_gui=True, no_preview=True,
+                    simulation_ports=ports, materials_list=materials, dielectrics_list=dielectrics, metals_list=metals,
+                    allpolygons=ap, sim_path=sim_path, model_basename='line')
+    with pytest.raises(SystemExit):
+        simulation_setup.create_palace(ports.all_active_excitations(), settings)
+    out = capsys.readouterr().out
+    assert 'ERROR: port 1 is a via port in the plane of the PEC wall at xmin' in out and "Make xmin a port wall" in out
+    assert not os.path.isfile(os.path.join(sim_path, 'config.json'))
+
+
+def test_standards_of_a_wall_next_to_an_extended_wall_continue_the_metal(stack):
+    """xmin is moved 20 outward: the plane that reaches xmin is continued, in the device and in the cross-section the
+    standards of ymin extrude (their box is 20 wider on that side)"""
+    ap = all_polygons_list()
+    ap.add_rectangle(0, -200, 300, 200, M1)
+    ap.add_rectangle(0, -5, 150, 5, TM2)
+    ap.add_rectangle(0, -5, 0, 5, 201)
+    ap.add_rectangle(250, -200, 260, -50, TM2)
+    ap.add_rectangle(250, -200, 260, -200, 202)
+    boundary = ['PORTWALL', 'ABC', 'PORTWALL', 'ABC', 'ABC', 'ABC']
+    r = analyze(stack, ap, ports_for([1, 2]), boundary=boundary, port_wall_extension={'xmin': 20.0})
+    xmin, ymin = r['groups']
+    assert xmin['extension'] == 20.0 and ymin['transverse'] == pytest.approx([-20.0, 300.0])
+    plane = [entry for entry in ymin['profile'] if entry[0] == 'Metal1']
+    assert plane == [['Metal1', pytest.approx(-20.0), pytest.approx(300.0)]]
+    line = [entry for entry in ymin['profile'] if entry[0] == 'TopMetal2']
+    assert line == [['TopMetal2', pytest.approx(250.0), pytest.approx(260.0)]] and ymin['port_details'][0]['stack'] == line
+

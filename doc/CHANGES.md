@@ -2,6 +2,16 @@
 
 This is an (incomplete) list of changes and new features.
 
+## Next version
+
+**New features**  
+`settings['wall_extension']`: a dictionary per side, e.g. `{'xmax': 2000}`, for a side that is not a port wall. The layout's cross-section at that edge (every metal layer that reaches it, no vias) is continued outward by the length, so that the wall sits there. Written by setupEM for the pieces of a split region: where the region has a port wall with a `port_wall_extension`, a piece without a port on that side gets the same box as the piece with the port.
+
+**Fix**  
+A via port drawn in the plane of a PEC wall (boundary `'PEC'`, no dielectric oversize and no air on that side) is shorted by the wall; the result showed nearly total reflection, with no message. The model is no longer written: the error names the port and the side (make the side a port wall, move the wall away, or use another boundary).
+
+Port walls: with a `port_wall_extension` on one port wall, the standards of a port wall next to it (around the corner) were wider by the extension on that side, as the model is, but their metal ended at the layout edge. The metal that reaches the extended wall is now continued in the standards' cross-section too, as in the model.
+
 ## 10 November-2026
 gds2palace 0.10.0
 

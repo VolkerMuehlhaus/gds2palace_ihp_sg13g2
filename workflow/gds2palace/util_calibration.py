@@ -51,7 +51,7 @@ from shapely.geometry import box as shapely_box
 
 from .util_stackup_reader import PEC_MATERIAL_NAME
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 C0 = 299792458.0
 TOL = 1e-3                     # drawing units, the gmsh geometry tolerance
@@ -374,10 +374,19 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
             result['errors'][side] = str(error)
 
     # an extension makes the box larger along the perpendicular walls: their standards need the same transverse box
+    # and the metal that reaches such a wall is continued by its extension (apply_port_walls): in the cross-section the
+    # standards extrude too, or their ground would end before the box does
     extended = {g['side']: g.get('extension', 0.0) for g in result['groups']}
     for g in result['groups']:
         lo, hi = TRANSVERSE[g['side']]
-        g['transverse'] = [g['transverse'][0] - extended.get(lo, 0.0), g['transverse'][1] + extended.get(hi, 0.0)]
+        v_lo, v_hi = g['transverse']
+        e_lo, e_hi = extended.get(lo, 0.0), extended.get(hi, 0.0)
+        for entry in g['profile'] + [s for p in g['port_details'] for s in p['stack']]:
+            if e_lo and entry[1] <= v_lo + TOL:
+                entry[1] = v_lo - e_lo
+            if e_hi and entry[2] >= v_hi - TOL:
+                entry[2] = v_hi + e_hi
+        g['transverse'] = [v_lo - e_lo, v_hi + e_hi]
 
     # two port walls facing each other too close
     for side in ('xmin', 'ymin'):
@@ -735,6 +744,79 @@ def ports_on_layout_edge(allpolygons, simulation_ports):
                  if _local_bounds(poly, side, walls[side])[0] <= TOL}
         if len(sides) == 1:
             out[port.portnumber] = sides.pop()
+    return out
+
+
+def extend_walls(allpolygons, metals_list, wall_extension, boundary):
+    """settings['wall_extension'] = {side: length}: the layout's cross-section at that edge continued outward by the
+    length (every metal layer that reaches the edge; no vias), so that the box wall on that side sits there. For a side
+    that is not a port wall. Made for the pieces of a split region: where the region has a port wall with a
+    port_wall_extension, a piece without a port on that side gets the same box as the piece with the port and as the
+    whole region. Changes allpolygons; returns log lines."""
+    log = []
+    if not wall_extension:
+        return log
+    if not isinstance(wall_extension, dict):
+        raise PortWallError(f"wall_extension must be a dictionary per side, e.g. {{'xmin': 20.0}}, not {wall_extension!r}")
+    for side in WALL_SIDES:
+        if side not in wall_extension:
+            continue
+        E = wall_extension[side]
+        if isinstance(E, bool) or not isinstance(E, (int, float)) or E < 0:
+            raise PortWallError(f"wall_extension for {side} must be a length of 0 or more, not {E!r}")
+        if str(boundary[BOX_SIDES.index(side)]).upper() == 'PORTWALL':
+            raise PortWallError(f"wall_extension has a value for {side}, which is a port wall: use port_wall_extension there")
+        if E == 0:
+            continue
+        bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+        wall = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}[side]
+        vlo, vhi = (bymin, bymax) if side in ('xmin', 'xmax') else (bxmin, bxmax)
+        layers = _Layers(allpolygons, metals_list, side, wall)
+        done, names = set(), []
+        for metal in metals_list.metals:
+            number = int(metal.layernum)
+            if metal.is_via or number in done:
+                continue
+            done.add(number)
+            intervals = layers.cut(number, CUT_OFFSET, vlo, vhi)
+            for v0, v1 in intervals:
+                piece = _global(shapely_box(-E, v0, 0.0, v1), side, wall)
+                allpolygons.add_polygon([list(c) for c in piece.exterior.coords[:-1]], number)
+            if intervals:
+                names.append(metal.name)
+        log.append(f"Wall {side}: moved {E:g} outward, the layout edge continued with "
+                   + (', '.join(names) if names else 'no metal (none reaches the edge)'))
+    for side in wall_extension:
+        if side not in WALL_SIDES:
+            raise PortWallError(f"wall_extension has a value for {side}; it can only be xmin, xmax, ymin or ymax")
+    return log
+
+
+def via_ports_in_pec_walls(allpolygons, simulation_ports, dielectrics_list, boundary, margin, air_around):
+    """[(portnumber, side)] of the via ports (no target layer) whose polygon lies in the plane of a PEC wall: a side with
+    boundary 'PEC', no dielectric oversize and no air, so that the wall is at the layout edge. The wall shorts such a
+    port. Via ports on a port wall are gap ports by now (apply_port_walls) and are not found."""
+    if any(d.gdsboundary is not None for d in dielectrics_list.dielectrics):
+        return []
+    air = list(air_around) if isinstance(air_around, (list, tuple)) else [air_around] * 6
+    bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+    walls = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}
+    pec = [side for i, side in enumerate(WALL_SIDES)
+           if str(boundary[i]).upper() == 'PEC' and margin[i] == 0 and air[i] == 0]
+    if not pec:
+        return []
+    polys = {}
+    for poly in allpolygons.polygons:
+        polys.setdefault(int(poly.layernum), []).append(poly)
+    out = []
+    for port in getattr(simulation_ports, 'ports', []):
+        if port.target_layername is not None:
+            continue
+        for side in pec:
+            mine = polys.get(int(port.source_layernum), [])
+            if mine and all(_local_bounds(poly, side, walls[side])[2] <= TOL for poly in mine):
+                out.append((port.portnumber, side))
+                break
     return out
 
 
