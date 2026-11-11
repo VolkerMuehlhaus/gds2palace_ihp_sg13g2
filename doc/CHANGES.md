@@ -2,7 +2,8 @@
 
 This is an (incomplete) list of changes and new features.
 
-## Next version
+## Not released yet
+gds2palace 0.10.1
 
 **New features**  
 `settings['wall_extension']`: a dictionary per side, e.g. `{'xmax': 2000}`, for a side that is not a port wall. The layout's cross-section at that edge (every metal layer that reaches it, no vias) is continued outward by the length, so that the wall sits there. Written by setupEM for the pieces of a split region: where the region has a port wall with a `port_wall_extension`, a piece without a port on that side gets the same box as the piece with the port.
