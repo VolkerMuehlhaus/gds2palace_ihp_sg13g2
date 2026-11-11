@@ -610,6 +610,8 @@ That is w + 2h for a strip over a plate, and the inner ground-to-ground spacing 
 
 ![How D is calculated](./images/portwall_D.png)
 
+**Several lines on one port wall.** All ports on a wall are calibrated together, and the standards always carry the whole cross-section, so the coupling between the lines is removed in any case. D only sets the gap and the length of the standards, and for that only lines that are coupled count together: two neighbouring lines whose spacing is less than twice their distance to ground form one group, and D is that of the largest group. A differential pair is one group, as before. Lines far apart against their distance to ground, such as the resonator arms of a filter cut by a split region, each have their own D, so a wide cut no longer gets long standards and a low frequency limit. The log names the groups when there is more than one.
+
 D in the cross-section at the port wall, as gds2palace calculates it. With a plate under the lines, the distance to ground is the height h above the plate: D = w + 2 h for one strip, the span of both lines + 2 h for a pair. With ground strips beside the lines, it is the gap to the ground strips, so D is the inner ground-to-ground spacing. gds2palace takes the nearest ground metal that reaches the wall, in any direction, and prints D in the log and in the setupEM Ports tab.
 
 These rules come from a study with nine cross-sections from 14 µm to 2 mm, on chip and on a PCB: `test_data/port_deembedding_study`.
@@ -646,6 +648,7 @@ The extended feed is a copy of the cross-section at the wall, so it is exactly t
 **settings['boundary']:** `'PORTWALL'` on a side makes it a port wall (xmin, xmax, ymin or ymax).
 **settings['reference_plane_shift']:** Dictionary with a distance per port wall, e.g. `{'xmin': 60}`, in drawing units, positive into the layout. Default: no shift
 **settings['port_wall_extension']:** Dictionary per port wall, e.g. `{'ymin': 'auto'}`: `'auto'` or a length in drawing units by which the port wall is moved outward, the feed extended by the cross-section at the wall. Default: none  
+**settings['wall_extension']:** Dictionary per side that is not a port wall, e.g. `{'xmax': 2000}`: a length in drawing units by which the layout's cross-section at that edge (the metal layers that reach it) is continued outward. For the pieces of a split region, where another piece has a port wall with an extension on that side. Default: none  
 **settings['deembedding_length']:** The length L of the shorter standard, in drawing units. Default: 4 D, shortened to a fifth of the guided wavelength at the highest frequency, at least 2 D
 **settings['deembedding']:** `'none'` writes no de-embedded file. Default: calibrated at port walls, estimated port inductance at the other ports
 

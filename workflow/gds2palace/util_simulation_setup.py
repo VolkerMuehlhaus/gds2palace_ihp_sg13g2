@@ -1683,6 +1683,10 @@ def create_model (excite_ports, settings):
     port_walls = None
     if not elmer_thermal and not get_optional_setting(settings, '_calibration_standard', False):
         try:
+            # settings['wall_extension']: a wall that is not a port wall moved outward (pieces of a split region)
+            for line in util_calibration.extend_walls(allpolygons, metals_list, get_optional_setting(settings, 'wall_extension', None),
+                                                      boundary_condition):
+                print(line)
             wall_sides = util_calibration.port_wall_sides(boundary_condition)
             if wall_sides:
                 if elmer:
@@ -1700,6 +1704,14 @@ def create_model (excite_ports, settings):
                 util_calibration.standard_records(port_walls, model_basename, margin, air_around, boundary_condition)
                 for line in util_calibration.describe(port_walls):
                     print(line)
+            shorted = util_calibration.via_ports_in_pec_walls(allpolygons, simulation_ports, dielectrics_list, boundary_condition,
+                                                              margin, air_around)
+            if shorted:
+                number, side = shorted[0]
+                raise util_calibration.PortWallError(
+                    f"port {number} is a via port in the plane of the PEC wall at {side} (no dielectric oversize, no air "
+                    f"there): the wall shorts it. Make {side} a port wall (boundary 'PORTWALL', the port is then calibrated), "
+                    f"or move the wall away from the port (margin and air_around for {side}), or use another boundary there")
         except util_calibration.PortWallError as error:
             print(f'ERROR: {error}')
             exit(1)

@@ -466,3 +466,100 @@ def test_plane_slot_far_and_the_device_distance(stack):
     r = analyze(stack, ap, ports_for([1]))
     dev = [n for n in r['notes'] if 'less than D' in n]
     assert dev and 10 < float(re.search(r'device is ([\d.]+) from', dev[0]).group(1)) <= 20
+
+
+def test_wall_extension_continues_the_layout_edge(stack):
+    """settings['wall_extension']: a wall that is not a port wall moved outward, for the pieces of a split region"""
+    _, _, metals = stack
+    ap = gssg()
+    ap.add_rectangle(100, -200, 300, 200, M1)                   # a plane that doesn't reach xmin: not continued
+    boundary = ['PEC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+    log = calibration.extend_walls(ap, metals, {'xmin': 20.0}, boundary)
+    assert ap.get_bounding_box()[0] == pytest.approx(-20.0)
+    added = [p for p in ap.polygons if min(p.pts_x) == pytest.approx(-20.0)]
+    assert len(added) == 4 and all(int(p.layernum) == TM2 and max(p.pts_x) == pytest.approx(0.0) for p in added)
+    assert sorted((min(p.pts_y), max(p.pts_y)) for p in added) == sorted(GSSG_LINES + GSSG_GROUNDS)
+    assert 'moved 20 outward' in log[0] and 'TopMetal2' in log[0] and 'Metal1' not in log[0]
+    assert calibration.extend_walls(gssg(), metals, None, boundary) == []
+    assert calibration.extend_walls(gssg(), metals, {'xmin': 0}, boundary) == []
+    for value, side, bc, message in ((-1, 'xmin', boundary, 'length of 0 or more'), ('auto', 'xmin', boundary, 'length of 0 or more'),
+                                     (20.0, 'zmax', boundary, 'can only be'), (20.0, 'xmin', BOUNDARY, 'use port_wall_extension')):
+        with pytest.raises(calibration.PortWallError, match=message):
+            calibration.extend_walls(gssg(), metals, {side: value}, bc)
+
+
+def test_via_port_in_the_plane_of_a_pec_wall(stack, tmp_path, capsys):
+    """a PEC wall at the layout edge shorts a via port drawn on that edge: found, and the model is not written"""
+    materials, dielectrics, metals = stack
+    ap = gssg()
+    ap.add_rectangle(0, -200, 300, 200, M1)
+    ap.add_rectangle(150, -5, 150, 5, 203)                      # a via port inside the layout
+    ports = via_ports([1, 3], 'Metal1', 'TopMetal2')
+    pec = ['PEC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+    found = lambda bc, margin, air, p=ports: calibration.via_ports_in_pec_walls(ap, p, dielectrics, bc, margin, air)
+    assert found(pec, (0, 100, 100, 100), [0, 50, 50, 50, 50, 50]) == [(1, 'xmin')]
+    assert found(pec, (100, 100, 100, 100), 50) == [], "a wall away from the layout edge"
+    assert found(pec, (0, 100, 100, 100), 50) == [], "air between the layout edge and the wall"
+    assert found(['PMC'] + pec[1:], (0, 100, 100, 100), [0, 50, 50, 50, 50, 50]) == [], "a PMC wall doesn't short it"
+    assert found(pec, (0, 100, 100, 100), [0, 50, 50, 50, 50, 50], ports_for([1])) == [], "an in-plane port: a gap port to the wall"
+    sim_path = utilities.create_sim_path(str(tmp_path), 'line', dirname='palace_model')
+    settings = dict(unit=1e-6, margin=[0, 100, 100, 100], air_around=[0, 50, 50, 50, 50, 50], boundary=pec, fstart=0, fstop=100e9,
+                    fstep=5e9, refined_cellsize=4, meshsize_max=70, order=1, no_gui=True, no_preview=True,
+                    simulation_ports=ports, materials_list=materials, dielectrics_list=dielectrics, metals_list=metals,
+                    allpolygons=ap, sim_path=sim_path, model_basename='line')
+    with pytest.raises(SystemExit):
+        simulation_setup.create_palace(ports.all_active_excitations(), settings)
+    out = capsys.readouterr().out
+    assert 'ERROR: port 1 is a via port in the plane of the PEC wall at xmin' in out and "Make xmin a port wall" in out
+    assert not os.path.isfile(os.path.join(sim_path, 'config.json'))
+
+
+def test_standards_of_a_wall_next_to_an_extended_wall_continue_the_metal(stack):
+    """xmin is moved 20 outward: the plane that reaches xmin is continued, in the device and in the cross-section the
+    standards of ymin extrude (their box is 20 wider on that side)"""
+    ap = all_polygons_list()
+    ap.add_rectangle(0, -200, 300, 200, M1)
+    ap.add_rectangle(0, -5, 150, 5, TM2)
+    ap.add_rectangle(0, -5, 0, 5, 201)
+    ap.add_rectangle(250, -200, 260, -50, TM2)
+    ap.add_rectangle(250, -200, 260, -200, 202)
+    boundary = ['PORTWALL', 'ABC', 'PORTWALL', 'ABC', 'ABC', 'ABC']
+    r = analyze(stack, ap, ports_for([1, 2]), boundary=boundary, port_wall_extension={'xmin': 20.0})
+    xmin, ymin = r['groups']
+    assert xmin['extension'] == 20.0 and ymin['transverse'] == pytest.approx([-20.0, 300.0])
+    plane = [entry for entry in ymin['profile'] if entry[0] == 'Metal1']
+    assert plane == [['Metal1', pytest.approx(-20.0), pytest.approx(300.0)]]
+    line = [entry for entry in ymin['profile'] if entry[0] == 'TopMetal2']
+    assert line == [['TopMetal2', pytest.approx(250.0), pytest.approx(260.0)]] and ymin['port_details'][0]['stack'] == line
+
+
+def lines_over_plate(lines, length=3000.0):
+    """TopMetal2 lines (y0, y1) over a Metal1 plate, drawn to the layout edge at x = 0, ports on 201.."""
+    ap = all_polygons_list()
+    for k, (y0, y1) in enumerate(lines):
+        ap.add_rectangle(0, y0, length, y1, TM2)
+        ap.add_rectangle(0, y0, 0, y1, 201 + k)
+    ap.add_rectangle(0, min(y for y, _ in lines) - 200, length, max(y for _, y in lines) + 200, M1)
+    return ap
+
+
+def test_D_of_lines_far_apart_is_not_their_span(stack):
+    """Lines far from each other against their distance to ground (resonator arms cut by a split region) each settle
+    over their own cross-section: D is that of the largest group of coupled lines."""
+    single = analyze(stack, lines_over_plate([(0, 10)]), ports_for([1]), fmax=10e9)['groups'][0]
+    d = single['distance_to_ground']
+    assert single['D'] == pytest.approx(10 + 2 * d) and len(single['clusters']) == 1
+    # a close pair (gap d): one cluster, D from the common span, as before
+    pair = analyze(stack, lines_over_plate([(0, 10), (10 + d, 20 + d)]), ports_for([1, 2]), fmax=10e9)['groups'][0]
+    assert pair['D'] == pytest.approx(20 + d + 2 * d) and [c['ports'] for c in pair['clusters']] == [[1, 2]]
+    # eight lines 10 d apart: every line on its own, D that of one line
+    far = [(k * (10 + 10 * d), k * (10 + 10 * d) + 10) for k in range(8)]
+    g = analyze(stack, lines_over_plate(far), ports_for(range(1, 9)), fmax=10e9)['groups'][0]
+    assert g['D'] == pytest.approx(single['D']) and len(g['clusters']) == 8
+    assert g['span'] == pytest.approx(far[-1][1]) and g['L'] == pytest.approx(single['L'])
+    assert any('groups of coupled lines' in n for n in g['notes'])
+    # mixed, as hairpin resonators: a close pair among far lines gives the pair's D
+    mixed = [(0, 10), (10 + 10 * d, 20 + 10 * d), (20 + 11 * d, 30 + 11 * d), (30 + 21 * d, 40 + 21 * d)]
+    g = analyze(stack, lines_over_plate(mixed), ports_for(range(1, 5)), fmax=10e9)['groups'][0]
+    assert [c['ports'] for c in g['clusters']] == [[1], [2, 3], [4]]
+    assert g['D'] == pytest.approx(pair['D'])
