@@ -24,3 +24,11 @@ def test_slit_along_hole_edge_keeps_strip():
     polygons = [Polygon(p) for p in pieces]
     assert all(p.is_valid for p in polygons)
     assert unary_union(polygons).symmetric_difference(expected).area < 1e-6
+
+
+def test_repair_does_not_split_into_pieces_of_five_points():
+    """gdspy did not return for a plain 12-vertex polygon with max_points=5 (seen on an Activ shape of the MIM
+    example), so the repair must not go that low: a hang there would have no message"""
+    import inspect
+    candidates = inspect.signature(reader._fracture_valid_pieces).parameters['max_points_candidates'].default
+    assert min(candidates) >= 6
