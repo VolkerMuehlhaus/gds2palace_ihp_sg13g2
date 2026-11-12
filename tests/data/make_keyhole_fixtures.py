@@ -3,7 +3,7 @@ single boundary with a slit to the outline, and KLayout and gdspy place that sli
 therefore written by both.
 
     klayout -b -r make_keyhole_fixtures.py      -> keyholes_klayout.gds, keyholes.json (shapes and KLayout's areas)
-    python make_keyhole_fixtures.py             -> keyholes_gdspy.gds (needs keyholes.json)
+    python make_keyhole_fixtures.py             -> keyholes_gdspy.gds, via_bridge.gds
 
 A case is (add - sub) + add2, all lists of polygons in um, drawn on Metal1 (8/0) at its own x offset.
 """
@@ -103,9 +103,26 @@ def write_gdspy():
     library.write_gds(os.path.join(HERE, 'keyholes_gdspy.gds'))
 
 
+def write_via_bridge():
+    """two lines 1 um apart on Metal1 (8) and Metal2 (10), a row of Via1 (19) on each next to the gap, and an
+    in-plane port (201) across the gap at one end: for via_bridge_model.py"""
+    import gdspy
+    library = gdspy.GdsLibrary(unit=1e-6, precision=1e-9)
+    top = library.new_cell('VIA_BRIDGE')
+    for x0, x1 in ((0, 10), (11, 21)):
+        for layer in (8, 10):
+            top.add(gdspy.Rectangle((x0, 0), (x1, 40), layer=layer))
+    for k in range(20):
+        for x in (9.4, 11.41):
+            top.add(gdspy.Rectangle((x, 5.4 + 1.5 * k), (x + 0.19, 5.59 + 1.5 * k), layer=19))
+    top.add(gdspy.Rectangle((10, 0), (11, 4), layer=201))
+    library.write_gds(os.path.join(HERE, 'via_bridge.gds'))
+
+
 if __name__ == '__main__' or 'pya' in dir():
     try:
         import pya  # noqa: F401  (inside KLayout)
         write_klayout()
     except ImportError:
         write_gdspy()
+        write_via_bridge()
