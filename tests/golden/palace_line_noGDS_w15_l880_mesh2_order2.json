@@ -1,0 +1,225 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     10
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.41999999999999993
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      8
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "palace_line_noGDS_w15_l880_mesh2_order2.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "palace_line_noGDS_w15_l880_mesh2_order2",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 2.5,
+      "MaxFreq": 100.0,
+      "MinFreq": 2.5,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   3
+  ],
+  "Absorbing_boundary": [
+   2,
+   10
+  ],
+  "Metal1_1": [
+   2,
+   1
+  ],
+  "P1": [
+   2,
+   8
+  ],
+  "P2": [
+   2,
+   9
+  ],
+  "PEC_boundary": [
+   2,
+   11
+  ],
+  "PMC_boundary": [
+   2,
+   12
+  ],
+  "Passive": [
+   3,
+   4
+  ],
+  "SiO2": [
+   3,
+   5
+  ],
+  "Spacing": [
+   3,
+   6
+  ],
+  "TopMetal2_1": [
+   2,
+   2
+  ],
+  "airbox": [
+   3,
+   7
+  ]
+ },
+ "port_information": {
+  "name": "palace_line_noGDS_w15_l880_mesh2_order2",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999999,
+    "portnumber": 1,
+    "width": 15.0,
+    "xmax": 0.0,
+    "xmin": 0.0,
+    "ymax": 7.5,
+    "ymin": -7.5,
+    "zmax": 13.2303,
+    "zmin": 3.46
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999999,
+    "portnumber": 2,
+    "width": 15.0,
+    "xmax": 880.0,
+    "xmin": 880.0,
+    "ymax": 7.5,
+    "ymin": -7.5,
+    "zmax": 13.2303,
+    "zmin": 3.46
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 113745
+}

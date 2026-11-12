@@ -1,0 +1,273 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     14
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.41999999999999993
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.000000000000001
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      12
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50.0
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": [
+      314300.0,
+      314300.0,
+      3143000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "inductor_500pH_2port.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "inductor_500pH_2port",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 1.0,
+      "MaxFreq": 100.0,
+      "MinFreq": 1.0,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   6
+  ],
+  "Absorbing_boundary": [
+   2,
+   14
+  ],
+  "EPI": [
+   3,
+   9
+  ],
+  "Metal1_1": [
+   2,
+   2
+  ],
+  "P1": [
+   2,
+   12
+  ],
+  "P2": [
+   2,
+   13
+  ],
+  "PEC_boundary": [
+   2,
+   15
+  ],
+  "PMC_boundary": [
+   2,
+   16
+  ],
+  "Passive": [
+   3,
+   7
+  ],
+  "SiO2": [
+   3,
+   8
+  ],
+  "Substrate": [
+   3,
+   10
+  ],
+  "TopMetal1_1": [
+   2,
+   3
+  ],
+  "TopMetal2_1": [
+   2,
+   4
+  ],
+  "TopMetal2_2": [
+   2,
+   5
+  ],
+  "TopVia2": [
+   3,
+   1
+  ],
+  "airbox": [
+   3,
+   11
+  ]
+ },
+ "port_information": {
+  "name": "inductor_500pH_2port",
+  "ports": [
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999992,
+    "portnumber": 1,
+    "width": 5.400000000000002,
+    "xmax": 36.435,
+    "xmin": 31.035,
+    "ymax": -42.0,
+    "ymin": -42.0,
+    "zmax": 194.9803,
+    "zmin": 185.21
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999992,
+    "portnumber": 2,
+    "width": 5.400000000000006,
+    "xmax": 56.965,
+    "xmin": 51.565,
+    "ymax": -42.0,
+    "ymin": -42.0,
+    "zmax": 194.9803,
+    "zmin": 185.21
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 32579
+}

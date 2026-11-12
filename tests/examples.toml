@@ -9,40 +9,40 @@
 
 [[example]]
 script = "workflow/palace_line_viaport.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_line_portwall.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_line_noGDS.py"
-tiers = []
-note = "no GDSII file: the geometry is built in the script"
+tiers = ["model"]
+note = "no GDSII file: the geometry is built in the script, so there is no layout to compare with"
 
 [[example]]
 script = "workflow/palace_L2n0.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/inductor_500pH_2port.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_ind_frame.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_rfcmim.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_balun_mesh5.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_butlermatrix.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_butlermatrix_dump93.py"
@@ -51,17 +51,17 @@ note = "same layout and ports as palace_butlermatrix.py, whose geometry takes 40
 
 [[example]]
 script = "workflow/palace_core.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "workflow/palace_pcb_lowpass.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 # fixtures of the tests themselves
 [[example]]
 script = "tests/data/dipole_model.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]
 
 [[example]]
 script = "tests/data/via_bridge_model.py"
-tiers = ["reader", "geometry"]
+tiers = ["reader", "geometry", "model"]

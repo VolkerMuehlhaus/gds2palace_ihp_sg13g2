@@ -1,0 +1,299 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     16
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 357141.0,
+     "Thickness": 0.4
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.41999999999999993
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4900000000000002
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 500000.0,
+     "Thickness": 0.14969999999999928
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.000000000000001
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      14
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      15
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": [
+      239000.0,
+      239000.0,
+      2390000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": [
+      219100.0,
+      219100.0,
+      2191000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "palace_rfcmim.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "palace_rfcmim",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 2.5,
+      "MaxFreq": 100.0,
+      "MinFreq": 2.5,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   8
+  ],
+  "Absorbing_boundary": [
+   2,
+   16
+  ],
+  "Activ_1": [
+   2,
+   3
+  ],
+  "Cont": [
+   3,
+   1
+  ],
+  "EPI": [
+   3,
+   11
+  ],
+  "MIM_1": [
+   2,
+   6
+  ],
+  "Metal1_1": [
+   2,
+   4
+  ],
+  "Metal5_1": [
+   2,
+   5
+  ],
+  "P1": [
+   2,
+   14
+  ],
+  "P2": [
+   2,
+   15
+  ],
+  "PEC_boundary": [
+   2,
+   17
+  ],
+  "PMC_boundary": [
+   2,
+   18
+  ],
+  "Passive": [
+   3,
+   9
+  ],
+  "SiO2": [
+   3,
+   10
+  ],
+  "Substrate": [
+   3,
+   12
+  ],
+  "TopMetal1_1": [
+   2,
+   7
+  ],
+  "Vmim": [
+   3,
+   2
+  ],
+  "airbox": [
+   3,
+   13
+  ]
+ },
+ "port_information": {
+  "name": "palace_rfcmim",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 4.97029999999998,
+    "portnumber": 1,
+    "width": 10.000000000000002,
+    "xmax": -32.665,
+    "xmin": -32.665,
+    "ymax": 23.85,
+    "ymin": 13.85,
+    "zmax": 190.1803,
+    "zmin": 185.21
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 3.6299999999999955,
+    "portnumber": 2,
+    "width": 10.000000000000002,
+    "xmax": 84.53,
+    "xmin": 84.53,
+    "ymax": 23.85,
+    "ymin": 13.85,
+    "zmax": 188.84,
+    "zmin": 185.21
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 20402
+}

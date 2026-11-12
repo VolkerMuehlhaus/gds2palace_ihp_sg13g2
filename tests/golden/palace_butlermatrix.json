@@ -1,0 +1,405 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     18
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4900000000000002
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.000000000000001
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      10
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 2,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 3,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 4,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      14
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 5,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      15
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 6,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      16
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 7,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      17
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 8,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": [
+      314300.0,
+      314300.0,
+      3143000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "palace_butlermatrix.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "palace_butlermatrix",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 0.5,
+      "MaxFreq": 105.0,
+      "MinFreq": 85.0,
+      "SaveStep": 0,
+      "Type": "Linear"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   5
+  ],
+  "Absorbing_boundary": [
+   2,
+   18
+  ],
+  "Metal3_1": [
+   2,
+   2
+  ],
+  "P1": [
+   2,
+   10
+  ],
+  "P2": [
+   2,
+   11
+  ],
+  "P3": [
+   2,
+   12
+  ],
+  "P4": [
+   2,
+   13
+  ],
+  "P5": [
+   2,
+   14
+  ],
+  "P6": [
+   2,
+   15
+  ],
+  "P7": [
+   2,
+   16
+  ],
+  "P8": [
+   2,
+   17
+  ],
+  "PEC_boundary": [
+   2,
+   19
+  ],
+  "PMC_boundary": [
+   2,
+   20
+  ],
+  "Passive": [
+   3,
+   6
+  ],
+  "SiO2": [
+   3,
+   7
+  ],
+  "Spacing": [
+   3,
+   8
+  ],
+  "TopMetal1_1": [
+   2,
+   3
+  ],
+  "TopMetal2_1": [
+   2,
+   4
+  ],
+  "TopVia2": [
+   3,
+   1
+  ],
+  "airbox": [
+   3,
+   9
+  ]
+ },
+ "port_information": {
+  "name": "palace_butlermatrix",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 1,
+    "width": 11.799999999999955,
+    "xmax": -316.61,
+    "xmin": -316.61,
+    "ymax": 314.95,
+    "ymin": 303.15000000000003,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 2,
+    "width": 11.8,
+    "xmax": -316.61,
+    "xmin": -316.61,
+    "ymax": -8.27,
+    "ymin": -20.07,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 3,
+    "width": 11.8,
+    "xmax": -316.61,
+    "xmin": -316.61,
+    "ymax": 20.07,
+    "ymin": 8.27,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 4,
+    "width": 11.799999999999955,
+    "xmax": -316.61,
+    "xmin": -316.61,
+    "ymax": -303.15000000000003,
+    "ymin": -314.95,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 5,
+    "width": 11.799999999999955,
+    "xmax": 316.61,
+    "xmin": 316.61,
+    "ymax": 314.95,
+    "ymin": 303.15000000000003,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 6,
+    "width": 11.8,
+    "xmax": 316.61,
+    "xmin": 316.61,
+    "ymax": -8.27,
+    "ymin": -20.07,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 7,
+    "width": 11.8,
+    "xmax": 316.61,
+    "xmin": 316.61,
+    "ymax": 20.07,
+    "ymin": 8.27,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.7103,
+    "portnumber": 8,
+    "width": 11.799999999999955,
+    "xmax": 316.61,
+    "xmin": 316.61,
+    "ymax": -303.15000000000003,
+    "ymin": -314.95,
+    "zmax": 13.2303,
+    "zmin": 5.52
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 207174
+}

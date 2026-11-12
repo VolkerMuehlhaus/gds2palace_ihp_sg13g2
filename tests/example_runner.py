@@ -6,6 +6,7 @@ from the GDSII file, not with results stored from an earlier run.
 """
 import contextlib
 import io
+import json
 import os
 import runpy
 import sys
@@ -420,3 +421,154 @@ def model_nets(groups, metals):
             for _, curve in gmsh.model.getBoundary([(2, face)], oriented=False):
                 parent[find(('c', abs(curve)))] = find(('f', face))
     return len({find(key) for key in list(parent) if key[0] == 'f'})
+
+
+# ----------------------------------------- model files -----------------------------------------
+
+# gds2palace names the groups of the PEC and PMC sides of the simulation box in every mesh, and lists the PEC one in
+# config.json next to PEC sheet layers also when no side of the box is PEC: then it is named and used without elements
+EMPTY_BOX_GROUPS = {'PEC_boundary', 'PMC_boundary'}
+
+
+def read_msh(path):
+    """({name: (dim, tag)}, {tag: number of elements}, number of tetrahedra) of a gmsh 2.2 ASCII mesh file"""
+    names, counts, tetrahedra = {}, {}, 0
+    with open(path, encoding='utf-8') as f:
+        section = None
+        for line in f:
+            line = line.strip()
+            if line.startswith('$'):
+                section = None if line.startswith('$End') else line
+                skip = 1                # the first line of a section is its number of entries
+                continue
+            if skip:
+                skip -= 1
+                continue
+            if section == '$PhysicalNames':
+                dim, tag, name = line.split(' ', 2)
+                names[name.strip('"')] = (int(dim), int(tag))
+            elif section == '$Elements':
+                parts = line.split(' ', 5)
+                tag = int(parts[3])
+                counts[tag] = counts.get(tag, 0) + 1
+                tetrahedra += parts[1] in ('4', '11')
+    return names, counts, tetrahedra
+
+
+def _attributes(node, found=None):
+    """all attribute numbers in a Palace config: every "Attributes" list, at any depth"""
+    found = set() if found is None else found
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == 'Attributes':
+                found.update(int(v) for v in value)
+            else:
+                _attributes(value, found)
+    elif isinstance(node, list):
+        for value in node:
+            _attributes(value, found)
+    return found
+
+
+def check_model_files(data_dir, model, settings):
+    """Problems (list of str) in the files of one model: the files are there, mesh and config.json fit together, and
+    the ports are those of the script."""
+    problems = []
+    paths = {name: os.path.join(data_dir, name)
+             for name in ('config.json', model + '.msh', 'port_information.json', 'run_sim')}
+    missing = [name for name, path in paths.items() if not os.path.isfile(path) or not os.path.getsize(path)]
+    if missing:
+        return [f'missing or empty: {missing}']
+    with open(paths['config.json'], encoding='utf-8') as f:
+        config = json.load(f)
+    with open(paths['port_information.json'], encoding='utf-8') as f:
+        port_information = json.load(f)
+    names, counts, tetrahedra = read_msh(paths[model + '.msh'])
+    by_tag = {tag: name for name, (_, tag) in names.items()}
+
+    if not tetrahedra:
+        problems.append('no tetrahedra in the mesh')
+    used = _attributes(config)
+    unknown = sorted(used - set(by_tag))
+    if unknown:
+        problems.append(f'config.json uses attribute(s) {unknown} that the mesh does not have')
+    empty = sorted(by_tag[tag] for tag in used & set(by_tag)
+                   if not counts.get(tag) and by_tag[tag] not in EMPTY_BOX_GROUPS)
+    if empty:
+        problems.append(f'no elements in group(s) {empty} that config.json uses')
+    unused = sorted(by_tag[tag] for tag in counts if tag in by_tag and tag not in used)
+    if unused:
+        problems.append(f'group(s) {unused} have elements, but config.json does not use them')
+    stray = sorted(tag for tag in counts if tag not in by_tag)
+    if stray:
+        problems.append(f'elements with attribute(s) {stray} that have no name')
+    volumes = {tag for name, (dim, tag) in names.items() if dim == 3 and counts.get(tag)}
+    materials = {int(a) for m in config.get('Domains', {}).get('Materials', []) for a in m.get('Attributes', [])}
+    if volumes - materials:
+        problems.append(f'volume(s) {sorted(by_tag[t] for t in volumes - materials)} without a material')
+
+    ports = settings['simulation_ports'].ports
+    lumped = {int(p['Index']): p for p in config.get('Boundaries', {}).get('LumpedPort', [])}
+    for port in ports:
+        entry = lumped.get(int(port.portnumber))
+        if entry is None:
+            problems.append(f'port {port.portnumber}: not in config.json')
+            continue
+        if abs(float(entry.get('R', 0)) - float(port.port_Z0)) > 1e-9 * abs(float(port.port_Z0)):
+            problems.append(f"port {port.portnumber}: R = {entry.get('R')} in config.json, Z0 = {port.port_Z0} in the script")
+        if bool(entry.get('Excitation')) != bool(port.voltage):
+            problems.append(f"port {port.portnumber}: Excitation = {entry.get('Excitation')} in config.json, "
+                            f'voltage = {port.voltage} in the script')
+    if set(lumped) - {int(p.portnumber) for p in ports}:
+        problems.append(f"port(s) {sorted(set(lumped) - {int(p.portnumber) for p in ports})} in config.json, "
+                        'not in the script')
+    listed = sorted(int(p['portnumber']) for p in port_information.get('ports', []))
+    if listed != sorted(int(p.portnumber) for p in ports):
+        problems.append(f'port_information.json lists ports {listed}')
+    return problems
+
+
+def model_record(data_dir, model):
+    """What is kept in tests/golden/ for one model: config.json without machine-dependent paths, the mesh groups,
+    port_information.json and the number of tetrahedra."""
+    with open(os.path.join(data_dir, 'config.json'), encoding='utf-8') as f:
+        config = json.load(f)
+
+    def without_paths(node):
+        if isinstance(node, dict):
+            return {key: without_paths(value) for key, value in node.items()}
+        if isinstance(node, list):
+            return [without_paths(value) for value in node]
+        if isinstance(node, str) and (os.sep in node or '/' in node):
+            return os.path.basename(node.rstrip('/\\'))
+        return node
+
+    with open(os.path.join(data_dir, 'port_information.json'), encoding='utf-8') as f:
+        port_information = json.load(f)
+    names, _, tetrahedra = read_msh(os.path.join(data_dir, model + '.msh'))
+    return {'config': without_paths(config), 'groups': {name: list(value) for name, value in sorted(names.items())},
+            'port_information': without_paths(port_information), 'tetrahedra': tetrahedra}
+
+
+def record_differences(expected, got, path='', rel=1e-9, band=0.25):
+    """Differences (list of str) between a stored record and a new one; numbers within rel, the number of tetrahedra
+    within band (the mesh is not the same on every machine and gmsh version)"""
+    if path == '/tetrahedra':
+        return [] if abs(got - expected) <= band * expected else [f'{path}: {expected} -> {got}']
+    if isinstance(expected, dict) and isinstance(got, dict):
+        out = []
+        for key in sorted(set(expected) | set(got)):
+            if key not in got:
+                out.append(f'{path}/{key}: removed (was {json.dumps(expected[key])[:80]})')
+            elif key not in expected:
+                out.append(f'{path}/{key}: new ({json.dumps(got[key])[:80]})')
+            else:
+                out += record_differences(expected[key], got[key], f'{path}/{key}', rel, band)
+        return out
+    if isinstance(expected, list) and isinstance(got, list):
+        if len(expected) != len(got):
+            return [f'{path}: {len(expected)} -> {len(got)} entries']
+        return [d for i, (a, b) in enumerate(zip(expected, got)) for d in record_differences(a, b, f'{path}[{i}]', rel, band)]
+    if isinstance(expected, (int, float)) and isinstance(got, (int, float)) and not isinstance(expected, bool):
+        return [] if abs(got - expected) <= rel * max(abs(expected), abs(got)) else [f'{path}: {expected} -> {got}']
+    return [] if expected == got else [f'{path}: {json.dumps(expected)[:80]} -> {json.dumps(got)[:80]}']
