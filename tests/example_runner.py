@@ -95,6 +95,12 @@ def run_example(script, tmp_path, mode='reader'):
 
     gmsh_clear = gmsh.clear
     gmsh.clear = clear
+    # an Elmer model ends with the conversion of the mesh by ElmerGrid, also when no mesh was written (geometry
+    # mode): not needed for the checks, and ElmerGrid is not installed everywhere
+    util_elmer = simulation_setup.util_elmer
+    convert_mesh = util_elmer.convert_mesh_to_elmer
+    if mode != 'model':
+        util_elmer.convert_mesh_to_elmer = lambda *args, **kwargs: None
     state = (os.getcwd(), list(sys.argv), list(sys.path))
     output = io.StringIO()
     gds_reader.read_gds = read_gds
@@ -112,6 +118,7 @@ def run_example(script, tmp_path, mode='reader'):
             setattr(simulation_setup, name, created[name])
         utilities.create_sim_path, utilities.create_run_script = original['create_sim_path'], original['create_run_script']
         gmsh.clear = gmsh_clear
+        util_elmer.convert_mesh_to_elmer = convert_mesh
         os.chdir(state[0])
         sys.argv[:], sys.path[:] = state[1], state[2]
         run.log = output.getvalue()
