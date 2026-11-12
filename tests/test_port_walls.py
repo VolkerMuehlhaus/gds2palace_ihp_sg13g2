@@ -322,6 +322,30 @@ def test_model_files_and_run_script(stack, tmp_path):
         open(os.path.join(utilities.get_scripts_dir(), 'combine_extend_snp.py')).read()
 
 
+@pytest.mark.parametrize('display, windows', [(None, 0), (':0', 1)])
+def test_no_gmsh_window_without_display(stack, tmp_path, monkeypatch, display, windows):
+    """a script without no_gui (e.g. exported from setupEM) on Linux with no display: no gmsh window"""
+    import sys
+    import gmsh
+    materials, dielectrics, metals = stack
+    ports = ports_for([1, 2])
+    opened = []
+    monkeypatch.setattr(gmsh.fltk, 'run', lambda: opened.append(1))
+    monkeypatch.setattr(sys, 'platform', 'linux')
+    monkeypatch.delenv('WAYLAND_DISPLAY', raising=False)
+    if display:
+        monkeypatch.setenv('DISPLAY', display)
+    else:
+        monkeypatch.delenv('DISPLAY', raising=False)
+    sim_path = utilities.create_sim_path(str(tmp_path), 'line', dirname='palace_model')
+    settings = dict(unit=1e-6, margin=100, air_around=50, boundary=BOUNDARY, fstart=0, fstop=100e9, fstep=5e9,
+                    refined_cellsize=4, meshsize_max=70, order=1, preview_only=True,
+                    simulation_ports=ports, materials_list=materials, dielectrics_list=dielectrics, metals_list=metals,
+                    allpolygons=gssg(length=250), sim_path=sim_path, model_basename='line')
+    simulation_setup.create_palace(ports.all_active_excitations(), settings)
+    assert len(opened) == windows
+
+
 def test_both_ends_of_a_line_share_the_standards(stack, tmp_path):
     ap = gssg()
     for k, (y0, y1) in enumerate(GSSG_LINES):

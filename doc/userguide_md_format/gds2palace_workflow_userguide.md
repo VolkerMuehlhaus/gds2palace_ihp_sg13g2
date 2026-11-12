@@ -507,7 +507,7 @@ Scripts from gds2palace before 0.9.0 use **settings['filled_metals']** instead. 
 
 #### Script control and output files
 
-**settings['no_gui']:** Run script without showing gmsh user interface, useful for automated processing, default is False  
+**settings['no_gui']:** Run script without showing gmsh user interface, useful for automated processing, default is False. On Linux without a display (no DISPLAY or WAYLAND_DISPLAY, e.g. over ssh or in a container), the gmsh user interface is always skipped.  
 **settings['no_preview']:** don't show unmeshed geometry, immediately show meshed model, default is False  
 **settings['preview_only']:** Only show the unmeshed geometry in gmsh, then stop without generating a mesh, default is False  
 **settings['save_gmsh_unrolled']:** Also save gmsh geometry file without meshing, for later inspection, default is False  
