@@ -18,7 +18,7 @@
 
 # Extract objects from layers in GDSII file
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 import gdspy
 import numpy as np
@@ -739,6 +739,20 @@ def _fracture_valid_pieces (points, max_points_candidates=(8, 6, 5)):
   """
   raw = ShapelyPolygon(points)
   fixed = raw if raw.is_valid else make_valid(raw)
+
+  # make_valid() decides what is inside from the noded lines, so it can drop a part
+  # of the shape: a slit that runs along a hole edge (as KLayout writes it) passes
+  # the root of a strip reaching into the hole twice, and the strip then counts as
+  # a hole. gdspy's boolean follows the winding of the boundary and keeps it. If
+  # the two disagree on the area, fracture the original boundary with gdspy instead.
+  reference = gdspy.boolean([points], None, 'or', max_points=199)
+  if reference is not None and abs(fixed.area - reference.area()) > 1e-9 * reference.area():
+    for max_points in max_points_candidates:
+      result = gdspy.boolean([points], None, 'or', max_points=max_points)
+      pieces = [list(map(tuple, p)) for p in result.polygons]
+      if all(ShapelyPolygon(p).is_valid for p in pieces):
+        return pieces
+    return None
 
   if fixed.geom_type == "GeometryCollection":
     # a repaired "bridge" polygon typically comes back as the resolved
