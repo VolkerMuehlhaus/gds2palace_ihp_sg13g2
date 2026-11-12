@@ -1,0 +1,250 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     12
+    ],
+    "Order": 2
+   },
+   "Conductivity": [],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      10
+     ],
+     "Direction": "Y",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Direction": "-Y",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": 27800000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": [
+      314300.0,
+      314300.0,
+      3143000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 30300000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "ind_frame_solve_inside_skin_mesh5.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "ind_frame_solve_inside_skin_mesh5",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 0.5,
+      "MaxFreq": 50.0,
+      "MinFreq": 0.5,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   4
+  ],
+  "Absorbing_boundary": [
+   2,
+   12
+  ],
+  "EPI": [
+   3,
+   7
+  ],
+  "P1": [
+   2,
+   10
+  ],
+  "P2": [
+   2,
+   11
+  ],
+  "PEC_boundary": [
+   2,
+   13
+  ],
+  "PMC_boundary": [
+   2,
+   14
+  ],
+  "Passive": [
+   3,
+   5
+  ],
+  "SiO2": [
+   3,
+   6
+  ],
+  "Substrate": [
+   3,
+   8
+  ],
+  "TopMetal1": [
+   3,
+   1
+  ],
+  "TopMetal2": [
+   3,
+   3
+  ],
+  "TopVia2": [
+   3,
+   2
+  ],
+  "airbox": [
+   3,
+   9
+  ]
+ },
+ "port_information": {
+  "name": "ind_frame_solve_inside_skin_mesh5",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "Y",
+    "element": 1,
+    "length": 3.0,
+    "portnumber": 1,
+    "width": 5.0,
+    "xmax": 62.5,
+    "xmin": 57.5,
+    "ymax": 0.0,
+    "ymin": -3.0,
+    "zmax": 194.9803,
+    "zmin": 194.9803
+   },
+   {
+    "Z0": 50,
+    "direction": "-Y",
+    "element": 1,
+    "length": 3.0,
+    "portnumber": 2,
+    "width": 5.0,
+    "xmax": 62.5,
+    "xmin": 57.5,
+    "ymax": 132.0,
+    "ymin": 129.0,
+    "zmax": 194.9803,
+    "zmin": 194.9803
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 61402
+}

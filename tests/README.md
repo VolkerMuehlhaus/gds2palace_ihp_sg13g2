@@ -1,8 +1,8 @@
 # Tests
 
 ```
-python -m pytest tests                  # everything without meshing the examples, about 1 min
-python -m pytest tests -m examples      # the model files of the examples, with meshing
+python -m pytest tests                  # everything without meshing the examples, about 1.5 min
+python -m pytest tests -m examples      # the model files of the examples, with meshing, about 5 min
 ```
 
 Needs `pytest` and `scikit-rf` in addition to gds2palace. No Palace run, no gmsh window.
@@ -20,10 +20,18 @@ The same two commands run on GitHub for every push and pull request (`.github/wo
 
 ## The example tests
 
-The examples in `workflow/` are run as they are. `example_runner.py` executes a model script with
-`read_gds()` and `create_palace()` recorded, the output in a temporary folder and no gmsh window.
-`examples.toml` lists the scripts and what is checked for each. A script in `workflow/` that is not
-listed fails a test, so a new example cannot be left out.
+The examples are run as they are. `example_runner.py` executes a model script with `read_gds()` and
+`create_palace()` (or `create_elmer...()`) recorded, the output in a temporary folder and no gmsh
+window. A script may build several models; each is checked.
+
+`examples.toml` lists the scripts and what is checked for each:
+
+- all scripts in `workflow/`. One that is not listed fails a test, so a new example cannot be left out.
+- from `more_examples/`, one script per distinct structure or feature: several models from one
+  script, conformal passivation, transistor ports to a reference sheet, resistors from derived layers,
+  conductors solved inside (with and without skin layers), via fill factor, SG13CMOS5L, MIM balun,
+  transformer, Elmer thermal. The other mesh, order and conductor model variants of the same layouts
+  are left out, and so are the study drivers and the synthesis scripts; `examples.toml` says which.
 
 Three levels, each against its own reference:
 

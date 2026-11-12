@@ -1,0 +1,374 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     21
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.41999999999999993
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.000000000000001
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.000000000000001
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.000000000000001
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      17
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      18
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      19
+     ],
+     "Direction": "Z",
+     "Excitation": 3,
+     "Index": 3,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      20
+     ],
+     "Direction": "Z",
+     "Excitation": 4,
+     "Index": 4,
+     "R": 50.0
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": [
+      314300.0,
+      314300.0,
+      3143000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      14
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      15
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      16
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "balun2x1_edgecoupled_do200_w8_s2_mesh5.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "balun2x1_edgecoupled_do200_w8_s2_mesh5",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 1.0,
+      "MaxFreq": 50.0,
+      "MinFreq": 1.0,
+      "SaveStep": 0,
+      "Type": "Linear"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   11
+  ],
+  "Absorbing_boundary": [
+   2,
+   21
+  ],
+  "EPI": [
+   3,
+   14
+  ],
+  "Metal1_1": [
+   2,
+   2
+  ],
+  "P1": [
+   2,
+   17
+  ],
+  "P2": [
+   2,
+   18
+  ],
+  "P3": [
+   2,
+   19
+  ],
+  "P4": [
+   2,
+   20
+  ],
+  "PEC_boundary": [
+   2,
+   22
+  ],
+  "PMC_boundary": [
+   2,
+   23
+  ],
+  "Passive": [
+   3,
+   12
+  ],
+  "SiO2": [
+   3,
+   13
+  ],
+  "Substrate": [
+   3,
+   15
+  ],
+  "TopMetal1_1": [
+   2,
+   3
+  ],
+  "TopMetal1_2": [
+   2,
+   4
+  ],
+  "TopMetal1_3": [
+   2,
+   5
+  ],
+  "TopMetal2_1": [
+   2,
+   6
+  ],
+  "TopMetal2_2": [
+   2,
+   7
+  ],
+  "TopMetal2_3": [
+   2,
+   8
+  ],
+  "TopMetal2_4": [
+   2,
+   9
+  ],
+  "TopMetal2_5": [
+   2,
+   10
+  ],
+  "TopVia2": [
+   3,
+   1
+  ],
+  "airbox": [
+   3,
+   16
+  ]
+ },
+ "port_information": {
+  "name": "balun2x1_edgecoupled_do200_w8_s2_mesh5",
+  "ports": [
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999992,
+    "portnumber": 1,
+    "width": 8.0,
+    "xmax": -116.0,
+    "xmin": -116.0,
+    "ymax": 22.625,
+    "ymin": 14.625,
+    "zmax": 194.9803,
+    "zmin": 185.21
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999992,
+    "portnumber": 2,
+    "width": 8.0,
+    "xmax": -116.0,
+    "xmin": -116.0,
+    "ymax": -14.625,
+    "ymin": -22.625,
+    "zmax": 194.9803,
+    "zmin": 185.21
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999992,
+    "portnumber": 3,
+    "width": 8.0,
+    "xmax": 116.0,
+    "xmin": 116.0,
+    "ymax": 22.625,
+    "ymin": 14.625,
+    "zmax": 194.9803,
+    "zmin": 185.21
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.770299999999992,
+    "portnumber": 4,
+    "width": 8.0,
+    "xmax": 116.0,
+    "xmin": 116.0,
+    "ymax": -14.625,
+    "ymin": -22.625,
+    "zmax": 194.9803,
+    "zmin": 185.21
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 44836
+}

@@ -57,6 +57,75 @@ tiers = ["reader", "geometry", "model"]
 script = "workflow/palace_pcb_lowpass.py"
 tiers = ["reader", "geometry", "model"]
 
+# more_examples/: one script per distinct structure or feature, not every variant of a study.
+# Left out: the other mesh, order, AMR and conductor model variants of the same layouts (mesh_convergence,
+# conductor_models, measured_vs_simulated: L6n2 is in once), the D-band balun and inductor frame of
+# mesh_convergence (the same structures are in workflow/), ground_cutout_inductor and conductor_models/lines
+# (study drivers that build many models), the two inductor synthesis scripts (they also run the solver; one needs
+# an external library).
+
+[[example]]
+script = "more_examples/EM_temperature_coefficient/palace_tcoef.py"
+tiers = ["reader", "geometry", "model"]
+note = "one script, one model per temperature"
+
+[[example]]
+script = "more_examples/conformal_3D_passivation/palace_balun_mesh4.py"
+tiers = ["reader", "geometry", "model"]
+note = "conformal passivation from derived layers"
+
+[[example]]
+script = "more_examples/core_transistor_3port_bce/50_ghz_mpa_core_bce_ports.py"
+tiers = ["reader", "geometry", "model"]
+note = "ports to the REF_FOR_TRANSISTOR sheet"
+
+[[example]]
+script = "more_examples/derived_layers_and_resistors/palace_resistors_rsil.py"
+tiers = ["reader", "geometry", "model"]
+note = "resistor sheets from derived layers"
+
+[[example]]
+script = "more_examples/measured_vs_simulated/more_accurate_models_L6n2_v4/L6n2_with_ports_5um_passi3D.py"
+tiers = ["reader", "geometry", "model"]
+note = "the L6n2 inductor, once: conductors solved inside, via fill factor, ports to SUBGND"
+
+[[example]]
+script = "more_examples/mesh_convergence/mesh_convergence_balun2x1/balun2x1_edgecoupled_do200_w8_s2_mesh5.py"
+tiers = ["reader", "geometry", "model"]
+
+[[example]]
+script = "more_examples/mesh_convergence/mesh_convergence_balun_mim/trans_100diff_to_80se_ports_mesh2.py"
+tiers = ["reader", "geometry", "model"]
+note = "balun with MIM capacitors"
+
+[[example]]
+script = "more_examples/mesh_convergence/mesh_convergence_balun_mim/verify_MIM_nominal_280.py"
+tiers = ["reader", "geometry", "model"]
+
+[[example]]
+script = "more_examples/mesh_convergence/mesh_convergence_mom_cmos5l/c4_frame_ports_mesh200nm.py"
+tiers = ["reader", "geometry", "model"]
+note = "SG13CMOS5L stackup, MOM capacitor"
+
+[[example]]
+script = "more_examples/mesh_convergence/mesh_convergence_transformer/palace_transformer_imn_mesh5.py"
+tiers = ["reader", "geometry", "model"]
+
+[[example]]
+script = "more_examples/conductor_models/inductor/ind_frame_solve_inside_mesh2.py"
+tiers = ["reader", "geometry", "model"]
+note = "conductor_model 'solve_inside'"
+
+[[example]]
+script = "more_examples/conductor_models/inductor/ind_frame_solve_inside_skin_mesh5.py"
+tiers = ["reader", "geometry", "model"]
+note = "conductor_model 'solve_inside_skin'"
+
+[[example]]
+script = "more_examples/thermal_simulation_using_Elmer/elmer_thermal_simplest_typicalvalues.py"
+tiers = ["reader", "geometry"]
+note = "Elmer thermal model: no Palace config.json, so no model file check"
+
 # fixtures of the tests themselves
 [[example]]
 script = "tests/data/dipole_model.py"

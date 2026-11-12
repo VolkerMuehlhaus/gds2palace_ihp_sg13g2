@@ -1,0 +1,283 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     15
+    ],
+    "Order": 2
+   },
+   "Conductivity": [],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      13
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      14
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50.0
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": 10000000000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 27800000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": [
+      87832.48267965576,
+      87832.48267965576,
+      878324.8267965576
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 30300000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "L6n2_with_ports_5um_passi3D.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "L6n2_with_ports_5um_passi3D",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 0.1,
+      "MaxFreq": 14.0,
+      "MinFreq": 0.1,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   7
+  ],
+  "Absorbing_boundary": [
+   2,
+   15
+  ],
+  "EPI": [
+   3,
+   10
+  ],
+  "P1": [
+   2,
+   13
+  ],
+  "P2": [
+   2,
+   14
+  ],
+  "PEC_boundary": [
+   2,
+   16
+  ],
+  "PMC_boundary": [
+   2,
+   17
+  ],
+  "Passive": [
+   3,
+   8
+  ],
+  "SUBGND": [
+   3,
+   1
+  ],
+  "SiO2": [
+   3,
+   9
+  ],
+  "Substrate": [
+   3,
+   11
+  ],
+  "TM2_above": [
+   3,
+   6
+  ],
+  "TM2_sides": [
+   3,
+   5
+  ],
+  "TopMetal1": [
+   3,
+   2
+  ],
+  "TopMetal2": [
+   3,
+   4
+  ],
+  "TopVia2_x0.28": [
+   3,
+   3
+  ],
+  "airbox": [
+   3,
+   12
+  ]
+ },
+ "port_information": {
+  "name": "L6n2_with_ports_5um_passi3D",
+  "ports": [
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 6.430299999999988,
+    "portnumber": 1,
+    "width": 8.0,
+    "xmax": -95.675,
+    "xmin": -103.675,
+    "ymax": -50.0,
+    "ymin": -50.0,
+    "zmax": 190.1803,
+    "zmin": 183.75
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 6.430299999999988,
+    "portnumber": 2,
+    "width": 8.0,
+    "xmax": -39.305,
+    "xmin": -47.305,
+    "ymax": -50.0,
+    "ymin": -50.005,
+    "zmax": 190.1803,
+    "zmin": 183.75
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 94711
+}

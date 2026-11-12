@@ -22,24 +22,28 @@ GOLDEN = os.path.join(er.TESTS, 'golden')
 @pytest.mark.parametrize('script', MODEL)
 def test_model_files(script, tmp_path):
     run = er.run_example(script, tmp_path, mode='model')
-    assert len(run.create_calls) == 1, run.log[-2000:]
-    settings = run.create_calls[0]
-    data_dir, model = settings['sim_path'], settings['model_basename']
-    problems = er.check_model_files(data_dir, model, settings)
-    assert not problems, '; '.join(problems) + '\n' + run.log[-1500:]
+    assert run.create_calls, run.log[-2000:]
+    written, differences = [], []
+    for settings in run.create_calls:               # a script may build several models
+        data_dir, model = settings['sim_path'], settings['model_basename']
+        problems = er.check_model_files(data_dir, model, settings)
+        assert not problems, model + ': ' + '; '.join(problems) + '\n' + run.log[-1500:]
 
-    record = er.model_record(data_dir, model)
-    path = os.path.join(GOLDEN, model + '.json')
-    if os.environ.get('UPDATE_GOLDEN'):
-        os.makedirs(GOLDEN, exist_ok=True)
-        with open(path, 'w', encoding='utf-8', newline='\n') as f:
-            json.dump(record, f, indent=1, sort_keys=True)
-            f.write('\n')
-        pytest.skip(f'golden file written: {os.path.basename(path)}')
-    assert os.path.isfile(path), f'no golden file {os.path.basename(path)}: run once with UPDATE_GOLDEN=1'
-    with open(path, encoding='utf-8') as f:
-        expected = json.load(f)
-    differences = er.record_differences(expected, json.loads(json.dumps(record)))
+        record = er.model_record(data_dir, model)
+        path = os.path.join(GOLDEN, model + '.json')
+        if os.environ.get('UPDATE_GOLDEN'):
+            os.makedirs(GOLDEN, exist_ok=True)
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(record, f, indent=1, sort_keys=True)
+                f.write('\n')
+            written.append(os.path.basename(path))
+            continue
+        assert os.path.isfile(path), f'no golden file {os.path.basename(path)}: run once with UPDATE_GOLDEN=1'
+        with open(path, encoding='utf-8') as f:
+            expected = json.load(f)
+        differences += [f'{model}{d}' for d in er.record_differences(expected, json.loads(json.dumps(record)))]
+    if written:
+        pytest.skip(f'golden file(s) written: {written}')
     assert not differences, 'stored -> now: ' + '; '.join(differences[:20])
 
 

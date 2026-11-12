@@ -38,7 +38,8 @@ def load_manifest():
 class ExampleRun:
     def __init__(self):
         self.read_calls = []        # {'filename', 'layerlist', 'kwargs', 'result'} per read_gds() call
-        self.create_calls = []      # settings of each create_palace() call
+        self.create_calls = []      # settings of each create_palace() / create_elmer...() call
+        self.solvers = []           # 'palace', 'elmer' or 'elmer_thermal' of each of them
         self.sim_path = None
         self.log = ''
         self.groups = []            # the gmsh physical groups of each model built, see model_groups()
@@ -51,7 +52,7 @@ def run_example(script, tmp_path, mode='reader'):
     script = os.path.join(REPO, script)
     run = ExampleRun()
     run.sim_path = str(tmp_path)
-    original = {'read_gds': gds_reader.read_gds, 'create_palace': simulation_setup.create_palace,
+    original = {'read_gds': gds_reader.read_gds,
                 'create_sim_path': utilities.create_sim_path, 'create_run_script': utilities.create_run_script}
 
     def read_gds(filename, layerlist, *args, **kwargs):
@@ -62,14 +63,22 @@ def run_example(script, tmp_path, mode='reader'):
                                'kwargs': kwargs, 'result': result})
         return result
 
-    def create_palace(excite_ports, settings):
-        run.create_calls.append(settings)
-        if mode == 'reader':
-            return '', run.sim_path
-        settings['no_gui'] = True
-        if mode == 'geometry':
-            settings['preview_only'] = True
-        return original['create_palace'](excite_ports, settings)
+    def create(name):
+        # create_palace(excite_ports, settings), create_elmer(excite_ports, settings), create_elmer_thermal(settings)
+        def wrapper(*args):
+            settings = args[-1]
+            run.create_calls.append(settings)
+            run.solvers.append(name[len('create_'):])
+            if mode == 'reader':
+                return '', run.sim_path
+            settings['no_gui'] = True
+            if mode == 'geometry':
+                settings['preview_only'] = True
+            return created[name](*args)
+        return wrapper
+
+    creators = ('create_palace', 'create_elmer', 'create_elmer_thermal')
+    created = {name: getattr(simulation_setup, name) for name in creators}
 
     def create_sim_path(script_path, model_basename, dirname='palace_model'):
         return original['create_sim_path'](run.sim_path, model_basename, dirname)
@@ -88,7 +97,9 @@ def run_example(script, tmp_path, mode='reader'):
     gmsh.clear = clear
     state = (os.getcwd(), list(sys.argv), list(sys.path))
     output = io.StringIO()
-    gds_reader.read_gds, simulation_setup.create_palace = read_gds, create_palace
+    gds_reader.read_gds = read_gds
+    for name in creators:
+        setattr(simulation_setup, name, create(name))
     utilities.create_sim_path, utilities.create_run_script = create_sim_path, create_run_script
     try:
         os.chdir(os.path.dirname(script))
@@ -96,7 +107,9 @@ def run_example(script, tmp_path, mode='reader'):
         with contextlib.redirect_stdout(output):
             runpy.run_path(script, run_name='__main__')
     finally:
-        gds_reader.read_gds, simulation_setup.create_palace = original['read_gds'], original['create_palace']
+        gds_reader.read_gds = original['read_gds']
+        for name in creators:
+            setattr(simulation_setup, name, created[name])
         utilities.create_sim_path, utilities.create_run_script = original['create_sim_path'], original['create_run_script']
         gmsh.clear = gmsh_clear
         os.chdir(state[0])
@@ -241,7 +254,7 @@ def filled_shape(points):
     """shapely geometry of the area a GDSII boundary fills, also for a boundary that touches or overlaps itself (a
     hole written with a slit). Independent of the reader's repair and of gdspy: the boundary is split where it meets
     itself, and each enclosed face counts if the boundary goes around it (non-zero winding)."""
-    ring = np.asarray(points, dtype=float)
+    ring = np.round(np.asarray(points, dtype=float), 9)     # 12.200000000000001 and 12.2 are one point
     polygon = ShapelyPolygon(ring)
     if polygon.is_valid:
         return polygon
@@ -276,6 +289,15 @@ def _model_box(groups):
     return [*boxes[:, :3].min(axis=0), *boxes[:, 3:].max(axis=0)]
 
 
+def _layer_of(group_name):
+    """stackup layer of a gmsh group: 'TopMetal2_1' (a conductor body with the surface model) and 'TopVia2_x0.28'
+    (merged vias with their fill factor) belong to TopMetal2 and TopVia2"""
+    base, _, suffix = group_name.rpartition('_')
+    if base and (suffix.isdigit() or (suffix[:1] == 'x' and suffix[1:].replace('.', '', 1).isdigit())):
+        return base
+    return group_name
+
+
 def compare_with_model(call, settings, groups):
     """Problems (list of str) of the gmsh model built from one read_gds() call: every stackup layer with shapes must be
     in the model with the size that follows from the layout and the stackup. Also returns what was not compared.
@@ -293,9 +315,10 @@ def compare_with_model(call, settings, groups):
         if number not in layers:
             continue
         shape = returned_shape(call, number)
-        surfaces = {key: g for key, g in groups.items()
-                    if key[0] == 2 and key[1].startswith(metal.name + '_') and key[1][len(metal.name) + 1:].isdigit()}
-        volume = groups.get((3, metal.name))
+        surfaces = {key: g for key, g in groups.items() if key[0] == 2 and _layer_of(key[1]) == metal.name
+                    and key[1] != metal.name}
+        volumes = [g for key, g in groups.items() if key[0] == 3 and _layer_of(key[1]) == metal.name]
+        volume = {'mass': sum(g['mass'] for g in volumes)} if volumes else None
         sheet = groups.get((2, metal.name))
         if not surfaces and volume is None and sheet is None:
             problems.append(f'{metal.name}: {shape.area:.6g} drawn, but not in the model')
@@ -307,7 +330,7 @@ def compare_with_model(call, settings, groups):
         if not metal.thickness:
             skipped.append(f'{metal.name} (no thickness, and not a sheet group)')
             continue
-        found = list(surfaces.values()) + ([volume] if volume is not None else [])
+        found = list(surfaces.values()) + volumes
         boxes = np.array([g['bbox'] for g in found])
         got_box = [*boxes[:, :3].min(axis=0), *boxes[:, 3:].max(axis=0)]
         bx0, by0, bx1, by1 = shape.bounds
@@ -328,12 +351,11 @@ def compare_with_model(call, settings, groups):
                                 f'(area {shape.area:.8g}, perimeter {shape.length:.8g}, thickness {metal.thickness:.4g})')
 
     for metal in metals.metals:
-        if int(metal.layernum) not in layers and any(
-                name == metal.name or (name.startswith(metal.name + '_') and name[len(metal.name) + 1:].isdigit())
-                for _, name in groups):
+        if int(metal.layernum) not in layers and any(_layer_of(name) == metal.name for _, name in groups):
             problems.append(f'{metal.name}: in the model, but nothing returned by the reader on layer {metal.layernum}')
 
-    for port in settings['simulation_ports'].ports:
+    ports = settings['simulation_ports'].ports if settings.get('simulation_ports') is not None else []
+    for port in ports:
         key = (2, f'P{port.portnumber}')
         drawn = [p for p in call['result'].polygons if int(p.layernum) == int(port.source_layernum)]
         if key not in groups:
@@ -351,7 +373,7 @@ def compare_with_model(call, settings, groups):
             want = sum(max(p.xmax - p.xmin, p.ymax - p.ymin) for p in drawn) * (upper.zmin - lower.zmax)
         if not _close(groups[key]['mass'], want):
             problems.append(f"port {port.portnumber}: area {groups[key]['mass']:.8g}, from layout and stackup {want:.8g}")
-    scripted = {f'P{port.portnumber}' for port in settings['simulation_ports'].ports}
+    scripted = {f'P{port.portnumber}' for port in ports}
     extra = sorted(name for dim, name in groups if dim == 2 and name[:1] == 'P' and name[1:].isdigit()
                    and name not in scripted)
     if extra:
@@ -389,9 +411,15 @@ def layout_nets(call):
             other = pieces[j][0]
             if j <= i or other is metal:
                 continue
-            meet = abs(metal.zmax - other.zmin) < 1e-6 or abs(other.zmax - metal.zmin) < 1e-6 or \
-                (metal.zmin < other.zmax and other.zmin < metal.zmax)
-            if meet and part.intersection(pieces[j][1]).area > 0:
+            # one above the other (a via on a metal): connected where they overlap. On the same level (a resistor
+            # sheet between its two heads): connected also where they only touch along an edge.
+            stacked = abs(metal.zmax - other.zmin) < 1e-6 or abs(other.zmax - metal.zmin) < 1e-6
+            overlap = metal.zmin < other.zmax and other.zmin < metal.zmax
+            level = overlap or (abs(metal.zmin - other.zmin) < 1e-6 and abs(metal.zmax - other.zmax) < 1e-6)
+            if not (stacked or level):
+                continue
+            common = part.intersection(pieces[j][1])
+            if common.area > 0 or (level and common.length > 0):
                 parent[find(i)] = find(j)
     return len({find(i) for i in range(len(pieces))})
 
@@ -403,9 +431,9 @@ def model_nets(groups, metals):
     names = {m.name for m in metals.metals if not getattr(m, 'is_dielectric', False)}
     bodies = []                     # each a list of face tags that belong together
     for (dim, name), group in groups.items():
-        if dim == 3 and name in names:
+        if dim == 3 and _layer_of(name) in names:
             bodies += [[abs(t) for _, t in gmsh.model.getBoundary([(3, v)], oriented=False)] for v in group['entities']]
-        elif dim == 2 and (name in names or name.rpartition('_')[0] in names):
+        elif dim == 2 and _layer_of(name) in names:
             bodies += [[face] for face in group['entities']]
     parent = {}
 

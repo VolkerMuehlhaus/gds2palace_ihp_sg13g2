@@ -17,11 +17,12 @@ GEOMETRY = [e['script'] for e in er.load_manifest() if 'geometry' in e['tiers']]
 @pytest.mark.parametrize('script', GEOMETRY)
 def test_model_geometry_matches_layout_and_stackup(script, tmp_path):
     run = er.run_example(script, tmp_path, mode='geometry')
-    assert len(run.read_calls) == 1 and len(run.groups) == 1, run.log[-2000:]
-    call, settings, groups = run.read_calls[0], run.create_calls[0], run.groups[0]
-    problems, skipped = er.compare_with_model(call, settings, groups)
-    assert not problems, '; '.join(problems)
-    assert run.nets[0] == er.layout_nets(call), 'separate conductor nets: model, layout'
+    # one model per read_gds() call; a script may build several (one per temperature, ...)
+    assert len(run.read_calls) == len(run.create_calls) == len(run.groups) >= 1, run.log[-2000:]
+    for call, settings, groups, nets in zip(run.read_calls, run.create_calls, run.groups, run.nets):
+        problems, skipped = er.compare_with_model(call, settings, groups)
+        assert not problems, settings['model_basename'] + ': ' + '; '.join(problems)
+        assert nets == er.layout_nets(call), settings['model_basename'] + ': separate conductor nets: model, layout'
 
 
 # ---- the checks above must fail for the bugs they are there for ----
