@@ -9,9 +9,6 @@ gds2palace 0.10.2
 **Changes**  
 Faster Palace runs without adaptive mesh refinement: the error estimate, which is then only reported, is computed with `EstimatorTol` 1e-2 instead of Palace's default 1e-6. S-parameters are unchanged. Example: a Butler matrix with 8 ports at one frequency took 254 s instead of 507 s.
 
-<img width="1430" height="988" alt="grafik" src="https://github.com/user-attachments/assets/12f1903d-8c95-4e17-989d-245f791dae4a" />
-
-
 **New features**  
 `settings['wall_extension']`: per side, e.g. `{'xmax': 2000}`, continues the layout's cross-section at that edge outward to the wall, for a side that is not a port wall. setupEM writes it for the pieces of a split region.
 
