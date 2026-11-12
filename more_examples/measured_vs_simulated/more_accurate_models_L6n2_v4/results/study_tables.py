@@ -100,7 +100,7 @@ for model, label in MODELS:
     if run:
         line += (f" {run['dof']:10,d} {run['elements']:9,d} {mmss(run['time_s']):>8s} {run['estimator_s']:8.0f} "
                  f"{run['ram_gb']:7.2f} {run['solves']:6d} {run['iterations']:5d} {run['iterations'] / run['solves']:9.1f}")
-        rows.append([model, label, run["dof"], run["elements"], f"{run['time_s']:.1f}", f"{run['estimator_s']:.1f}",
+        rows.append([model, label, run["dof"], run["elements"], f"{run['time_s']:.2f}", f"{run['estimator_s']:.1f}",
                      f"{run['ram_gb']:.2f}", run["solves"], run["iterations"], run["palace"]])
     print(line)
 

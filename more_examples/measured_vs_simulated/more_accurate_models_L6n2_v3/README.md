@@ -1,6 +1,6 @@
 # Stackup and Conductor Model Study: L6n2 Inductor vs. Measurement (IHP SG13G2), v3
 
-> **There is a newer version of this study:** [v4](../more_accurate_models_L6n2_v4/README.md) repeats the same models with gds2palace 0.10.2. The results are the same; the run times are about a third of those reported here.
+> **There is a newer version of this study:** [v4](../more_accurate_models_L6n2_v4/README.md) repeats the same models with gds2palace 0.10.2 and Palace 0.19. The run times are less than a quarter of those reported here. L and SRF are the same; peak Q is 4 to 5 % higher, because Palace 0.19 corrects its absorbing boundary.
 
 ![(model)](results/plots/visualize_pointingvector.png)
 
