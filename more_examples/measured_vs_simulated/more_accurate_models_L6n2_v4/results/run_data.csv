@@ -1,13 +1,13 @@
 model,label,dof,elements,time_s,estimator_s,ram_gb,solves,iterations,palace
-surfacemesh_2um_viamerge,"Surface, 2 µm, via merge, no correction",1012554,145226,207.8,8.8,14.57,12,263,b92aef8
-surfacemesh_2um_noviamerge,"Surface, 2 µm, no via merge",1099794,157914,281.7,9.2,15.55,12,327,b92aef8
-surfacemesh_2um_mergecorrection,"Surface, 2 µm, via merge + correction",1012554,145226,204.8,8.7,14.62,12,263,b92aef8
-2um_mergecorrection_filled,"Volume, 2 µm, planar",1216074,191574,209.1,9.9,17.19,10,217,b92aef8
-2um_passicut,"Volume, 2 µm, PassiCut",1528972,240786,293.9,12.0,20.86,10,273,b92aef8
-5um_passi3D,"Volume, 5 µm, conformal",600518,94686,162.4,7.1,9.25,12,462,b92aef8
-2um_passi3D,"Volume, 2 µm, conformal",1505676,237453,419.5,15.1,22.06,12,443,b92aef8
-1um_passi3D,"Volume, 1 µm, conformal",2992908,471759,908.6,30.4,41.86,12,430,b92aef8
-2um_passi3D_margin100,"Volume, 2 µm, conformal, margin 100 µm",1449368,228653,417.9,14.3,21.34,12,447,b92aef8
-2um_passi3D_margin200,"Volume, 2 µm, conformal, margin 200 µm",1475110,232693,404.3,14.4,21.31,12,414,b92aef8
-2um_passi3D_margin800,"Volume, 2 µm, conformal, margin 800 µm",1596716,251636,439.9,17.2,23.26,12,430,b92aef8
-2um_passi3D_testframe_ground,"Volume, 2 µm, conformal, test frame ground",1409752,222297,386.6,14.1,20.76,11,413,b92aef8
+surfacemesh_2um_viamerge,"Surface, 2 µm, via merge, no correction",1012554,145226,131.99,8.4,15.12,12,263,v0.19.0
+surfacemesh_2um_noviamerge,"Surface, 2 µm, no via merge",1099794,157914,177.14,9.0,16.17,12,327,v0.19.0
+surfacemesh_2um_mergecorrection,"Surface, 2 µm, via merge + correction",1012554,145226,131.60,8.3,15.09,12,263,v0.19.0
+2um_mergecorrection_filled,"Volume, 2 µm, planar",1216074,191574,137.26,9.9,17.95,10,217,v0.19.0
+2um_passicut,"Volume, 2 µm, PassiCut",1528972,240786,189.38,12.0,21.72,10,273,v0.19.0
+5um_passi3D,"Volume, 5 µm, conformal",600518,94686,103.28,6.9,9.80,12,467,v0.19.0
+2um_passi3D,"Volume, 2 µm, conformal",1505676,237453,264.80,14.8,22.87,12,427,v0.19.0
+1um_passi3D,"Volume, 1 µm, conformal",2992908,471759,582.68,30.5,43.07,12,428,v0.19.0
+2um_passi3D_margin100,"Volume, 2 µm, conformal, margin 100 µm",1449368,228653,275.21,14.4,22.29,12,468,v0.19.0
+2um_passi3D_margin200,"Volume, 2 µm, conformal, margin 200 µm",1475110,232693,263.56,14.6,22.16,12,422,v0.19.0
+2um_passi3D_margin800,"Volume, 2 µm, conformal, margin 800 µm",1596716,251636,286.52,16.8,24.00,12,426,v0.19.0
+2um_passi3D_testframe_ground,"Volume, 2 µm, conformal, test frame ground",1409752,222297,292.81,16.8,21.44,14,485,v0.19.0
