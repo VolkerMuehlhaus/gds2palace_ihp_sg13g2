@@ -2,7 +2,7 @@
 
 Volker Mühlhaus,volker@muehlhaus.com
 ---
-Document version: 2026-10-31
+Document version: 2026-11-12
 
 ## Contents
 [What's New](#whats-new)  
@@ -65,6 +65,7 @@ This chapter gives a brief overview of major features added since the previous e
 - **settings['conductor_model']** chooses the conductor model in one setting: `'surface'` (default, surface impedance), `'solve_inside'` (conductors meshed as volumes) or `'solve_inside_skin'` (volumes with thin layers along their faces for the skin effect). With the surface model, the peak Q of coils on TopMetal1/TopMetal2 with 2-8 µm traces is 18-30 % too high; for Q and loss, use `'solve_inside'` while designing and `'solve_inside_skin'` for final numbers. See "Choosing the conductor model" in chapter "Conductor loss modelling".
 - `conductor_model` replaces **settings['filled_metals']**. Scripts that set it still work: `True` is the same as `'solve_inside'`, `False` the same as `'surface'`.
 - **settings['z_thickness_factor'] was removed.** Scripts that still set it get a warning, and the full metal thickness is used on all conductor faces. Use `conductor_model` for accurate conductor loss.
+- **Chapter "Dielectric loss modelling" redone** with `'solve_inside_skin'`. The earlier agreement with the measured line up to 40 GHz came from the surface model's extra loss in the Metal1 ground plane. With the right conductor loss, a SiO2 loss tangent of about 0.015 explains most of the measured line loss from 20 to 110 GHz. The supplied stackups stay lossless. The chapter also describes the loss of the silicon substrate.
 - **Elmer FEM as an additional solver.** gds2palace can now generate simulation input not only for AWS Palace, but also for [Elmer FEM](https://www.elmerfem.org/), an open-source multiphysics solver. This adds two new workflows, both built from the same GDSII layout + XML stackup + Python model script approach already used for Palace:
   - **Elmer EM simulation** — S-parameter simulation, see chapter "Using gds2palace with Elmer FEM for EM simulation".
   - **Elmer thermal simulation** — steady-state heat conduction (temperature) simulation from user-defined heat sources and constant-temperature boundaries, see chapter "Using gds2palace with Elmer FEM for thermal simulation".
@@ -496,7 +497,7 @@ Discrete frequencies can be used in addition to fstart/fstop and fstep, or inste
 There is nothing to set for the skin layers. Their depths are about 0.4 and 1 skin depth at the highest simulation frequency (the largest of `fstop`, `fpoint`, `fdump`), from each layer's conductivity. A depth is only used if a core of at least 1/3 of the layer thickness remains; the model script prints the depths used per layer. Some layers get no skin layers:
 
 - Vias, sheet layers and PEC layers.
-- Layers thinner than 4 skin depths at the highest frequency. In SG13G2, these are Metal1-Metal5 below about 1 THz, TopMetal1 below about 35 GHz and TopMetal2 below about 15 GHz. They gain little, while their very thin skin layers cost much solver effort. For the 0.42 µm Metal1 ground plane of `palace_line_viaport.py`, skin layers changed the line resistance by about 1 % and made the simulation 2.6 times slower. In the D-band balun of the mesh convergence studies, skin layers in Metal3-Metal5 left the result unchanged and made it 1.7 times slower.
+- Layers thinner than 4 skin depths at the highest frequency. In SG13G2, these are Metal1 below about 1 THz, Metal2-Metal5 below about 700 GHz, TopMetal1 below about 35 GHz and TopMetal2 below about 15 GHz. They gain little, while their very thin skin layers cost much solver effort. For the 0.42 µm Metal1 ground plane of `palace_line_viaport.py`, skin layers changed the line resistance by about 1 % and made the simulation 2.6 times slower. In the D-band balun of the mesh convergence studies, skin layers in Metal3-Metal5 left the result unchanged and made it 1.7 times slower.
 - Layers with a conductivity above 1e8 S/m. No real metal conducts better than silver (6.3e7 S/m), so such a material stands in for a perfect conductor, e.g. `LOWLOSS` (1e10 S/m) for SUBGND in older stackups, and its skin layers would be a few nanometres thin.
 
 So in a low GHz simulation, `'solve_inside_skin'` builds the same model as `'solve_inside'`. Skin layers were tested on TopMetal2 inductors and lines up to 150 GHz with `refined_cellsize` 2, see chapter "Conductor loss modelling". Elmer thermal models always use solid conductor volumes, whatever this setting is.
@@ -921,7 +922,13 @@ refined_cellsize=2 + AMR 2x: 1346s (3 freq), DOF 804166, 961866, 1742956
 
 ## Conductor loss modelling 
 
-Many RF FEM solvers, including this gds2palace workflow, model metals as hollow bodies with surface resistance on the side walls. The advantage of this approach is that we don’t need to mesh into skin effect, which might require sub-micron mesh size inside the conductors.  
+gds2palace has three conductor models, chosen with `settings['conductor_model']`:
+
+- `'surface'`, the default: the conductors are hollow bodies with a surface impedance on all faces. Like many RF FEM solvers, this model doesn't mesh the inside of the conductors, which at high frequency would need sub-micron cells near the surface for the skin effect. It is the fastest model.
+- `'solve_inside'`: the conductors are meshed as volumes with their bulk conductivity.
+- `'solve_inside_skin'`: volumes, plus thin layers along all faces for the skin effect.
+
+The surface model has two errors in the conductor loss: one at low frequency, described first, and one at high frequency, described in "Accuracy at high frequency". The volume models avoid both. "Choosing the conductor model" below sums up the errors and run times of all three models.
 
 
 ![Metals modelled as hollow bodies with surface impedance Zs on all sides](./images/gds2palace_workflow_userguide.pdf-0029-02.png)
@@ -931,15 +938,15 @@ The surface impedance can be calculated easily when physical metal dimensions ar
 
 ### Limits of conductor loss calculation 
 
-The gds2palace workflow creates surface elements for planar metals, and defines them as a conductor sheet with conductivity and thickness in the Palace config.json file. Thickness in this case is the value defined for that metal in the XML stackup file, e.g. 3µm thickness for TopMetal2.  
+With the surface model, gds2palace creates the faces of each conductor and defines them as a conductor sheet with conductivity and thickness in the Palace config.json file. Thickness in this case is the value defined for that metal in the XML stackup file, e.g. 3µm thickness for TopMetal2.  
 
-The code in Palace does not know anything about the aspect ratio of the conductor, and uses a surface impedance calculation that is accurate for wide sheets, where we have a conductor that is much wider than the conductor height. Summing up the surface impedance mapped to top and bottom side of a thin sheet, the resulting impedance would be accurate down to DC where it is limited by physical conductor cross section.  
+The code in Palace does not know anything about the aspect ratio of the conductor, and uses a surface impedance calculation that is accurate for wide sheets, where we have a conductor that is much wider than the conductor height. Summing up the surface impedance mapped to top and bottom side of a thin sheet, the resulting impedance would be accurate down to DC where it is limited by physical conductor cross section, as long as both faces carry the same current. A thin layer with current on one face only, such as a ground plane under a line, gets up to twice its loss, see "Accuracy at high frequency".  
 
 However, in our RFIC use case, we might have conductor aspect ratio that reaches almost square shape, and we need to account for side wall currents, not only for closely spaced coupled lines.  
 
 Mapping the surface impedance (as calculated internally by Palace from conductor thickness) onto all surfaces, i.e. side walls as well as top and bottom, will lead to an overestimate of available conductor cross section at low frequency:  
 
-The Palace calculation [^palace-zs] of Zs is exact when applied to top and bottom side only. If we apply this value to all sides, the extreme case at DC will over-estimate the conductor cross section by factor (width+thickness)/width.  
+The Palace calculation [^palace-zs] of Zs is exact when applied to top and bottom side only, with the same current on both. If we apply this value to all sides, the extreme case at DC will over-estimate the conductor cross section by factor (width+thickness)/width.  
 
 
 ![Surface impedance for a thin sheet (left) and a conductor with near-square cross section (right)](./images/gds2palace_workflow_userguide.pdf-0029-10.png)
@@ -1052,33 +1059,45 @@ With `margin` and `air_around` both 0 on a side, a conductor can reach the simul
 
 ## Dielectric loss modelling 
 
-The 15 µm wide TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`) was measured with lengths of 880 µm and 2580 µm. The line was de-embedded from the measurement with GSG pads, so part of the ripple in the measured data can come from this de-embedding. The Palace models leave out the silicon substrate, which is shielded by the Metal1 ground plane (with and without substrate, the difference was negligible), and use the surface impedance model, which overestimates the loss of the Metal1 ground plane (see "Accuracy at high frequency" in chapter "Conductor loss modelling"). An openEMS simulation of the 880 µm line with a 0.5 µm mesh gave about the same insertion loss as Palace.  
+### Silicon substrate
 
-Up to about 40 GHz, simulated and measured insertion loss agree; above, the measured loss increases faster with frequency than the simulated one. This could indicate higher **dielectric loss** than modelled. In the supplied XML stackup files, SiO2 is modelled as a lossless dielectric. To verify if dielectric loss could be the reason for poor agreement in that frequency range, we repeat the simulation of the 2580 µm line with non-zero loss tangent for the SiO2 layer.  
+The silicon below the oxide is not an insulator. In the XML stackup files it is a material with `Type="Semiconductor"` and a conductivity: in the latest SG13G2 files 2 S/m for the substrate and 5 S/m for the EPI layer on top of it, both with a permittivity of 11.9. gds2palace passes this conductivity to Palace, see "Mapping of Volumes and Surfaces to Palace materials" in the Appendix.
 
-Loss tangent value used in this simulation is **0.01** , which is a rough estimate based on a paper published by IHP authors for SG25H technologies back in 2007:  
+The silicon adds loss wherever the fields of a structure reach into it. The electric field drives a current through the conducting silicon, and the changing magnetic field of a coil induces eddy currents in it. A ground plane between the structure and the silicon, e.g. on Metal1 or the SUBGND sheet, keeps the fields out of the silicon. The line below has such a ground plane, so its models leave the substrate out.
+
+### The line measurement
+
+The 15 µm wide TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`, `palace_line_noGDS.py`) was measured by IHP in 2014 with two lengths, 880 µm and 2580 µm, up to 110 GHz. The GSG pads were de-embedded from the measurement, which leaves some ripple in the data.
+
+The simulations use `conductor_model = 'solve_inside_skin'`, the most accurate conductor model (see "Choosing the conductor model"), with `refined_cellsize` 2 and `order` 2, and the stackup `SG13G2_nosub.xml` of the examples. The models have ideal via ports at the line ends, where the measurement has pads.
+
+![S21 of the 880 µm and 2580 µm lines, measured and simulated](./images/dielectric_loss_line_S21.png)
+
+Pads and ports affect both lengths in the same way. The difference between the two lengths is 1700 µm of line, and its loss is the loss of the line itself. It follows from the transfer matrices of both lengths, as in a multiline calibration, for the measurement and for the simulation alike. The figure below shows this attenuation per mm. It compares the line without pads and ports, so it is the better comparison.
+
+![Attenuation of the line from the 880 µm and 2580 µm lines, measured and simulated](./images/dielectric_loss_line_alpha.png)
+
+### Lossless SiO2
+
+In the supplied XML stackup files, SiO2 is lossless. With this stackup, the simulated attenuation agrees with the measurement from 3 to 10 GHz, within about 5 %. Below 3 GHz, the measured attenuation is higher, by up to 0.03 dB/mm (17 % at 1 GHz). There, all loss is conductor loss, so the metal of the measured wafer may differ in thickness or conductivity from the stackup; this measurement can't tell. Above 10 GHz, the measured loss grows faster with frequency. At 20 GHz, the simulation is 14 % low, at 100 GHz 30 % (0.55 instead of 0.78 dB/mm).
+
+The surface model (`'surface'`, dotted) seems to agree better between 20 and 40 GHz. This is an error cancellation. The surface model doubles the loss of the thin Metal1 ground plane (see "Accuracy at high frequency"), and in this range the extra loss happens to replace the missing loss. Earlier editions of this guide used the surface model and found agreement up to 40 GHz.
+
+A loss that grows faster with frequency than the conductor loss points to dielectric loss. With the skin effect, conductor loss grows about with the square root of frequency. The loss of a dielectric with a constant loss tangent grows in proportion to frequency.
+
+### SiO2 with a loss tangent
+
+The loss tangent of the SiO2 in this process is not known. A paper by IHP authors on the SG25H technologies found values around 0.01:  
 _Korndörfer F, F Sischka Optimization of the Substrate Parameters for EM-simulators MOSAK/ESSDERC/ESSCIRC Workshop (Munich) 14 Sep., 2007_  
 - <https://www.mos-ak.org/munich_2007/posters/P05_MOS-AK_Korndoerfer.pdf> 
 
-
-![Measured and optimized permittivity and loss tangent from the referenced paper](./images/gds2palace_workflow_userguide.pdf-0038-06.png)
-
-
-Indeed, that simulation with SiO2 loss tangent of 0.01 (pink curve) gives increased high frequency loss and quite nice agreement with the measured data above 50 GHz, much better than the model with lossless SiO2.  
-
-
-![2580 µm line: S21 with SiO2 loss tangent 0 and 0.01, compared to measurement](./images/gds2palace_workflow_userguide.pdf-0038-08.png)
-
-
-For the 880µm line length, the ripple on measurement data has a larger (relative) impact, but we see the same trend: simulation results with tand=0.01 are much closer to measurement than the simulation without SiO2 losses.  
-
-
-![880 µm line: S21 with SiO2 loss tangent 0 and 0.01, compared to measurement](./images/gds2palace_workflow_userguide.pdf-0039-01.png)
-
+With a loss tangent of 0.01 in all SiO2 layers, the simulation closes about 60 % of the gap. With 0.015, it agrees with the measured attenuation within about 5 % from 20 to 80 GHz. Between 80 and 100 GHz, the measured attenuation stays flat for a while, and the simulation is up to 12 % above it; at 100-110 GHz, it is within about 10 % again. In S21, 0.015 follows the 2580 µm line up to 40 GHz. Above, both measured lines have more loss, the 880 µm line most; S21 includes the pads and their de-embedding.
 
 ### Conclusion regarding dielectric losses 
 
-The existing data is not complete enough to create an “official” technology stackup with SiO2 losses, but it seems that some amount of dielectric loss is real. If you decide to include dielectric loss in your simulation, this can be easily specified in the XML stackup file using parameter _DielectricLossTangent_ for the SiO2 material definition.  
+Some dielectric loss seems to be real: a loss tangent of about 0.015 in SiO2 explains most of the measured line loss from 20 to 110 GHz. This value is fitted to one line on one wafer, measured in 2014. It is not a process value, and the measurement can't tell dielectric loss from other losses that grow with frequency. So the supplied XML stackup files stay lossless.
+
+To see how much dielectric loss matters for your design, set `DielectricLossTangent` of the SiO2 material in a copy of the XML stackup file, e.g. to 0.015, and compare the result with the lossless one. Palace uses the loss tangent; the Elmer EM output does not.
 
 ## Advanced topics 
 
@@ -1334,13 +1353,13 @@ If `settings['ELMER_MPI_THREADS']` is set to more than 1, gds2palace also partit
 The workflow creates different types of geometry: volumes and surfaces. This depends on the mapping in the XML stackup file. 
 
 **Geometries from GDSII layers** are defined in the “Layers” section of the XML file : 
-- Type=”conductor” is used for all regular metal layers, in the mesh they are represented by **“Surface”** objects on all boundaries (top, bottom, side walls). In other words, these metals are represented by hollow shells and not by solid volumes.  
-- Type=”sheet” is used for metal layers that have no physical height in the model, they are represented as one flat **“Surface** ” only.  
+- Type=”conductor” is used for all regular metal layers. With the default `conductor_model = 'surface'`, they are represented in the mesh by **“Surface”** objects on all boundaries (top, bottom, side walls). In other words, these metals are represented by hollow shells and not by solid volumes. With `'solve_inside'` or `'solve_inside_skin'`, they are **“Volume”** objects instead, see "Conductor loss modelling".  
+- Type=”sheet” is used for metal layers that have no physical height in the model, they are represented as one flat **“Surface** ” only. A sheet uses a Resistor material or the reserved material `PEC`, see "Mapping of Volumes and Surfaces to Palace materials".  
 - Type=”via” is used for via layers, these are represented in the mesh by **“Volume”** objects.  
 
 **Important: Conductor layers must never be stacked directly, they must be separated by a via layer!** 
 
-Extract from an XML stackup file, showing layer mappings with conductor, via and sheet types: 
+Extract from an XML stackup file, showing layer mappings with conductor, via and sheet types. It uses absolute z positions, as the legacy files do; the latest files position layers relative to each other (see "Extended XML stackup format"). The ground layers SUBGND and BACKSIDEGND are sheets of the reserved material `PEC`, as in the latest files: 
 
 
 ```xml
@@ -1362,8 +1381,8 @@ Extract from an XML stackup file, showing layer mappings with conductor, via and
     <Layer Name="Via2" Type="via" Zmin="2.4900" Zmax="3.0300" Material="Via2" Layer="29"/>
     <Layer Name="Via1" Type="via" Zmin="1.4600" Zmax="2.0000" Material="Via1" Layer="19"/>
     <Layer Name="Cont" Type="via" Zmin="0.4000" Zmax="1.0400" Material="Cont" Layer="6"/>
-    <Layer Name="SUBGND" Type="conductor" Zmin="-3.75" Zmax="0" Material="LOWLOSS" Layer="210"/>
-    <Layer Name="BACKSIDEGND" Type="sheet" Zmin="-180" Zmax="-180" Material="LOWLOSS" Layer="211"/>
+    <Layer Name="SUBGND" Type="sheet" Zmin="0" Zmax="0" Material="PEC" Layer="250"/>
+    <Layer Name="BACKSIDEGND" Type="sheet" Zmin="-183.75" Zmax="-183.75" Material="PEC" Layer="251"/>
     <Layer Name="MIM" Type="conductor" Zmin="5.6043" Zmax="5.7540" Material="MIM" Layer="36"/>
     <Layer Name="Vmim" Type="via" Zmin="5.7540" Zmax="6.4303" Material="Vmim" Layer="129"/>
     <Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="Air" Layer="157"/>
@@ -1469,9 +1488,9 @@ With settings['fill_factor_correction'] = True, the conductivity of merged via p
 ```
 
 
-All faces, top, bottom and side walls, get the same conductivity and thickness. This is exact for top and bottom of wide conductors, down to low frequency where the skin depth is larger than the physical conductor height. On the side walls, it over-estimates the conductor cross section at low frequency, see "Limits of conductor loss calculation".  
+All faces, top, bottom and side walls, get the same conductivity and thickness. This is exact for top and bottom of wide conductors with the same current on both faces, down to low frequency where the skin depth is larger than the physical conductor height. On the side walls, it over-estimates the conductor cross section at low frequency, see "Limits of conductor loss calculation". A thin layer with current on one face only gets up to twice its loss, see "Palace's External option". A conductor whose top or bottom face is on the simulation boundary gets `"External": true`, see "Conductors at the simulation boundary".  
 
-**Metall sheet layers** (Type=”sheet”) are created as a single, flat surface. Their position in the stackup should be defined with Zmin=Zmax for better readability, but actually the Zmax value is ignored here.  
+**Metal sheet layers** (Type=”sheet”) are created as a single, flat surface. Their position in the stackup should be defined with Zmin=Zmax for better readability, but actually the Zmax value is ignored here.  
  
 
 ```xml
@@ -1483,7 +1502,7 @@ All faces, top, bottom and side walls, get the same conductivity and thickness. 
 ```
 
 
-These sheets are typically used with a Type=”Resistor” material definition in the XML file, with fixed sheet resistance in Ohm/square. 
+A sheet layer uses a Type=”Resistor” material definition in the XML file, with fixed sheet resistance in Ohm/square, or the reserved material `PEC` (see below). A sheet with a Type=”Conductor” material stops the model script with an error. 
 
 
 ```xml
@@ -1534,6 +1553,29 @@ Both corrections are fixed amounts, so physically small resistors are affected m
 
 rhigh and rppd come out about 10 % low. rsil is close, because its contacts in the EM model happen to make up for most of its end resistance. If the exact value of an rhigh or rppd resistor matters, leave the resistor out of the EM model: put ports at its two Metal1 heads and connect the PDK resistor model there in the circuit simulator.
 
+**The reserved material `PEC`** (`Material="PEC"`, no `<Material>` entry needed) is an ideal conductor. In the latest IHP stackups, the sheets SUBGND, BACKSIDEGND and REF_FOR_TRANSISTOR use it. A PEC sheet, and with the surface model a PEC conductor, goes into Palace's `PEC` boundary, together with the PEC sides of the simulation box. Palace has no ideal conductor volume, so a PEC via layer, and a PEC conductor with `'solve_inside'` or `'solve_inside_skin'`, is a volume with a conductivity of 1e10 S/m instead (a via layer again with a tenth of it in x and y).
+
+**Dielectrics and semiconductors** (the `<Dielectrics>` stack and Type=”dielectric” layers) are volumes with the permittivity of their material. A material with `DielectricLossTangent` above 0 gets that loss tangent. Otherwise it gets its `Conductivity`, which is how the silicon is lossy: in the latest SG13G2 stackups, the substrate (`Type="Semiconductor"`) has 2 S/m and the EPI layer 5 S/m. A material with both a loss tangent and a conductivity gets only the loss tangent.
+
+
+```json
+"Materials": [
+    {
+        "Attributes": [
+            3
+        ],
+        "Permittivity": 11.9,
+        "Conductivity": 2.0
+    },
+    {
+        "Attributes": [
+            5
+        ],
+        "Permittivity": 4.1,
+        "LossTan": 0.01
+    },
+```
+
 
 ### Extended XML stackup format
 
@@ -1549,10 +1591,11 @@ The full attribute reference, with examples, is in [`XML_stackup_format.md`](../
 
 ### Software versions used in this document 
 
-Palace version used for this document: v0.14  
-Palace installation method used: container for Apptainer environment, running on Ubuntu 24.04.02 LTS  
-Simulation host: AMD Ryzen 9-7950X (16 cores) with 128 GB RAM  
-Code base used for this test: gds2palace Python scripts as of October 13, 2025 (unless noted otherwise)  
+The results in this document come from different dates:
+
+- Unless noted otherwise: Palace v0.14, gds2palace Python scripts as of October 13, 2025, in an Apptainer container on Ubuntu 24.04.02 LTS, AMD Ryzen 9-7950X (16 cores) with 128 GB RAM.  
+- Conductor loss modelling: Palace v0.18.0, gds2palace 0.9.0 (October 2026).  
+- Dielectric loss modelling: Palace v0.19.0, gds2palace 0.10.4 (November 2026).  
 
 ## List of examples 
 
