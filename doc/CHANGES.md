@@ -12,6 +12,9 @@ Tests on the shipped examples: `python -m pytest tests` runs the scripts in `wor
 **Fix**  
 Repair of polygons with cutouts: a splitting step that could stall model generation without a message is no longer used. A polygon that cannot be repaired without it is left as read, with the existing warning.
 
+**Documentation**  
+User's guide, chapter "Dielectric loss modelling": redone with `conductor_model = 'solve_inside_skin'` and Palace 0.19.0, against the measured 880 µm and 2580 µm lines, including the line's attenuation from the two lengths. The earlier agreement up to 40 GHz came from the surface model's extra loss in the Metal1 ground plane; with the right conductor loss, a SiO2 loss tangent of about 0.015 explains most of the measured line loss from 20 to 110 GHz. The supplied stackups stay lossless. New section on the loss of the silicon substrate. Chapter "Conductor loss modelling" and the appendix no longer describe conductors as always hollow; the appendix describes the PEC material and how dielectrics and semiconductors are written to Palace (loss tangent or conductivity), and its stackup example uses PEC sheets for SUBGND and BACKSIDEGND (the old one, a sheet with a conductor material, stops with an error). Sheets need a resistor or PEC material.
+
 ## 12 November-2026
 
 gds2palace 0.10.3
