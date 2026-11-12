@@ -333,7 +333,10 @@ Simplify GDS), the original vias are gone and no correction is possible.
    unmeshed geometry first; closing the window continues with meshing. Use
    `preview_only=True` for a quick geometry and port check without meshing.
    For unattended runs, set `no_gui=True` and use `python -u` (otherwise the
-   output is buffered and a log file stays empty until the end).
+   output is buffered and a log file stays empty until the end). On Linux
+   without a display (no `DISPLAY` or `WAYLAND_DISPLAY`), gds2palace 0.10.4 and
+   newer skips the window by itself, but with X forwarding or Xvfb the window
+   opens and waits: set `no_gui` there.
 2. **Check the output**: `palace_model/<model>_data/` must contain
    `config.json`, `<model>.msh`, `port_information.json` and `run_sim`. Don't
    rely on the exit code alone.

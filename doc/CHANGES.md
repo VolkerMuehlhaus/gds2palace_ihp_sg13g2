@@ -9,6 +9,10 @@ gds2palace 0.10.4
 **Changes**  
 Tests on the shipped examples: `python -m pytest tests` runs the scripts in `workflow/` and selected ones from `more_examples/` and compares the GDS reader output and the gmsh model with the layout and the stackup. `python -m pytest tests -m examples` also meshes the models and compares the model files with stored records. See `tests/README.md`. Both run on GitHub for every push and pull request.
 
+Without a display (Linux with neither `DISPLAY` nor `WAYLAND_DISPLAY` set, e.g. over ssh, in a container or a batch job), the model is built without the gmsh window, as with `settings['no_gui'] = True`, and a line in the output says so. Before, such a script stopped with "Can't open display" unless it set `no_gui`. This also covers scripts exported from setupEM.
+
+`combine_extend_snp.py` (`combine_snp`) has `--help` and `--version`, and takes the folder to search as an optional argument (default: the current folder). Before, any option was ignored and the conversion ran.
+
 **Fix**  
 Repair of polygons with cutouts: a splitting step that could stall model generation without a message is no longer used. A polygon that cannot be repaired without it is left as read, with the existing warning.
 

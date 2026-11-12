@@ -35,8 +35,10 @@
 # updated 08-Nov-2026: calibrated de-embedding of ports at port walls (box sides set to 'PORTWALL'), from the
 #   calibration standards that gds2palace writes and run_sim solves; Touchstone comment line per port with the
 #   method used, sidecar <name>_deembedding.json; the standards' own results are skipped here
+# updated 12-Nov-2026: --help and --version (before, any option was ignored and the conversion ran), optional
+#   folder argument instead of the current folder, exit code 2 for a folder that does not exist
 
-import os,re, json, math
+import os, re, sys, json, math
 import skrf as rf
 from   skrf.circuit import Circuit
 import numpy as np
@@ -676,14 +678,39 @@ def _standard_folder_of(found_filename, port_info_data):
     return None
 
 
-__version__ = "1.3"      # 1.3: port wall calibration (gds2palace 0.10.0); printed at the start so a log shows which copy ran
+__version__ = "1.3.1"    # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument
+                         # printed at the start so a log shows which copy ran
 
 
-def main():
+def cli(argv=None):
+    """Command line: python combine_extend_snp.py [folder]. Returns the exit code."""
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog="combine_extend_snp.py",
+        description="Convert Palace (port-S.csv) and Elmer (scalar_results) S-parameter results to Touchstone "
+                    ".sNp files. Searches the folder and all folders below it. Also writes a DC-extrapolated "
+                    "_dc.sNp when the data starts at low frequency, and de-embedded files when the model's "
+                    "port_information.json asks for it.")
+    parser.add_argument("folder", nargs="?", default=None,
+                        help="folder to search (default: the current folder)")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    args = parser.parse_args(argv)
+
+    workdir = os.path.abspath(args.folder) if args.folder else os.getcwd()
+    if not os.path.isdir(workdir):
+        print(f"combine_extend_snp.py: error: folder not found: {workdir}", file=sys.stderr)
+        return 2
+    main(workdir)
+    return 0
+
+
+def main(workdir=None):
+    """Convert all results in workdir (default: the current folder) and the folders below it."""
     print(f"combine_extend_snp.py {__version__} ({os.path.abspath(__file__)})")
     global found_datafiles
 
-    workdir = os.getcwd()
+    if workdir is None:
+        workdir = os.getcwd()
     found_datafiles = []
 
     # work recursively through directories
@@ -879,5 +906,5 @@ def _process_datafile(found_filename):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli())
 
