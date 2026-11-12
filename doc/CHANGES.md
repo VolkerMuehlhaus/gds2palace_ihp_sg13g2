@@ -2,6 +2,13 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 12 November-2026
+
+gds2palace 0.10.3
+
+**Fix**  
+A metal strip that reaches into a cutout could be missing in the model. It happened when the GDSII file encodes the cutout with its connecting slit along the cutout edge, past the root of the strip, as KLayout can write it. Example: a ground plane with a slot and a feed strip into the slot.
+
 ## 11 November-2026
 
 gds2palace 0.10.2
