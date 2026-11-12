@@ -1,0 +1,57 @@
+# Model scripts that the example tests run (tests/test_examples_*.py). Every script in workflow/ must be listed:
+# test_every_workflow_script_is_listed fails for one that is missing.
+#
+#   script    path from the repository root
+#   tiers     "reader": GDS reader output against the layout (seconds)
+#             "geometry": gmsh geometry against layout and stackup (no meshing)
+#             "model": meshed model files (marker "examples")
+#   note      why a tier is left out
+
+[[example]]
+script = "workflow/palace_line_viaport.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_line_portwall.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_line_noGDS.py"
+tiers = []
+note = "no GDSII file: the geometry is built in the script"
+
+[[example]]
+script = "workflow/palace_L2n0.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/inductor_500pH_2port.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_ind_frame.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_rfcmim.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_balun_mesh5.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_butlermatrix.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_butlermatrix_dump93.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_core.py"
+tiers = ["reader"]
+
+[[example]]
+script = "workflow/palace_pcb_lowpass.py"
+tiers = ["reader"]
