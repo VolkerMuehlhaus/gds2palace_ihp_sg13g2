@@ -1,0 +1,184 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     7
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": 33000000.0,
+     "Thickness": 17.0
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 33000000.0,
+     "Thickness": 17.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      5
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Direction": "Z",
+     "Excitation": false,
+     "Index": 2,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      3
+     ],
+     "LossTan": 0.0022,
+     "Permittivity": 3.38
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "palace_pcb_lowpass.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "palace_pcb_lowpass",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 0.05,
+      "MaxFreq": 6.0,
+      "MinFreq": 0.1,
+      "SaveStep": 0,
+      "Type": "Linear"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "Absorbing_boundary": [
+   2,
+   7
+  ],
+  "Bottom_1": [
+   2,
+   1
+  ],
+  "P1": [
+   2,
+   5
+  ],
+  "P2": [
+   2,
+   6
+  ],
+  "PEC_boundary": [
+   2,
+   8
+  ],
+  "PMC_boundary": [
+   2,
+   9
+  ],
+  "RO4003": [
+   3,
+   3
+  ],
+  "Top_1": [
+   2,
+   2
+  ],
+  "airbox": [
+   3,
+   4
+  ]
+ },
+ "port_information": {
+  "name": "palace_pcb_lowpass",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 510.0,
+    "portnumber": 1,
+    "width": 500.0,
+    "xmax": 7500.000000000004,
+    "xmin": 7500.000000000004,
+    "ymax": 20000.000000000007,
+    "ymin": 19500.000000000007,
+    "zmax": 510.0,
+    "zmin": 0.0
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 510.0,
+    "portnumber": 2,
+    "width": 499.0,
+    "xmax": 57000.00000000002,
+    "xmin": 56999.00000000002,
+    "ymax": 20000.000000000007,
+    "ymin": 19501.000000000007,
+    "zmax": 510.0,
+    "zmin": 0.0
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 86544
+}

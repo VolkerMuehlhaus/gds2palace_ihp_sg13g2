@@ -1,0 +1,545 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     33
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      14
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      15
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      16
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4899999999999949
+    },
+    {
+     "Attributes": [
+      17
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.0
+    },
+    {
+     "Attributes": [
+      18
+     ],
+     "Conductivity": 27800000.0,
+     "Thickness": 2.0
+    },
+    {
+     "Attributes": [
+      19
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      20
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      28
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      29
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      30
+     ],
+     "Direction": "Z",
+     "Excitation": 3,
+     "Index": 3,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      31
+     ],
+     "Direction": "Z",
+     "Excitation": 4,
+     "Index": 4,
+     "R": 50.0
+    },
+    {
+     "Attributes": [
+      32
+     ],
+     "Direction": "Z",
+     "Excitation": 5,
+     "Index": 5,
+     "R": 50.0
+    }
+   ],
+   "PEC": {
+    "Attributes": [
+     34,
+     27
+    ]
+   }
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": [
+      166000.0,
+      166000.0,
+      1660000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": [
+      166000.0,
+      166000.0,
+      1660000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": [
+      166000.0,
+      166000.0,
+      1660000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": [
+      219100.0,
+      219100.0,
+      2191000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": [
+      314300.0,
+      314300.0,
+      3143000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      21
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      22
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      23
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      24
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      25
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      26
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "50_ghz_mpa_core_bce_ports.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "50_ghz_mpa_core_bce_ports",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 5.0,
+      "MaxFreq": 350.0,
+      "MinFreq": 5.0,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   21
+  ],
+  "Absorbing_boundary": [
+   2,
+   33
+  ],
+  "EPI": [
+   3,
+   24
+  ],
+  "Metal2_1": [
+   2,
+   6
+  ],
+  "Metal2_2": [
+   2,
+   7
+  ],
+  "Metal2_3": [
+   2,
+   8
+  ],
+  "Metal3_1": [
+   2,
+   9
+  ],
+  "Metal3_2": [
+   2,
+   10
+  ],
+  "Metal3_3": [
+   2,
+   11
+  ],
+  "Metal4_1": [
+   2,
+   12
+  ],
+  "Metal4_2": [
+   2,
+   13
+  ],
+  "Metal4_3": [
+   2,
+   14
+  ],
+  "Metal5_1": [
+   2,
+   15
+  ],
+  "Metal5_2": [
+   2,
+   16
+  ],
+  "P1": [
+   2,
+   28
+  ],
+  "P2": [
+   2,
+   29
+  ],
+  "P3": [
+   2,
+   30
+  ],
+  "P4": [
+   2,
+   31
+  ],
+  "P5": [
+   2,
+   32
+  ],
+  "PEC_boundary": [
+   2,
+   34
+  ],
+  "PMC_boundary": [
+   2,
+   35
+  ],
+  "Passive": [
+   3,
+   22
+  ],
+  "REF_FOR_TRANSISTOR": [
+   2,
+   27
+  ],
+  "SiO2": [
+   3,
+   23
+  ],
+  "Substrate": [
+   3,
+   25
+  ],
+  "TopMetal1_1": [
+   2,
+   17
+  ],
+  "TopMetal1_2": [
+   2,
+   18
+  ],
+  "TopMetal2_1": [
+   2,
+   19
+  ],
+  "TopMetal2_2": [
+   2,
+   20
+  ],
+  "TopVia1": [
+   3,
+   4
+  ],
+  "TopVia2": [
+   3,
+   5
+  ],
+  "Via2": [
+   3,
+   1
+  ],
+  "Via3": [
+   3,
+   2
+  ],
+  "Via4": [
+   3,
+   3
+  ],
+  "airbox": [
+   3,
+   26
+  ]
+ },
+ "port_information": {
+  "name": "50_ghz_mpa_core_bce_ports",
+  "ports": [
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.710300000000004,
+    "portnumber": 1,
+    "width": 3.0,
+    "xmax": -72.46000000000001,
+    "xmin": -72.46000000000001,
+    "ymax": -41.175000000000004,
+    "ymin": -44.175000000000004,
+    "zmax": 95.18030000000002,
+    "zmin": 87.47000000000001
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 7.710300000000004,
+    "portnumber": 2,
+    "width": 3.0,
+    "xmax": -11.94,
+    "xmin": -11.94,
+    "ymax": -41.08,
+    "ymin": -44.08,
+    "zmax": 95.18030000000002,
+    "zmin": 87.47000000000001
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 1.6000000000000085,
+    "portnumber": 3,
+    "width": 15.5,
+    "xmax": -49.0,
+    "xmin": -49.0,
+    "ymax": -35.0,
+    "ymin": -50.5,
+    "zmax": 85.95000000000002,
+    "zmin": 84.35000000000001
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 1.6000000000000085,
+    "portnumber": 4,
+    "width": 15.5,
+    "xmax": -35.5,
+    "xmin": -35.5,
+    "ymax": -35.0,
+    "ymin": -50.5,
+    "zmax": 85.95000000000002,
+    "zmin": 84.35000000000001
+   },
+   {
+    "Z0": 50.0,
+    "direction": "Z",
+    "element": 1,
+    "length": 1.6000000000000085,
+    "portnumber": 5,
+    "width": 15.5,
+    "xmax": -42.5,
+    "xmin": -42.5,
+    "ymax": -35.0,
+    "ymin": -50.5,
+    "zmax": 85.95000000000002,
+    "zmin": 84.35000000000001
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 33932
+}

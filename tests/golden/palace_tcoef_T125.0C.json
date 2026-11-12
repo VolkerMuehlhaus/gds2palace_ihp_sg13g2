@@ -1,0 +1,236 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     11
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": 16225416.319889631,
+     "Thickness": 0.4199999999999875
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 22068945.424881823,
+     "Thickness": 3.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      9
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "palace_tcoef_T125.0C.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "palace_tcoef_T125.0C",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 2.5,
+      "MaxFreq": 100.0,
+      "MinFreq": 2.5,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   3
+  ],
+  "Absorbing_boundary": [
+   2,
+   11
+  ],
+  "EPI": [
+   3,
+   6
+  ],
+  "Metal1_1": [
+   2,
+   1
+  ],
+  "P1": [
+   2,
+   9
+  ],
+  "P2": [
+   2,
+   10
+  ],
+  "PEC_boundary": [
+   2,
+   12
+  ],
+  "PMC_boundary": [
+   2,
+   13
+  ],
+  "Passive": [
+   3,
+   4
+  ],
+  "SiO2": [
+   3,
+   5
+  ],
+  "Substrate": [
+   3,
+   7
+  ],
+  "TopMetal2_1": [
+   2,
+   2
+  ],
+  "airbox": [
+   3,
+   8
+  ]
+ },
+ "port_information": {
+  "name": "palace_tcoef_T125.0C",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.77030000000002,
+    "portnumber": 1,
+    "width": 15.000000000000007,
+    "xmax": -193.00000000000009,
+    "xmin": -193.00000000000009,
+    "ymax": 8.000000000000004,
+    "ymin": -7.0000000000000036,
+    "zmax": 195.1803,
+    "zmin": 185.40999999999997
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 9.77030000000002,
+    "portnumber": 2,
+    "width": 15.000000000000007,
+    "xmax": 687.0000000000003,
+    "xmin": 687.0000000000003,
+    "ymax": 8.000000000000004,
+    "ymin": -7.0000000000000036,
+    "zmax": 195.1803,
+    "zmin": 185.40999999999997
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 105057
+}

@@ -1,0 +1,238 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     13
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4199999999999875
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4199999999999875
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4900000000000091
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.4900000000000091
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      12
+     ],
+     "Direction": "X",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": [
+      166000.0,
+      166000.0,
+      1660000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "via_bridge_model.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "via_bridge_model",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 1.0,
+      "MaxFreq": 10.0,
+      "MinFreq": 1.0,
+      "SaveStep": 0,
+      "Type": "Linear"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 1
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   6
+  ],
+  "Absorbing_boundary": [
+   2,
+   13
+  ],
+  "EPI": [
+   3,
+   9
+  ],
+  "Metal1_1": [
+   2,
+   2
+  ],
+  "Metal1_2": [
+   2,
+   3
+  ],
+  "Metal2_1": [
+   2,
+   4
+  ],
+  "Metal2_2": [
+   2,
+   5
+  ],
+  "P1": [
+   2,
+   12
+  ],
+  "PEC_boundary": [
+   2,
+   14
+  ],
+  "PMC_boundary": [
+   2,
+   15
+  ],
+  "Passive": [
+   3,
+   7
+  ],
+  "SiO2": [
+   3,
+   8
+  ],
+  "Substrate": [
+   3,
+   10
+  ],
+  "Via1": [
+   3,
+   1
+  ],
+  "airbox": [
+   3,
+   11
+  ]
+ },
+ "port_information": {
+  "name": "via_bridge_model",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "X",
+    "element": 1,
+    "length": 1.0,
+    "portnumber": 1,
+    "width": 4.0,
+    "xmax": 11.0,
+    "xmin": 10.0,
+    "ymax": 4.0,
+    "ymin": 0.0,
+    "zmax": 185.86999999999998,
+    "zmin": 185.86999999999998
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 5821
+}

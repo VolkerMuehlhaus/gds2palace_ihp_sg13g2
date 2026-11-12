@@ -1,0 +1,32 @@
+# Runs the tests in tests/ (see tests/README.md): the GDS reader and the gmsh model of the shipped
+# examples against their layouts, then the model files with meshing against tests/golden/.
+# No Palace run. gmsh runs without a display.
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["workflow/**", "tests/**", "scripts/**", "XML_stackup/**", "pyproject.toml", ".github/workflows/tests.yml"]
+  pull_request:
+    paths: ["workflow/**", "tests/**", "scripts/**", "XML_stackup/**", "pyproject.toml", ".github/workflows/tests.yml"]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Libraries that the gmsh wheel needs
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libgl1 libxcursor1 libxft2 libxinerama1 libxrender1
+      - name: Install
+        run: |
+          python scripts/build_pypi_readme.py
+          pip install -e . pytest scikit-rf
+      - name: Reader and geometry tests
+        run: python -m pytest tests
+      - name: Model files of the examples (meshing)
+        run: python -m pytest tests -m examples
