@@ -4,6 +4,16 @@ This is an (incomplete) list of changes and new features.
 
 ## 12 November-2026
 
+gds2palace 0.10.4
+
+**Changes**  
+Tests on the shipped examples: `python -m pytest tests` runs the scripts in `workflow/` and selected ones from `more_examples/` and compares the GDS reader output and the gmsh model with the layout and the stackup. `python -m pytest tests -m examples` also meshes the models and compares the model files with stored records. See `tests/README.md`. Both run on GitHub for every push and pull request.
+
+**Fix**  
+Repair of polygons with cutouts: a splitting step that could stall model generation without a message is no longer used. A polygon that cannot be repaired without it is left as read, with the existing warning.
+
+## 12 November-2026
+
 gds2palace 0.10.3
 
 **Fix**  
