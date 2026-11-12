@@ -1,0 +1,484 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     15
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 30300000.0,
+     "Thickness": 3.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      11
+     ],
+     "Direction": "X",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Direction": "X",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Direction": "-X",
+     "Excitation": 3,
+     "Index": 3,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      14
+     ],
+     "Direction": "-X",
+     "Excitation": 4,
+     "Index": 4,
+     "R": 50
+    }
+   ],
+   "PEC": {
+    "Attributes": [
+     16
+    ]
+   }
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "palace_line_portwall.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "palace_line_portwall",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 2.5,
+      "MaxFreq": 100.0,
+      "MinFreq": 2.5,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   5
+  ],
+  "Absorbing_boundary": [
+   2,
+   15
+  ],
+  "EPI": [
+   3,
+   8
+  ],
+  "P1": [
+   2,
+   11
+  ],
+  "P2": [
+   2,
+   12
+  ],
+  "P3": [
+   2,
+   13
+  ],
+  "P4": [
+   2,
+   14
+  ],
+  "PEC_boundary": [
+   2,
+   16
+  ],
+  "PMC_boundary": [
+   2,
+   17
+  ],
+  "Passive": [
+   3,
+   6
+  ],
+  "SiO2": [
+   3,
+   7
+  ],
+  "Substrate": [
+   3,
+   9
+  ],
+  "TopMetal2_1": [
+   2,
+   1
+  ],
+  "TopMetal2_2": [
+   2,
+   2
+  ],
+  "TopMetal2_3": [
+   2,
+   3
+  ],
+  "TopMetal2_4": [
+   2,
+   4
+  ],
+  "airbox": [
+   3,
+   10
+  ]
+ },
+ "port_information": {
+  "name": "palace_line_portwall",
+  "port_walls": [
+   {
+    "D": 50.0,
+    "L": 200.0,
+    "L_rule": "4 D",
+    "device_size": null,
+    "distance_to_ground": 10.0,
+    "eps_max": 11.9,
+    "extension": 0.0,
+    "fmax_GHz": 100.0,
+    "ground_layers": [
+     "TopMetal2"
+    ],
+    "n_eff_estimate": 2.5397,
+    "port_details": [
+     {
+      "converted": null,
+      "gap": 1.0,
+      "gap_origin": "drawing",
+      "line": [
+       -15.0,
+       -5.0
+      ],
+      "line_start": 0.0,
+      "portnumber": 1,
+      "stack": [
+       [
+        "TopMetal2",
+        -15.0,
+        -5.0
+       ]
+      ],
+      "target_layer": "TopMetal2"
+     },
+     {
+      "converted": null,
+      "gap": 1.0,
+      "gap_origin": "drawing",
+      "line": [
+       5.0,
+       15.0
+      ],
+      "line_start": 0.0,
+      "portnumber": 2,
+      "stack": [
+       [
+        "TopMetal2",
+        5.0,
+        15.0
+       ]
+      ],
+      "target_layer": "TopMetal2"
+     }
+    ],
+    "ports": [
+     1,
+     2
+    ],
+    "shift": 0.0,
+    "side": "xmin",
+    "span": 30.0,
+    "standards": [
+     {
+      "config": "config_cal_xmin_L.json",
+      "key": "cal_xmin_L.key",
+      "length": 200.0,
+      "model": "palace_line_portwall_cal_xmin_L",
+      "name": "cal_xmin_L",
+      "output": "palace_line_portwall_cal_xmin_L"
+     },
+     {
+      "config": "config_cal_xmin_2L.json",
+      "key": "cal_xmin_2L.key",
+      "length": 400.0,
+      "model": "palace_line_portwall_cal_xmin_2L",
+      "name": "cal_xmin_2L",
+      "output": "palace_line_portwall_cal_xmin_2L"
+     }
+    ],
+    "uniform_from_wall": null,
+    "valid_to_GHz": 100.0,
+    "warnings": []
+   },
+   {
+    "D": 50.0,
+    "L": 200.0,
+    "L_rule": "4 D",
+    "device_size": null,
+    "distance_to_ground": 10.0,
+    "eps_max": 11.9,
+    "extension": 0.0,
+    "fmax_GHz": 100.0,
+    "ground_layers": [
+     "TopMetal2"
+    ],
+    "n_eff_estimate": 2.5397,
+    "port_details": [
+     {
+      "converted": null,
+      "gap": 1.0,
+      "gap_origin": "drawing",
+      "line": [
+       -15.0,
+       -5.0
+      ],
+      "line_start": 0.0,
+      "portnumber": 3,
+      "stack": [
+       [
+        "TopMetal2",
+        -15.0,
+        -5.0
+       ]
+      ],
+      "target_layer": "TopMetal2"
+     },
+     {
+      "converted": null,
+      "gap": 1.0,
+      "gap_origin": "drawing",
+      "line": [
+       5.0,
+       15.0
+      ],
+      "line_start": 0.0,
+      "portnumber": 4,
+      "stack": [
+       [
+        "TopMetal2",
+        5.0,
+        15.0
+       ]
+      ],
+      "target_layer": "TopMetal2"
+     }
+    ],
+    "ports": [
+     3,
+     4
+    ],
+    "shared_with": "xmin",
+    "shift": 0.0,
+    "side": "xmax",
+    "span": 30.0,
+    "standards": [
+     {
+      "config": "config_cal_xmin_L.json",
+      "key": "cal_xmin_L.key",
+      "length": 200.0,
+      "model": "palace_line_portwall_cal_xmin_L",
+      "name": "cal_xmin_L",
+      "output": "palace_line_portwall_cal_xmin_L"
+     },
+     {
+      "config": "config_cal_xmin_2L.json",
+      "key": "cal_xmin_2L.key",
+      "length": 400.0,
+      "model": "palace_line_portwall_cal_xmin_2L",
+      "name": "cal_xmin_2L",
+      "output": "palace_line_portwall_cal_xmin_2L"
+     }
+    ],
+    "uniform_from_wall": null,
+    "valid_to_GHz": 100.0,
+    "warnings": []
+   }
+  ],
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "X",
+    "element": 1,
+    "length": 1.0,
+    "portnumber": 1,
+    "width": 10.0,
+    "xmax": 1.0,
+    "xmin": 0.0,
+    "ymax": -5.0,
+    "ymin": -15.0,
+    "zmax": 195.1003,
+    "zmin": 195.1003
+   },
+   {
+    "Z0": 50,
+    "direction": "X",
+    "element": 1,
+    "length": 1.0,
+    "portnumber": 2,
+    "width": 10.0,
+    "xmax": 1.0,
+    "xmin": 0.0,
+    "ymax": 15.0,
+    "ymin": 5.0,
+    "zmax": 195.1003,
+    "zmin": 195.1003
+   },
+   {
+    "Z0": 50,
+    "direction": "-X",
+    "element": 1,
+    "length": 1.0,
+    "portnumber": 3,
+    "width": 10.0,
+    "xmax": 300.0,
+    "xmin": 299.0,
+    "ymax": -5.0,
+    "ymin": -15.0,
+    "zmax": 195.1003,
+    "zmin": 195.1003
+   },
+   {
+    "Z0": 50,
+    "direction": "-X",
+    "element": 1,
+    "length": 1.0,
+    "portnumber": 4,
+    "width": 10.0,
+    "xmax": 300.0,
+    "xmin": 299.0,
+    "ymax": 15.0,
+    "ymin": 5.0,
+    "zmax": 195.1003,
+    "zmin": 195.1003
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 58966
+}

@@ -1,0 +1,360 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     22
+    ],
+    "Order": 2
+   },
+   "Conductivity": [
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4200000000000017
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4200000000000017
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4200000000000017
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4200000000000017
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4200000000000017
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 21640000.0,
+     "Thickness": 0.4200000000000017
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.490000000000002
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.490000000000002
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 23190000.0,
+     "Thickness": 0.490000000000002
+    }
+   ],
+   "Impedance": [
+    {
+     "Attributes": [
+      17
+     ],
+     "Rs": 1360.0
+    },
+    {
+     "Attributes": [
+      18
+     ],
+     "Rs": 260.0
+    },
+    {
+     "Attributes": [
+      19
+     ],
+     "Rs": 7.0
+    }
+   ],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      20
+     ],
+     "Direction": "Z",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      21
+     ],
+     "Direction": "Z",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50
+    }
+   ]
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": [
+      239000.0,
+      239000.0,
+      2390000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      14
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      15
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      16
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "palace_resistors_rsil.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "palace_resistors_rsil",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 2.5,
+      "MaxFreq": 10.0,
+      "MinFreq": 2.5,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   11
+  ],
+  "Absorbing_boundary": [
+   2,
+   22
+  ],
+  "Cont": [
+   3,
+   1
+  ],
+  "EPI": [
+   3,
+   14
+  ],
+  "Metal1_1": [
+   2,
+   2
+  ],
+  "Metal1_2": [
+   2,
+   3
+  ],
+  "Metal1_3": [
+   2,
+   4
+  ],
+  "Metal1_4": [
+   2,
+   5
+  ],
+  "Metal1_5": [
+   2,
+   6
+  ],
+  "Metal1_6": [
+   2,
+   7
+  ],
+  "Metal2_1": [
+   2,
+   8
+  ],
+  "Metal2_2": [
+   2,
+   9
+  ],
+  "Metal2_3": [
+   2,
+   10
+  ],
+  "P1": [
+   2,
+   20
+  ],
+  "P2": [
+   2,
+   21
+  ],
+  "PEC_boundary": [
+   2,
+   23
+  ],
+  "PMC_boundary": [
+   2,
+   24
+  ],
+  "Passive": [
+   3,
+   12
+  ],
+  "RHIGH": [
+   2,
+   17
+  ],
+  "RPPD": [
+   2,
+   18
+  ],
+  "RSIL": [
+   2,
+   19
+  ],
+  "SiO2": [
+   3,
+   13
+  ],
+  "Substrate": [
+   3,
+   15
+  ],
+  "airbox": [
+   3,
+   16
+  ]
+ },
+ "port_information": {
+  "name": "palace_resistors_rsil",
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 0.5399999999999991,
+    "portnumber": 1,
+    "width": 1.6,
+    "xmax": -1.0,
+    "xmin": -2.6,
+    "ymax": 17.2,
+    "ymin": 17.2,
+    "zmax": 35.75,
+    "zmin": 35.21
+   },
+   {
+    "Z0": 50,
+    "direction": "Z",
+    "element": 1,
+    "length": 0.5399999999999991,
+    "portnumber": 2,
+    "width": 1.6,
+    "xmax": -1.0,
+    "xmin": -2.6,
+    "ymax": 1.8,
+    "ymin": 1.8,
+    "zmax": 35.75,
+    "zmin": 35.21
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 10587
+}

@@ -4,6 +4,23 @@ This is an (incomplete) list of changes and new features.
 
 ## 12 November-2026
 
+gds2palace 0.10.4
+
+**Changes**  
+Tests on the shipped examples: `python -m pytest tests` runs the scripts in `workflow/` and selected ones from `more_examples/` and compares the GDS reader output and the gmsh model with the layout and the stackup. `python -m pytest tests -m examples` also meshes the models and compares the model files with stored records. See `tests/README.md`. Both run on GitHub for every push and pull request.
+
+Without a display (Linux with neither `DISPLAY` nor `WAYLAND_DISPLAY` set, e.g. over ssh, in a container or a batch job), the model is built without the gmsh window, as with `settings['no_gui'] = True`, and a line in the output says so. Before, such a script stopped with "Can't open display" unless it set `no_gui`. This also covers scripts exported from setupEM.
+
+`combine_extend_snp.py` (`combine_snp`) has `--help` and `--version`, and takes the folder to search as an optional argument (default: the current folder). Before, any option was ignored and the conversion ran.
+
+**Fix**  
+Repair of polygons with cutouts: a splitting step that could stall model generation without a message is no longer used. A polygon that cannot be repaired without it is left as read, with the existing warning.
+
+**Documentation**  
+User's guide, chapter "Dielectric loss modelling": redone with `conductor_model = 'solve_inside_skin'` and Palace 0.19.0, against the measured 880 µm and 2580 µm lines, including the line's attenuation from the two lengths. The earlier agreement up to 40 GHz came from the surface model's extra loss in the Metal1 ground plane; with the right conductor loss, a SiO2 loss tangent of about 0.015 explains most of the measured line loss from 20 to 110 GHz. The supplied stackups stay lossless. New section on the loss of the silicon substrate. Chapter "Conductor loss modelling" and the appendix no longer describe conductors as always hollow; the appendix describes the PEC material and how dielectrics and semiconductors are written to Palace (loss tangent or conductivity), and its stackup example uses PEC sheets for SUBGND and BACKSIDEGND (the old one, a sheet with a conductor material, stops with an error). Sheets need a resistor or PEC material.
+
+## 12 November-2026
+
 gds2palace 0.10.3
 
 **Fix**  

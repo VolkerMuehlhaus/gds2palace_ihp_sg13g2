@@ -45,3 +45,10 @@ py-modules = ["gds2palace.scripts.combine_extend_snp", "gds2palace.scripts.palac
 
 [tool.setuptools.package-data]
 "gds2palace.stackups" = ["*.xml", "README.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "examples: model files of the shipped examples, with meshing (minutes); run with -m examples",
+]
+addopts = "-m 'not examples'"

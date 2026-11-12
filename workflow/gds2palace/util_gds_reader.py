@@ -18,7 +18,7 @@
 
 # Extract objects from layers in GDSII file
 
-__version__ = "1.3.2"
+__version__ = "1.3.3"
 
 import gdspy
 import numpy as np
@@ -718,7 +718,7 @@ def _is_benign_single_keyhole (shapely_poly):
   )
 
 
-def _fracture_valid_pieces (points, max_points_candidates=(8, 6, 5)):
+def _fracture_valid_pieces (points, max_points_candidates=(8, 6)):
   """Resolve a possibly self-intersecting "keyhole" polygon boundary (`points`)
   into a list of simple, non-self-intersecting point loops representing the
   same shape (any holes preserved, not filled in) - or None if that isn't
@@ -736,6 +736,8 @@ def _fracture_valid_pieces (points, max_points_candidates=(8, 6, 5)):
   pieces instead - so each candidate is tried in turn (least material change
   first) and validated with shapely before being accepted, since the "right"
   threshold isn't knowable in advance and depends on the hole layout.
+  5 is not tried: gdspy did not return for a plain 12-vertex polygon with
+  max_points=5, and no layout in the tests needs less than 6.
   """
   raw = ShapelyPolygon(points)
   fixed = raw if raw.is_valid else make_valid(raw)

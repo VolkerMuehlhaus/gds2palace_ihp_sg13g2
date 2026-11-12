@@ -1622,6 +1622,10 @@ def create_model (excite_ports, settings):
 
     # script control
     no_gui = get_optional_setting (settings,'no_gui', False)
+    if not no_gui and sys.platform.startswith('linux') and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+        # ssh session, container or batch job: gmsh cannot open its window there ("Can't open display")
+        print('No display found: the model is built without the gmsh window, as with settings["no_gui"] = True.')
+        no_gui = True
     preview_only = get_optional_setting (settings,'preview_only', False)   # show unmeshed geometry only  
     no_preview   = get_optional_setting (settings,'no_preview', False)   # don't show unmeshed geometry, immediately show meshed model
 
