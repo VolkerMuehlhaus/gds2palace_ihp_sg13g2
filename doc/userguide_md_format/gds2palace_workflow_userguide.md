@@ -1067,7 +1067,7 @@ The silicon adds loss wherever the fields of a structure reach into it. The elec
 
 ### The line measurement
 
-The 15 µm wide TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`, `palace_line_noGDS.py`) was measured in 2014 with two lengths, 880 µm and 2580 µm, up to 110 GHz. The GSG pads were de-embedded from the measurement, which leaves some ripple in the data.
+The 15 µm wide TopMetal2 line over a Metal1 ground plane (`palace_line_viaport.py`, `palace_line_noGDS.py`) was measured by IHP in 2014 with two lengths, 880 µm and 2580 µm, up to 110 GHz. The GSG pads were de-embedded from the measurement, which leaves some ripple in the data.
 
 The simulations use `conductor_model = 'solve_inside_skin'`, the most accurate conductor model (see "Choosing the conductor model"), with `refined_cellsize` 2 and `order` 2, and the stackup `SG13G2_nosub.xml` of the examples. The models have ideal via ports at the line ends, where the measurement has pads.
 
