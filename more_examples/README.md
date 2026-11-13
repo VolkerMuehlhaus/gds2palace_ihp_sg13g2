@@ -6,6 +6,7 @@ These are extra, more advanced gds2palace examples. Each one shows a specific fe
 
 | Example | What it shows |
 |---|---|
+| [`calibrated_boxwall_ports`](calibrated_boxwall_ports) | Beginner's step-by-step guide to calibrated box wall ports (double delay, after J. C. Rautio and V. I. Okhmatovski): an RF MIM capacitor without its feed lines and port parasitics, reference planes at the pcell pins, compared with the PDK model `cap_rfcmim` |
 | [`core_transistor_3port_bce`](core_transistor_3port_bce) | Parasitic network of a transistor with 5 ports: 2 via ports at the RF pads, plus 3 via ports directly at the base, collector and emitter, referenced to an artificial ground plane |
 | [`derived_layers_and_resistors`](derived_layers_and_resistors) | Simulating an IHP SG13G2 `Rsil` resistor. The resistor is detected with `<DerivedLayers>` boolean operations. Also shows how to override stackup `<Variable>`s from Python |
 | [`EM_temperature_coefficient`](EM_temperature_coefficient) | Metal conductivity that depends on temperature, using stackup `<Variables>` and expressions: `sigma(T) = sigma(T0) / [1 + TC1*(T-T0)]` for Metal1-5, TopMetal1 and TopMetal2 |

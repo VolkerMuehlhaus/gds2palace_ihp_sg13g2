@@ -2,7 +2,7 @@
 
 Volker Mühlhaus,volker@muehlhaus.com
 ---
-Document version: 2026-11-12
+Document version: 2026-11-13
 
 ## Contents
 [What's New](#whats-new)  
@@ -566,7 +566,11 @@ To get the full S-parameter file, all ports must be defined with non-zero voltag
 
 A lumped port drives the line through a small sheet. Its field fringes around the sheet, so the port adds a capacitance to ground and a short piece of inductance. Both depend on the line and the stackup. A formula can only estimate them: for a via port in the de-embedding study, the estimated inductance was about 45 % too low.
 
-A calibration measures the port instead. The same port drives short lines of known length, the standards. Two of them, of length L and 2 L, differ only by a piece of line, and comparing them leaves the port alone. This is how planar EM solvers remove their box wall ports (J. C. Rautio, "double delay"). In the study, it removed the port 30 to 100 times better than the estimate.
+A calibration measures the port instead. The same port drives short lines of known length, the standards. Two of them, of length L and 2 L, differ only by a piece of line, and comparing them leaves the port alone. This method is called double delay. It was invented by James C. Rautio to remove the box wall ports of planar EM solvers,[^rautio-1991] and described in full by James C. Rautio and Vladimir I. Okhmatovski, as a special case of an extended short-open calibration.[^rautio-okhmatovski-2005] gds2palace implements it as described there; the credit for the method goes to the authors. In the study, it removed the port 30 to 100 times better than the estimate.
+
+[^rautio-1991]: J. C. Rautio, "A de-embedding algorithm for electromagnetics," International Journal of Microwave and Millimeter-Wave Computer-Aided Engineering, vol. 1, no. 3, pp. 282–287, July 1991.
+
+[^rautio-okhmatovski-2005]: J. C. Rautio and V. I. Okhmatovski, "Unification of double-delay and SOC electromagnetic deembedding," IEEE Transactions on Microwave Theory and Techniques, vol. 53, no. 9, pp. 2892–2898, September 2005, <https://doi.org/10.1109/TMTT.2005.854250>. A step-by-step example is in `more_examples/calibrated_boxwall_ports`.
 
 #### Port walls
 

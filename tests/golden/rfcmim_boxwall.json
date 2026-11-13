@@ -1,0 +1,429 @@
+{
+ "config": {
+  "Boundaries": {
+   "Absorbing": {
+    "Attributes": [
+     16
+    ],
+    "Order": 2
+   },
+   "Conductivity": [],
+   "LumpedPort": [
+    {
+     "Attributes": [
+      14
+     ],
+     "Direction": "X",
+     "Excitation": 1,
+     "Index": 1,
+     "R": 50
+    },
+    {
+     "Attributes": [
+      15
+     ],
+     "Direction": "-X",
+     "Excitation": 2,
+     "Index": 2,
+     "R": 50
+    }
+   ],
+   "PEC": {
+    "Attributes": [
+     17
+    ]
+   }
+  },
+  "Domains": {
+   "Materials": [
+    {
+     "Attributes": [
+      1
+     ],
+     "Conductivity": 357141.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      2
+     ],
+     "Conductivity": [
+      239000.0,
+      239000.0,
+      2390000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      3
+     ],
+     "Conductivity": 21640000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      4
+     ],
+     "Conductivity": 23190000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      5
+     ],
+     "Conductivity": 500000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      6
+     ],
+     "Conductivity": [
+      219100.0,
+      219100.0,
+      2191000.0
+     ],
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      7
+     ],
+     "Conductivity": 27800000.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      8
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 1.0
+    },
+    {
+     "Attributes": [
+      9
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 6.6
+    },
+    {
+     "Attributes": [
+      10
+     ],
+     "Conductivity": 0.0,
+     "Permittivity": 4.1
+    },
+    {
+     "Attributes": [
+      11
+     ],
+     "Conductivity": 5.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      12
+     ],
+     "Conductivity": 2.0,
+     "Permittivity": 11.9
+    },
+    {
+     "Attributes": [
+      13
+     ],
+     "Permittivity": 1.0
+    }
+   ],
+   "Postprocessing": {
+    "Energy": [],
+    "Probe": []
+   }
+  },
+  "Model": {
+   "L0": 1e-06,
+   "Mesh": "rfcmim_boxwall.msh",
+   "Refinement": {
+    "MaxIts": 0,
+    "MaxSize": 2000000.0,
+    "Nonconformal": true,
+    "SaveAdaptMesh": false,
+    "Tol": 0.01,
+    "UniformLevels": 0,
+    "UpdateFraction": 0.7
+   }
+  },
+  "Problem": {
+   "Output": "rfcmim_boxwall",
+   "Type": "Driven",
+   "Verbose": 3
+  },
+  "Solver": {
+   "Device": "CPU",
+   "Driven": {
+    "AdaptiveTol": 0.02,
+    "Samples": [
+     {
+      "FreqStep": 1.8,
+      "MaxFreq": 180.0,
+      "MinFreq": 1.8,
+      "SaveStep": 0,
+      "Type": "Linear"
+     },
+     {
+      "Freq": [
+       0.01,
+       0.02
+      ],
+      "SaveStep": 0,
+      "Type": "Point"
+     }
+    ]
+   },
+   "Linear": {
+    "ComplexCoarseSolve": true,
+    "EstimatorTol": 0.01,
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-06,
+    "Type": "Default"
+   },
+   "Order": 2
+  }
+ },
+ "groups": {
+  "AIR": [
+   3,
+   8
+  ],
+  "Absorbing_boundary": [
+   2,
+   16
+  ],
+  "Activ": [
+   3,
+   1
+  ],
+  "Cont": [
+   3,
+   2
+  ],
+  "EPI": [
+   3,
+   11
+  ],
+  "MIM": [
+   3,
+   5
+  ],
+  "Metal1": [
+   3,
+   3
+  ],
+  "Metal5": [
+   3,
+   4
+  ],
+  "P1": [
+   2,
+   14
+  ],
+  "P2": [
+   2,
+   15
+  ],
+  "PEC_boundary": [
+   2,
+   17
+  ],
+  "PMC_boundary": [
+   2,
+   18
+  ],
+  "Passive": [
+   3,
+   9
+  ],
+  "SiO2": [
+   3,
+   10
+  ],
+  "Substrate": [
+   3,
+   12
+  ],
+  "TopMetal1": [
+   3,
+   7
+  ],
+  "Vmim": [
+   3,
+   6
+  ],
+  "airbox": [
+   3,
+   13
+  ]
+ },
+ "port_information": {
+  "name": "rfcmim_boxwall",
+  "port_walls": [
+   {
+    "D": 19.9406,
+    "L": 79.762,
+    "L_rule": "4 D",
+    "device_size": 26.2,
+    "distance_to_ground": 4.9703,
+    "eps_max": 11.9,
+    "extension": 0.0,
+    "fmax_GHz": 180.0,
+    "ground_layers": [
+     "Metal1"
+    ],
+    "n_eff_estimate": 2.5397,
+    "port_details": [
+     {
+      "converted": null,
+      "gap": 0.623,
+      "gap_origin": "tool",
+      "line": [
+       13.85,
+       23.85
+      ],
+      "line_start": 0.0,
+      "portnumber": 1,
+      "stack": [
+       [
+        "TopMetal1",
+        13.85,
+        23.85
+       ]
+      ],
+      "target_layer": "TopMetal1"
+     }
+    ],
+    "ports": [
+     1
+    ],
+    "shift": 35.0,
+    "side": "xmin",
+    "span": 10.0,
+    "standards": [
+     {
+      "config": "config_cal_xmin_L.json",
+      "key": "cal_xmin_L.key",
+      "length": 79.762,
+      "model": "rfcmim_boxwall_cal_xmin_L",
+      "name": "cal_xmin_L",
+      "output": "rfcmim_boxwall_cal_xmin_L"
+     },
+     {
+      "config": "config_cal_xmin_2L.json",
+      "key": "cal_xmin_2L.key",
+      "length": 159.524,
+      "model": "rfcmim_boxwall_cal_xmin_2L",
+      "name": "cal_xmin_2L",
+      "output": "rfcmim_boxwall_cal_xmin_2L"
+     }
+    ],
+    "uniform_from_wall": 35.0,
+    "valid_to_GHz": 180.0,
+    "warnings": []
+   },
+   {
+    "D": 17.26,
+    "L": 69.04,
+    "L_rule": "4 D",
+    "device_size": 26.2,
+    "distance_to_ground": 3.63,
+    "eps_max": 11.9,
+    "extension": 0.0,
+    "fmax_GHz": 180.0,
+    "ground_layers": [
+     "Metal1"
+    ],
+    "n_eff_estimate": 2.5397,
+    "port_details": [
+     {
+      "converted": null,
+      "gap": 0.539,
+      "gap_origin": "tool",
+      "line": [
+       13.85,
+       23.85
+      ],
+      "line_start": 0.0,
+      "portnumber": 2,
+      "stack": [
+       [
+        "Metal5",
+        13.85,
+        23.85
+       ]
+      ],
+      "target_layer": "Metal5"
+     }
+    ],
+    "ports": [
+     2
+    ],
+    "shift": 35.0,
+    "side": "xmax",
+    "span": 10.0,
+    "standards": [
+     {
+      "config": "config_cal_xmax_L.json",
+      "key": "cal_xmax_L.key",
+      "length": 69.04,
+      "model": "rfcmim_boxwall_cal_xmax_L",
+      "name": "cal_xmax_L",
+      "output": "rfcmim_boxwall_cal_xmax_L"
+     },
+     {
+      "config": "config_cal_xmax_2L.json",
+      "key": "cal_xmax_2L.key",
+      "length": 138.08,
+      "model": "rfcmim_boxwall_cal_xmax_2L",
+      "name": "cal_xmax_2L",
+      "output": "rfcmim_boxwall_cal_xmax_2L"
+     }
+    ],
+    "uniform_from_wall": 35.0,
+    "valid_to_GHz": 180.0,
+    "warnings": []
+   }
+  ],
+  "ports": [
+   {
+    "Z0": 50,
+    "direction": "X",
+    "element": 1,
+    "length": 0.6230000000000011,
+    "portnumber": 1,
+    "width": 10.000000000000002,
+    "xmax": -30.756999999999998,
+    "xmin": -31.38,
+    "ymax": 23.85,
+    "ymin": 13.85,
+    "zmax": 190.3003,
+    "zmin": 190.3003
+   },
+   {
+    "Z0": 50,
+    "direction": "-X",
+    "element": 1,
+    "length": 0.5390000000000015,
+    "portnumber": 2,
+    "width": 10.000000000000002,
+    "xmax": 79.82000000000001,
+    "xmin": 79.281,
+    "ymax": 23.85,
+    "ymin": 13.85,
+    "zmax": 188.95999999999998,
+    "zmin": 188.95999999999998
+   }
+  ],
+  "unit": 1e-06
+ },
+ "tetrahedra": 134112
+}

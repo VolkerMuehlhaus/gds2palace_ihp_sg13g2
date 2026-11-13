@@ -70,6 +70,11 @@ tiers = ["reader", "geometry", "model"]
 note = "one script, one model per temperature"
 
 [[example]]
+script = "more_examples/calibrated_boxwall_ports/rfcmim_boxwall.py"
+tiers = ["reader", "geometry", "model"]
+note = "port walls on two different cross-sections, reference plane shift"
+
+[[example]]
 script = "more_examples/conformal_3D_passivation/palace_balun_mesh4.py"
 tiers = ["reader", "geometry", "model"]
 note = "conformal passivation from derived layers"

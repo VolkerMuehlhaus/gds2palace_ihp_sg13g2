@@ -1,0 +1,193 @@
+{
+  "file": "rfcmim_boxwall_deembedded.s2p",
+  "ports": [
+    "port 1: calibrated at port wall xmin, reference plane 35 um into the layout",
+    "port 2: calibrated at port wall xmax, reference plane 35 um into the layout"
+  ],
+  "port_walls": [
+    {
+      "side": "xmin",
+      "ports": [
+        1
+      ],
+      "D": 19.9406,
+      "L": 79.762,
+      "shift": 35.0,
+      "extension": 0.0,
+      "gaps": {
+        "1": 0.623
+      },
+      "frequencies_GHz": [
+        9.0,
+        36.0,
+        180.0
+      ],
+      "port_C_fF": [
+        [
+          [
+            2.8167
+          ]
+        ],
+        [
+          [
+            2.817
+          ]
+        ],
+        [
+          [
+            2.8259
+          ]
+        ]
+      ],
+      "port_G_mS": [
+        [
+          [
+            -3e-05
+          ]
+        ],
+        [
+          [
+            -3e-05
+          ]
+        ],
+        [
+          [
+            0.01742
+          ]
+        ]
+      ],
+      "port_series_L_pH": [
+        [
+          [
+            0.0363
+          ]
+        ],
+        [
+          [
+            0.0621
+          ]
+        ],
+        [
+          [
+            0.0594
+          ]
+        ]
+      ],
+      "line": [
+        {
+          "mode": "single",
+          "Z0_ohm": [
+            44.236,
+            42.02,
+            41.131
+          ],
+          "n_eff": [
+            2.1542,
+            2.0646,
+            2.0224
+          ],
+          "loss_dB_per_mm": [
+            0.5192,
+            0.8044,
+            1.8529
+          ]
+        }
+      ],
+      "valid_to_GHz": 180.0,
+      "warnings_from_generation": [],
+      "calibration_doubtful": []
+    },
+    {
+      "side": "xmax",
+      "ports": [
+        2
+      ],
+      "D": 17.26,
+      "L": 69.04,
+      "shift": 35.0,
+      "extension": 0.0,
+      "gaps": {
+        "2": 0.539
+      },
+      "frequencies_GHz": [
+        9.0,
+        36.0,
+        180.0
+      ],
+      "port_C_fF": [
+        [
+          [
+            1.6715
+          ]
+        ],
+        [
+          [
+            1.6717
+          ]
+        ],
+        [
+          [
+            1.677
+          ]
+        ]
+      ],
+      "port_G_mS": [
+        [
+          [
+            -1e-05
+          ]
+        ],
+        [
+          [
+            -1e-05
+          ]
+        ],
+        [
+          [
+            0.00705
+          ]
+        ]
+      ],
+      "port_series_L_pH": [
+        [
+          [
+            0.0056
+          ]
+        ],
+        [
+          [
+            0.0144
+          ]
+        ],
+        [
+          [
+            0.0194
+          ]
+        ]
+      ],
+      "line": [
+        {
+          "mode": "single",
+          "Z0_ohm": [
+            43.188,
+            37.384,
+            36.314
+          ],
+          "n_eff": [
+            2.3265,
+            2.1186,
+            2.0703
+          ],
+          "loss_dB_per_mm": [
+            1.3368,
+            1.6817,
+            2.7614
+          ]
+        }
+      ],
+      "valid_to_GHz": 180.0,
+      "warnings_from_generation": [],
+      "calibration_doubtful": []
+    }
+  ]
+}
