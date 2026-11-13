@@ -452,15 +452,18 @@ def deembed_s(Sm, Se):
 
 
 def _interp_per_omega(f_std, X_std, f):
-    """an element known at the standards' frequencies, at the frequencies f: the imaginary part per omega (inductance,
-    capacitance) and the real part per sqrt(f) (conductor loss, which follows the surface impedance) are interpolated
-    linearly in f and held constant outside the standards' range"""
+    """an element known at the standards' frequencies, at the frequencies f. The imaginary part per omega (inductance,
+    capacitance) is interpolated linearly in f. The real part (loss) is interpolated linearly in sqrt(f): exact for
+    skin effect loss and for a constant DC resistance, so it also holds between the model's lowest frequency and
+    fmax/20, where a thin line goes from one to the other. Both are held constant outside the standards' range (up to
+    1.3: the real part was Re/sqrt(f), linear in f, which goes to zero towards DC and removed too little line loss
+    below fmax/20 with a reference plane shift)"""
     im = X_std.imag / (2 * np.pi * f_std)[:, None, None]
-    re = X_std.real / np.sqrt(f_std)[:, None, None]
     out = np.empty((len(f),) + X_std.shape[1:], dtype=complex)
     for a in range(X_std.shape[1]):
         for b in range(X_std.shape[2]):
-            out[:, a, b] = np.interp(f, f_std, re[:, a, b]) * np.sqrt(f) + 1j * np.interp(f, f_std, im[:, a, b]) * 2 * np.pi * f
+            out[:, a, b] = (np.interp(np.sqrt(f), np.sqrt(f_std), X_std.real[:, a, b])
+                            + 1j * np.interp(f, f_std, im[:, a, b]) * 2 * np.pi * f)
     return out
 
 
@@ -530,8 +533,28 @@ def _calibrate_group(group, sim_path, unit):
     L = group['L']
     T_line = np.linalg.inv(P) @ TL @ np.linalg.inv(rev_t(P))
     A = _eig_fun(T_line, np.log) / L
-    w = 2 * np.pi * f1
     n = Ys.shape[-1]
+    # Frequencies below fmax/20 (gds2palace 0.10.6 adds the model's lowest frequency) are there for the line's
+    # resistance only, which does not follow sqrt(f) down to DC. Only the series resistance is taken from such a point:
+    # R' of the line and the port's series R. At 10 MHz the thru is a small series resistor, well above the solver's
+    # noise, but its inductance and capacitance and the port's capacitance are below it (rfcmim example, three runs:
+    # R' 3.545 to 3.548 ohm/mm, port C 1.0 to 4.4 fF). Those are taken from the lowest regular frequency: L and C
+    # unchanged, shunt loss in proportion to f. The diagnostics and the report use the regular frequencies only.
+    fmax = group.get('fmax_GHz')
+    regular = f1 >= (fmax * 1e9 / 20 if fmax else f1[0]) * (1 - 1e-3)
+    if not np.any(regular):
+        regular = np.ones(len(f1), dtype=bool)
+    k0 = int(np.argmax(regular))
+    for k in np.flatnonzero(~regular):
+        ratio = f1[k] / f1[k0]
+        series_R = A[k, :n, n:].real.copy()
+        A[k] = A[k0] * ratio
+        A[k, :n, n:] = series_R + 1j * A[k0, :n, n:].imag * ratio
+        Ys[k] = Ys[k0] * ratio
+        Zs[k] = Zs[k].real + 1j * Zs[k0].imag * ratio
+    f_all, Ys_all, Zs_all, A_all = f1, Ys, Zs, A
+    f1, Ys, Zs, T_line = f1[regular], Ys[regular], Zs[regular], T_line[regular]
+    w = 2 * np.pi * f1
     report = _line_report(T_line, L, f1, unit)
     doubtful = []
     C = Ys.imag / w[:, None, None]
@@ -551,7 +574,8 @@ def _calibrate_group(group, sim_path, unit):
                             f"sqrt(eps_max) = {n_max / 1.05:.3g}")
     n_top = max(float(m['n_eff'][-1]) for m in report)
     valid = min(f1[-1], C0 / (n_top * 5 * L * unit)) if n_top > 0 else f1[-1]
-    return {'f': f1, 'Ys': Ys, 'Zs': Zs, 'A': A, 'report': report, 'doubtful': doubtful, 'valid_to_GHz': valid / 1e9}
+    return {'f': f_all, 'Ys': Ys_all, 'Zs': Zs_all, 'A': A_all, 'regular': regular, 'report': report, 'doubtful': doubtful,
+            'valid_to_GHz': valid / 1e9}
 
 
 def _error_network(f, N, port_info, groups_cal, unit):
@@ -642,14 +666,17 @@ def calibrated_deembedding(snp_filename, port_info, sim_path):
 
     sidecar = {'file': os.path.basename(out_filename), 'ports': lines, 'port_walls': []}
     for g, cal in groups_cal:
-        w = 2 * np.pi * cal['f']
+        reg = cal['regular']
+        f_reg, Ys_reg, Zs_reg = cal['f'][reg], cal['Ys'][reg], cal['Zs'][reg]
+        w = 2 * np.pi * f_reg
         entry = {'side': g['side'], 'ports': g['ports'], 'D': g.get('D'), 'L': g['L'], 'shift': g.get('shift', 0.0),
                  'extension': g.get('extension', 0.0),
                  'gaps': {str(p['portnumber']): p['gap'] for p in g.get('port_details', [])},
-                 'frequencies_GHz': (cal['f'] / 1e9).tolist(),
-                 'port_C_fF': (cal['Ys'].imag / w[:, None, None] * 1e15).round(4).tolist(),
-                 'port_G_mS': (cal['Ys'].real * 1e3).round(5).tolist(),
-                 'port_series_L_pH': (cal['Zs'].imag / w[:, None, None] * 1e12).round(4).tolist(),
+                 'frequencies_GHz': (f_reg / 1e9).tolist(),
+                 'line_resistance_also_solved_at_GHz': (cal['f'][~reg] / 1e9).tolist(),
+                 'port_C_fF': (Ys_reg.imag / w[:, None, None] * 1e15).round(4).tolist(),
+                 'port_G_mS': (Ys_reg.real * 1e3).round(5).tolist(),
+                 'port_series_L_pH': (Zs_reg.imag / w[:, None, None] * 1e12).round(4).tolist(),
                  'line': [{'mode': m['mode'],
                            'Z0_ohm': None if m['Z0'] is None else [round(float(abs(z)), 3) for z in m['Z0']],
                            'n_eff': [round(float(x), 4) for x in m['n_eff']],
@@ -657,10 +684,10 @@ def calibrated_deembedding(snp_filename, port_info, sim_path):
                  'valid_to_GHz': round(cal['valid_to_GHz'], 3),
                  'warnings_from_generation': g.get('warnings', []), 'calibration_doubtful': cal['doubtful']}
         sidecar['port_walls'].append(entry)
-        mid = len(cal['f']) // 2
+        mid = len(f_reg) // 2
         modes = ', '.join(f"{m['mode']}" + (f" Z0 {abs(m['Z0'][mid]):.4g} ohm" if m['Z0'] is not None else '') +
                           f", n_eff {m['n_eff'][mid]:.4g}, loss {m['loss_dB_per_mm'][mid]:.3g} dB/mm" for m in cal['report'])
-        print(f"  feed line at port wall {g['side']}, {cal['f'][mid] / 1e9:.4g} GHz: {modes}")
+        print(f"  feed line at port wall {g['side']}, {f_reg[mid] / 1e9:.4g} GHz: {modes}")
         print(f"  calibration valid up to about {cal['valid_to_GHz']:.4g} GHz")
         for warning in cal['doubtful']:
             print(f"  WARNING, calibration doubtful: {warning}")
@@ -678,7 +705,8 @@ def _standard_folder_of(found_filename, port_info_data):
     return None
 
 
-__version__ = "1.3.1"    # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument
+__version__ = "1.4"      # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument;
+                         # 1.4: line loss of port walls linear in sqrt(f) between the standards' frequencies (0.10.6)
                          # printed at the start so a log shows which copy ran
 
 

@@ -16,6 +16,7 @@ import skrf as rf  # noqa: E402
 
 F_DEV = np.linspace(1e9, 100e9, 12)
 F_STD = np.array([5e9, 20e9, 100e9])
+F_STD_LOW = np.array([1e9, 5e9, 20e9, 100e9])   # with the model's lowest frequency, as gds2palace writes them
 UNIT = 1e-6
 
 
@@ -32,7 +33,10 @@ def line_t(f, length, loss=False):
     w = 2 * np.pi * f[:, None, None]
     Lp = np.array([[0.45e-6, 0.10e-6], [0.10e-6, 0.45e-6]])           # H/m
     Cp = np.array([[0.20e-9, -0.04e-9], [-0.04e-9, 0.20e-9]])         # F/m
-    Zp = 1j * w * Lp + (np.eye(2) * 2e3 * np.sqrt(f[:, None, None] / 1e9) if loss else 0)
+    # loss: skin effect, R' ~ sqrt(f); loss 'dc': a thin line, R' flat at low frequency and ~ sqrt(f) above 10 GHz
+    Rp = {False: 0, True: 2e3 * np.sqrt(f[:, None, None] / 1e9),
+          'dc': 6e3 * np.sqrt(1 + f[:, None, None] / 10e9)}[loss]
+    Zp = 1j * w * Lp + np.eye(2) * Rp
     Yp = 1j * w * Cp
     K = ce._join(np.zeros_like(Zp), Zp, Yp, np.zeros_like(Yp)) * (length * UNIT)
     return ce._eig_fun(K, np.exp)
@@ -70,15 +74,15 @@ def write_palace_csv(path, f, S):
             fh.write(', '.join(row) + ',\n')
 
 
-def make_case(tmp_path, shift=0.0, loss=False, interior=False, extension=0.0):
+def make_case(tmp_path, shift=0.0, loss=False, interior=False, extension=0.0, f_std=F_STD):
     """sim folder with port_information.json, the two standards' results and the device's result"""
     sim = tmp_path / 'dev_data'
     L = 200.0
-    Ys, Zs = port_elements(F_STD)
+    Ys, Zs = port_elements(f_std)
     P = ce.shunt_t(Ys) @ ce.series_t(Zs)
     for name, factor in (('cal_xmin_L', 1), ('cal_xmin_2L', 2)):
-        T = P @ line_t(F_STD, factor * L, loss) @ ce.rev_t(P)
-        write_palace_csv(str(sim / 'output' / f'dev_{name}' / 'port-S.csv'), F_STD, ce.t2s(T))
+        T = P @ line_t(f_std, factor * L, loss) @ ce.rev_t(P)
+        write_palace_csv(str(sim / 'output' / f'dev_{name}' / 'port-S.csv'), f_std, ce.t2s(T))
     Ys, Zs = port_elements(F_DEV)
     E = ce.shunt_t(Ys) @ ce.series_t(Zs) @ line_t(F_DEV, shift + extension, loss)
     S_dut = dut_s(F_DEV)
@@ -105,7 +109,7 @@ def make_case(tmp_path, shift=0.0, loss=False, interior=False, extension=0.0):
     write_palace_csv(str(sim / 'output' / 'dev' / 'port-S.csv'), F_DEV, S_meas)
     ports = [{'portnumber': p, 'Z0': 50, 'length': 1.0, 'width': 10.0, 'element': 1} for p in range(1, S_dut.shape[-1] + 1)]
     info = {'ports': ports, 'unit': UNIT, 'name': 'dev', 'port_walls': [{
-        'side': 'xmin', 'ports': ports_wall, 'D': 50.0, 'L': L, 'shift': shift, 'extension': extension, 'eps_max': 11.9,
+        'side': 'xmin', 'ports': ports_wall, 'D': 50.0, 'L': L, 'shift': shift, 'extension': extension, 'eps_max': 11.9, 'fmax_GHz': 100.0,
         'port_details': [{'portnumber': p, 'gap': 1.0} for p in ports_wall], 'warnings': [],
         'standards': [{'name': n, 'model': f'dev_{n}', 'output': f'output/dev_{n}', 'length': L * k}
                       for n, k in (('cal_xmin_L', 1), ('cal_xmin_2L', 2))]}]}
@@ -174,12 +178,24 @@ def test_interior_port_gets_the_estimated_inductance(tmp_path):
     assert '!port 2: estimated port inductance' in text and 'Terman' not in text
 
 
-def test_lossy_line_with_shift_is_close(tmp_path):
-    """the line's A is interpolated between the standards' frequencies: with skin effect loss not exact, but close"""
-    sim, S_dut = make_case(tmp_path, shift=60.0, loss=True)
+@pytest.mark.parametrize('loss', [True, 'dc'])
+def test_lossy_line_with_shift_is_close(tmp_path, loss):
+    """the line's A is interpolated between the standards' frequencies, the real part linear in sqrt(f): close for skin
+    effect loss, and for a thin line whose resistance is flat down to the model's lowest frequency"""
+    sim, S_dut = make_case(tmp_path, shift=60.0, loss=loss, f_std=F_STD_LOW)
     run_combine(sim)
     out = rf.Network(str(sim / 'output' / 'dev' / 'dev_deembedded.s2p'))
     assert np.max(np.abs(out.s - S_dut)) < 2e-3
+
+
+def test_line_loss_at_the_lowest_frequency_is_removed(tmp_path):
+    """a thin feed line, flat resistance at low frequency: with the standards solved at the model's lowest frequency,
+    the shift removes the line's resistance there (0.36 ohm per line here; extrapolated with sqrt(f) from 5 GHz, only
+    a part of it was removed)"""
+    sim, S_dut = make_case(tmp_path, shift=60.0, loss='dc', f_std=F_STD_LOW)
+    run_combine(sim)
+    out = rf.Network(str(sim / 'output' / 'dev' / 'dev_deembedded.s2p'))
+    assert np.max(np.abs(out.s[0] - S_dut[0])) < 1e-6
 
 
 def test_missing_standards_write_no_deembedded_file(tmp_path, capsys):

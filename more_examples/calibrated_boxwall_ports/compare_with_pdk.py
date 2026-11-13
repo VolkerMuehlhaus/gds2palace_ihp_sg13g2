@@ -92,16 +92,12 @@ def main():
     c, q = series_c_and_q(f, y_pdk)
     curves.append(('PDK model cap_rfcmim (typical)', f, c, q, dict(color='C3', lw=2, ls=':')))
 
-    # Q only from the lowest frequency of the calibration standards (fstop/20 = 9 GHz): below it, the loss of the
-    # 35 um feed lines that the reference plane shift removes is extrapolated, see README.md
-    f_q = 9e9
     fig, (ax_z, ax_c, ax_q) = plt.subplots(1, 3, figsize=(15, 4.4))
     for label, fx, c, q, style in curves:
         z = np.abs(1 / (2 * np.pi * fx * c))   # |Im Z| of the series element, from C = -1/(omega Im Z)
         ax_z.plot(fx / 1e9, z, label=label, **style)
         ax_c.plot(fx / 1e9, np.where(c > 0, c, np.nan) * 1e15, label=label, **style)
-        sel = fx >= f_q * 0.999
-        ax_q.plot(fx[sel] / 1e9, q[sel], label=label, **style)
+        ax_q.plot(fx / 1e9, np.where(q > 0, q, np.nan), label=label, **style)
     ax_z.set_yscale('log')
     ax_z.set_xlim(0, 180)
     ax_z.set_ylabel('series reactance |X| (ohm)')
@@ -111,9 +107,10 @@ def main():
     ax_c.set_ylabel('series capacitance (fF)')
     ax_c.set_title('series capacitance, below self-resonance')
     ax_q.set_xlim(0, 40)
-    ax_q.set_ylim(0, 80)
+    ax_q.set_yscale('log')
+    ax_q.set_ylim(2, 2000)
     ax_q.set_ylabel('Q')
-    ax_q.set_title('Q, from 9 GHz (lowest calibration frequency)')
+    ax_q.set_title('Q, below self-resonance')
     for ax in (ax_z, ax_c, ax_q):
         ax.set_xlabel('frequency (GHz)')
         ax.grid(True, alpha=0.3)
