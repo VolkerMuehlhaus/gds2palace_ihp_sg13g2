@@ -2,6 +2,13 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 13 November-2026
+
+gds2palace 0.10.5
+
+**Fix**  
+Port walls with a conformal passivation stackup (`SG13G2_FEM_200um_passi3D.xml`): the passivation around TopMetal2 is a derived layer grown by 0.6 µm, and where a line ends at the layout edge (a region cut out of a larger layout, e.g. by the KLayout plug-in) it reached 0.6 µm past the edge. The port wall was then placed there, away from the ports, and stopped with "port wall ... has no port". The layout edge of port walls, wall extensions and PEC walls at the layout edge is now the drawn one, and derived layers are cut there on those sides. Models without such a wall are unchanged.
+
 ## 12 November-2026
 
 gds2palace 0.10.4

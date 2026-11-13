@@ -18,7 +18,7 @@
 
 # Extract objects from layers in GDSII file
 
-__version__ = "1.3.3"
+__version__ = "1.3.4"
 
 import gdspy
 import numpy as np
@@ -212,6 +212,8 @@ class all_polygons_list:
     self.bounding_box = all_bounding_box_list() # manages bounding box per layer and global
     # {layernum: unmerged via point arrays}, filled for via layers where via array merging ran
     self.via_originals = {}
+    # layer numbers of the stackup's derived layers (computed, not drawn): see get_drawn_bounding_box
+    self.derived_layernums = set()
 
   def compute_via_fill_factors (self):
     """Set fill_factor on every polygon of a via layer that went through via array merging,
@@ -337,6 +339,26 @@ class all_polygons_list:
     """
     return self.bounding_box.xmin, self.bounding_box.xmax, self.bounding_box.ymin, self.bounding_box.ymax 
  
+  def get_drawn_bounding_box (self):
+    """Bounding box of the drawn layout: all layers except the derived ones. A derived layer with an Oversize (the
+    conformal passivation around TopMetal2) reaches past the drawn layout where a metal ends at a cut layout edge;
+    the layout edge for port walls is the drawn one. The global bounding box if there are no derived layers.
+    Returns:
+        xmin, xmax, ymin, ymax (float)
+    """
+    boxes = [box for layer, box in self.bounding_box.bounding_boxes.items() if int(layer) not in self.derived_layernums]
+    if not self.derived_layernums or not boxes:
+      return self.get_bounding_box()
+    return (min(b.xmin for b in boxes), max(b.xmax for b in boxes), min(b.ymin for b in boxes),
+            max(b.ymax for b in boxes))
+
+  def update_bounding_box (self):
+    """Compute the bounding boxes (per layer and global) again from the polygons, after polygons were cut or removed
+    """
+    self.bounding_box = all_bounding_box_list()
+    for poly in self.polygons:
+      self.bounding_box.update(int(poly.layernum), poly.xmin, poly.xmax, poly.ymin, poly.ymax)
+
 
   def get_xmin (self):
     # return global bounding box
@@ -365,6 +387,7 @@ class all_polygons_list:
       self.polygons.append(polygon)
     for layernum, original_vias in another_polygons_list.via_originals.items():
       self.via_originals.setdefault(layernum, []).extend(original_vias)
+    self.derived_layernums |= getattr(another_polygons_list, 'derived_layernums', set())
     # also merge boundary information  
     self.bounding_box.merge(another_polygons_list.bounding_box)          
 
@@ -987,6 +1010,7 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
     # ----------- derived layers: boolean operations on other layers -----------
     if derived_layers is not None and len(derived_layers.derived_layers) > 0:
       resolve_derived_layers(cell, derived_layers, layerlist, purposelist, layer_polygons_gds, layernumber_offset, all_polygons)
+      all_polygons.derived_layernums = set(derived_layers.getlayernumbers())   # stored without the offset
 
     '''
     # Re-evaluate bounding box if we have a bounding box specified in GDS file and evaluation is requested

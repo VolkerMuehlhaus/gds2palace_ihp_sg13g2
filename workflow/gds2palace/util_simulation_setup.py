@@ -1687,6 +1687,11 @@ def create_model (excite_ports, settings):
     port_walls = None
     if not elmer_thermal and not get_optional_setting(settings, '_calibration_standard', False):
         try:
+            # derived layers that reach past the layout edge where a wall sits on it (passivation oversize around a cut
+            # line): cut at the drawn edge, so that the wall is there
+            for line in util_calibration.clip_derived_layers(allpolygons, util_calibration.walls_at_layout_edge(
+                    boundary_condition, margin, air_around, get_optional_setting(settings, 'wall_extension', None))):
+                print(line)
             # settings['wall_extension']: a wall that is not a port wall moved outward (pieces of a split region)
             for line in util_calibration.extend_walls(allpolygons, metals_list, get_optional_setting(settings, 'wall_extension', None),
                                                       boundary_condition):

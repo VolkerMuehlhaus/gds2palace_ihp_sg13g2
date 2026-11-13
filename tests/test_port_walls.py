@@ -587,3 +587,62 @@ def test_D_of_lines_far_apart_is_not_their_span(stack):
     g = analyze(stack, lines_over_plate(mixed), ports_for(range(1, 5)), fmax=10e9)['groups'][0]
     assert [c['ports'] for c in g['clusters']] == [[1], [2, 3], [4]]
     assert g['D'] == pytest.approx(pair['D'])
+
+
+def gssg_with_passivation_oversize():
+    """GSSG lines drawn to the layout edge at x = 0 with a conformal passivation as in SG13G2_FEM_200um_passi3D.xml:
+    derived layer 900 = TopMetal2 grown by 0.6, which reaches 0.6 past the edge where the lines are cut"""
+    ap = gssg()
+    for y0, y1 in GSSG_LINES + GSSG_GROUNDS:
+        ap.add_rectangle(-0.6, y0 - 0.6, 300.6, y1 + 0.6, 900)
+    ap.derived_layernums = {900}
+    return ap
+
+
+def test_passivation_oversize_does_not_move_the_layout_edge(stack):
+    """The layout edge of a port wall is the drawn one: a derived layer reaching past it (passi3D stackup, a line cut by
+    the region box) must not move the wall away from the ports (klayout_em_export balun, 'port wall has no port')"""
+    ap = gssg_with_passivation_oversize()
+    assert ap.get_bounding_box()[0] == pytest.approx(-0.6)
+    assert ap.get_drawn_bounding_box()[0] == pytest.approx(0.0)
+    assert calibration.ports_on_layout_edge(ap, ports_for([1, 2])) == {1: 'xmin', 2: 'xmin'}
+    g = analyze(stack, ap, ports_for([1, 2]))['groups'][0]
+    assert g['side'] == 'xmin' and g['ports'] == [1, 2]
+
+
+def test_derived_layers_cut_at_the_walls_only():
+    ap = gssg_with_passivation_oversize()
+    assert calibration.walls_at_layout_edge(BOUNDARY, [20] * 4, 20) == ['xmin']
+    assert calibration.walls_at_layout_edge(['ABC', 'PEC', 'ABC', 'ABC', 'ABC', 'ABC'], [20, 0, 20, 20], 0) == ['xmax']
+    assert calibration.walls_at_layout_edge(['ABC'] * 6, [20] * 4, 20, {'ymax': 5.0}) == ['ymax']
+    # no wall at the layout edge, or no derived layers: nothing changes
+    before = [(p.layernum, p.xmin, p.xmax, p.ymin, p.ymax) for p in ap.polygons]
+    assert calibration.clip_derived_layers(ap, []) == []
+    plain = gssg()
+    assert calibration.clip_derived_layers(plain, ['xmin']) == []
+    assert [(p.layernum, p.xmin, p.xmax, p.ymin, p.ymax) for p in ap.polygons] == before
+    # a port wall at xmin: cut there, the other sides keep the oversize
+    log = calibration.clip_derived_layers(ap, ['xmin'])
+    assert log and '900' in log[0]
+    passivation = [p for p in ap.polygons if p.layernum == 900]
+    assert len(passivation) == 4
+    assert all(p.xmin == pytest.approx(0.0) and p.xmax == pytest.approx(300.6) for p in passivation)
+    assert ap.get_bounding_box() == pytest.approx((0.0, 300.6, -65.6, 65.6))
+
+
+def test_read_gds_knows_the_derived_layers(tmp_path):
+    """read_gds records the derived layers, so that the drawn layout edge leaves them out (passi3D stackup)"""
+    import gdspy
+    from gds2palace import gds_reader
+    lib = gdspy.GdsLibrary()
+    cell = lib.new_cell('TOP')
+    cell.add(gdspy.Rectangle((0, -5), (100, 5), layer=TM2))
+    cell.add(gdspy.Rectangle((0, -5), (0, 5), layer=201))
+    gds = str(tmp_path / 'line.gds')
+    lib.write_gds(gds)
+    materials, dielectrics, metals = stackup_reader.read_substrate(utilities.get_stackup_path('SG13G2_FEM_200um_passi3D.xml'))
+    ap = gds_reader.read_gds(gds, metals.getlayernumbers() + [201], purposelist=[0], metals_list=metals,
+                             gds_boundary_layers=dielectrics.get_boundary_layers())
+    assert 900 in ap.derived_layernums
+    assert ap.get_bounding_box()[0] == pytest.approx(-0.6, abs=1e-3)
+    assert ap.get_drawn_bounding_box() == pytest.approx((0.0, 100.0, -5.0, 5.0))
