@@ -162,6 +162,12 @@ Current density at 93 Ghz:
 
 ![butler 5](./doc/png/butler5.png)
 
+# How to cite
+
+If you use gds2palace in a publication, please cite it. The **Cite this repository** button on the GitHub repository page gives APA and BibTeX entries, generated from [CITATION.cff](./CITATION.cff).
+
+Please also cite the [Palace](https://github.com/awslabs/palace) solver that computed your results.
+
 # License
 
 This project is licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later) - see [LICENSE](./LICENSE) for the full text.
