@@ -43,6 +43,7 @@ import json
 import math
 import os
 
+import gdspy
 import numpy as np
 import shapely
 from shapely.affinity import affine_transform
@@ -51,7 +52,7 @@ from shapely.geometry import box as shapely_box
 
 from .util_stackup_reader import PEC_MATERIAL_NAME
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 C0 = 299792458.0
 TOL = 1e-3                     # drawing units, the gmsh geometry tolerance
@@ -312,7 +313,7 @@ def analyze_port_walls(allpolygons, metals_list, materials_list, dielectrics_lis
     if simulation_ports is None or len(getattr(simulation_ports, 'ports', [])) == 0:
         raise PortWallError("port walls are set, but the model has no ports")
 
-    bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+    bxmin, bxmax, bymin, bymax = allpolygons.get_drawn_bounding_box()
     walls = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}
     transverse_range = {'xmin': (bymin, bymax), 'xmax': (bymin, bymax), 'ymin': (bxmin, bxmax), 'ymax': (bxmin, bxmax)}
     depth = {'xmin': bxmax - bxmin, 'xmax': bxmax - bxmin, 'ymin': bymax - bymin, 'ymax': bymax - bymin}
@@ -753,7 +754,7 @@ def _analyze_group(side, wall, ports, vrange, depth, allpolygons, metals_list, m
 def ports_on_layout_edge(allpolygons, simulation_ports):
     """{portnumber: side} for the in-plane ports whose polygon lies on exactly one side of the layout edge, the place of
     a port wall. Works without port walls: setupEM uses it to ask whether such a side should be one."""
-    bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+    bxmin, bxmax, bymin, bymax = allpolygons.get_drawn_bounding_box()
     walls = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}
     polys = {}
     for poly in allpolygons.polygons:
@@ -790,7 +791,7 @@ def extend_walls(allpolygons, metals_list, wall_extension, boundary):
             raise PortWallError(f"wall_extension has a value for {side}, which is a port wall: use port_wall_extension there")
         if E == 0:
             continue
-        bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+        bxmin, bxmax, bymin, bymax = allpolygons.get_drawn_bounding_box()
         wall = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}[side]
         vlo, vhi = (bymin, bymax) if side in ('xmin', 'xmax') else (bxmin, bxmax)
         layers = _Layers(allpolygons, metals_list, side, wall)
@@ -814,6 +815,51 @@ def extend_walls(allpolygons, metals_list, wall_extension, boundary):
     return log
 
 
+def walls_at_layout_edge(boundary, margin, air_around, wall_extension=None):
+    """The sides (xmin, ...) whose box wall sits at the layout edge: port walls, sides moved out by wall_extension (from
+    the layout edge), and PEC sides without dielectric oversize and air. margin: 4 values, air_around: 1 or 6."""
+    air = list(air_around) if isinstance(air_around, (list, tuple)) else [air_around] * 6
+    sides = set(port_wall_sides(boundary))
+    if isinstance(wall_extension, dict):
+        sides |= set(wall_extension) & set(WALL_SIDES)
+    sides |= {side for i, side in enumerate(WALL_SIDES)
+              if str(boundary[i]).upper() == 'PEC' and margin[i] == 0 and air[i] == 0}
+    return [side for side in WALL_SIDES if side in sides]
+
+
+def clip_derived_layers(allpolygons, sides):
+    """Cut the derived layers at the drawn layout edge on sides (walls_at_layout_edge). A derived layer with an Oversize
+    (the conformal passivation around TopMetal2) reaches past the layout edge where a metal ends there: a line cut by
+    the layout edge, which continues behind a wall. Left as it is, it would move the wall away from the drawn edge and
+    the ports on it. Changes allpolygons; returns log lines. Nothing to do without derived layers or such sides."""
+    derived = getattr(allpolygons, 'derived_layernums', set())
+    if not derived or not sides:
+        return []
+    edge = dict(zip(WALL_SIDES, allpolygons.get_drawn_bounding_box()))
+    outer = dict(zip(WALL_SIDES, allpolygons.get_bounding_box()))
+    lo = [edge[s] if s in sides else outer[s] - 1.0 for s in ('xmin', 'ymin')]
+    hi = [edge[s] if s in sides else outer[s] + 1.0 for s in ('xmax', 'ymax')]
+    window = gdspy.Rectangle((lo[0], lo[1]), (hi[0], hi[1]))
+    keep, cut = [], {}
+    for poly in allpolygons.polygons:
+        number = int(poly.layernum)
+        if number not in derived or (poly.xmin >= lo[0] - TOL and poly.xmax <= hi[0] + TOL
+                                     and poly.ymin >= lo[1] - TOL and poly.ymax <= hi[1] + TOL):
+            keep.append(poly)
+            continue
+        result = gdspy.boolean([np.column_stack((poly.pts_x, poly.pts_y))], window, 'and', max_points=199)
+        cut.setdefault(number, []).extend(result.polygons if result is not None else [])
+    if not cut:
+        return []
+    allpolygons.polygons = keep
+    for number, pieces in cut.items():
+        for points in pieces:
+            allpolygons.add_polygon([[round(float(x), 6), round(float(y), 6)] for x, y in points], number)
+    allpolygons.update_bounding_box()
+    return [f"Derived layer(s) {', '.join(str(n) for n in sorted(cut))} cut at the layout edge at {', '.join(sides)} "
+            f"(they reached past it, e.g. a passivation oversize around a line cut by the edge)"]
+
+
 def via_ports_in_pec_walls(allpolygons, simulation_ports, dielectrics_list, boundary, margin, air_around):
     """[(portnumber, side)] of the via ports (no target layer) whose polygon lies in the plane of a PEC wall: a side with
     boundary 'PEC', no dielectric oversize and no air, so that the wall is at the layout edge. The wall shorts such a
@@ -821,7 +867,7 @@ def via_ports_in_pec_walls(allpolygons, simulation_ports, dielectrics_list, boun
     if any(d.gdsboundary is not None for d in dielectrics_list.dielectrics):
         return []
     air = list(air_around) if isinstance(air_around, (list, tuple)) else [air_around] * 6
-    bxmin, bxmax, bymin, bymax = allpolygons.get_bounding_box()
+    bxmin, bxmax, bymin, bymax = allpolygons.get_drawn_bounding_box()
     walls = {'xmin': bxmin, 'xmax': bxmax, 'ymin': bymin, 'ymax': bymax}
     pec = [side for i, side in enumerate(WALL_SIDES)
            if str(boundary[i]).upper() == 'PEC' and margin[i] == 0 and air[i] == 0]
