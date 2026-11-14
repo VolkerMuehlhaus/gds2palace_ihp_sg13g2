@@ -23,5 +23,5 @@ from . import util_utilities as utilities
 from . import util_simulation_setup as simulation_setup
 from . import util_calibration as calibration
 
-__version__ = "0.10.5"   # version of gds2palace
+__version__ = "0.10.6"   # version of gds2palace
 

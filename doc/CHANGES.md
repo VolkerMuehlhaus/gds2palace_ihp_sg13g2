@@ -4,6 +4,16 @@ This is an (incomplete) list of changes and new features.
 
 ## 13 November-2026
 
+gds2palace 0.10.6
+
+**Fix**  
+Port walls with a reference plane shift or a port wall extension: R and Q below fstop/20 were wrong. The standards were solved at fstop/20, fstop/5 and fstop only, and below fstop/20 the feed line's loss was extrapolated with sqrt(f), towards zero at DC. A thin line's resistance stays at its DC value there, so too little of it was removed. Example: an rfcmim capacitor with two 35 µm feed lines, series resistance at 0.01 GHz 0.74 Ω instead of 0.25 Ω (PDK model 0.25 Ω). The standards are now also solved at the model's lowest frequency, which gives the line's resistance there, and between the solved frequencies the loss is interpolated linearly in sqrt(f). Results without a shift or extension change very little, capacitance and inductance not at all. Models written by an earlier version keep their own `combine_extend_snp.py` and their results; write the model again to get the fix. `combine_extend_snp.py` is 1.4.
+
+**New example**  
+`more_examples/calibrated_boxwall_ports`: step-by-step guide to port walls on an rfcmim capacitor, compared with the PDK model.
+
+## 13 November-2026
+
 gds2palace 0.10.5
 
 **Fix**  

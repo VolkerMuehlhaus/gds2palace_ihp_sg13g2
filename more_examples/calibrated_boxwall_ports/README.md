@@ -38,8 +38,9 @@ works is in [Behind the scenes](#behind-the-scenes) at the end.
 
 ## What you need
 
-- **gds2palace 0.10.0 or newer**, on the machine that writes the model. Port walls came with 0.10.0, and later
-  versions fixed details, so use the latest version. The model script was tested with 0.10.5.
+- **gds2palace 0.10.6 or newer**, on the machine that writes the model. Port walls came with 0.10.0, but the Q of
+  this example at low frequency needs 0.10.6: before, too little of the feed lines' resistance was removed below
+  fstop/20. The results in this folder are from 0.10.6.
 - **Palace** on Linux. The results in this folder are from Palace 0.19.0.
 - **An up-to-date `combine_snp`** on the Linux machine, from gds2palace 0.10.0 or newer: copy it once from
   [`scripts/`](../../scripts). An older one leaves the feed lines in the result, without an error, see
@@ -165,8 +166,8 @@ On Linux with Palace installed, in `palace_model/rfcmim_boxwall_data/`:
 ./run_sim
 ```
 
-`run_sim` first solves the four standards, at three frequencies each (fstop/20, fstop/5 and fstop: 9, 36 and
-180 GHz). Then it solves the model, and `combine_snp` writes the results into
+`run_sim` first solves the four standards, at four frequencies each: fstop/20, fstop/5 and fstop (9, 36 and
+180 GHz), and the model's lowest frequency (0.01 GHz), which gives the feed lines' resistance at low frequency. Then it solves the model, and `combine_snp` writes the results into
 `output/rfcmim_boxwall/`:
 
 - `rfcmim_boxwall.s2p`: the raw result, as Palace computed it at the ports on the walls (see below)
@@ -229,21 +230,11 @@ different structure. It shows why the feed lines must be removed before comparin
 Towards the self-resonance, both rise the same way, the calibrated one a little earlier. A finer mesh brings the
 capacitance closer to the PDK model: with a 2 µm mesh it was 4 % higher, with 1 µm 2.6 %, with 0.5 µm 1.5 %.
 
-**Q.** From 9 GHz up, the calibrated Q is within about 20 % of the PDK model's. The raw Q is much lower, because
-the raw result includes the loss of 70 µm of feed line.
+**Q.** Over the whole range below the self-resonance, the calibrated Q is within about 12 % of the PDK model's. The
+series resistance at 0.01 GHz is 0.253 Ω, and the PDK model's 0.252 Ω. The raw Q is much lower, because the raw
+result includes the loss of 70 µm of feed line: 0.76 Ω at 0.01 GHz.
 
 The small step near 165 GHz in both Palace curves is in the raw result too, so it doesn't come from the calibration.
-
-### A limit: R and Q below the lowest calibration frequency
-
-The standards are solved at 9, 36 and 180 GHz only. In between, gds2palace interpolates the line's loss, assuming
-that it grows with √f, like skin effect loss. Below 9 GHz, it extrapolates with the same √f, towards zero at DC.
-
-A thin feed line doesn't behave like that at low frequency. Its resistance stays at its DC value until the skin
-depth gets smaller than the metal thickness. So below 9 GHz, the calibration removes too little feed line
-resistance, and the calibrated R is too high and the Q too low. That is why the plot shows Q only from 9 GHz up. The
-capacitance is not affected, and neither is the result without a reference plane shift: the port itself has almost
-no loss.
 
 ## Behind the scenes
 

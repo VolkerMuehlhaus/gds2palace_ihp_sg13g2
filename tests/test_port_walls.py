@@ -310,7 +310,7 @@ def test_model_files_and_run_script(stack, tmp_path):
     info = json.load(open(os.path.join(sim_path, 'port_information.json')))
     assert info['port_walls'][0]['ports'] == [1, 2] and info['port_walls'][0]['standards'][1]['length'] == 400
     std = json.load(open(os.path.join(sim_path, 'config_cal_xmin_L.json')))
-    assert std['Solver']['Driven']['Samples'] == [{'Type': 'Point', 'Freq': [5.0, 20.0, 100.0], 'SaveStep': 0}]
+    assert std['Solver']['Driven']['Samples'] == [{'Type': 'Point', 'Freq': [0.01, 5.0, 20.0, 100.0], 'SaveStep': 0}]
     assert std['Problem']['Output'] == 'output/line_cal_xmin_L' and len(std['Boundaries']['LumpedPort']) == 4
     run = open(os.path.join(sim_path, 'run_sim')).read()
     assert run.index('config_cal_xmin_L.json') < run.index('config_cal_xmin_2L.json') < run.index('run_palace config.json')

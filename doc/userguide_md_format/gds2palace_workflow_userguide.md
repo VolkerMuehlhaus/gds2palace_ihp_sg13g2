@@ -605,7 +605,7 @@ A via port on a port wall, e.g. from a layout tool's export, can't stay a via po
 
 #### The standards
 
-For each port wall, the tool writes two standards into the model's `_data` folder: the layout's cross-section at the wall, extruded to thru lines of length L and 2 L. They use the model's stackup, conductor model and mesh settings, because each mesh has its own small line error, and the calibration only removes it when model and standards share it. They are solved at three frequencies (fstop/20, fstop/5 and fstop). Both ends of a line have the same cross-section, so two such port walls share one pair of standards.
+For each port wall, the tool writes two standards into the model's `_data` folder: the layout's cross-section at the wall, extruded to thru lines of length L and 2 L. They use the model's stackup, conductor model and mesh settings, because each mesh has its own small line error, and the calibration only removes it when model and standards share it. They are solved at three frequencies (fstop/20, fstop/5 and fstop), and also at the model's lowest frequency when that is lower. The low point is there for the feed line's resistance: a thin line's resistance stays at its DC value at low frequency, and a reference plane shift must remove that, not an extrapolated value. Both ends of a line have the same cross-section, so two such port walls share one pair of standards.
 
 The length follows from the size of the cross-section at the cut:
 

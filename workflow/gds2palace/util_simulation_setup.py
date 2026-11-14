@@ -1670,6 +1670,8 @@ def create_model (excite_ports, settings):
         fmax = max(fmax, discrete_max)
     if len(f_dump_list) > 0:
         fmax = max(fmax, max(f_dump_list))
+    # the model's lowest frequency: the port wall standards are solved there too
+    fmin = min([f for f in ([fstart] if fstart is not None else []) + list(f_discrete_list) if f > 0], default=None)
 
     wavelength_air = 3e8/fmax / unit
     # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
@@ -3563,7 +3565,7 @@ def create_model (excite_ports, settings):
             for (tag, factor), record in zip(util_calibration.STANDARDS, group['standards']):
                 print(f"Writing calibration standard {record['name']}: thru line of length {record['length']:g}")
                 standard, standard_ports = util_calibration.standard_settings(settings, group, record, factor, margin, air_around,
-                                                                              boundary_condition, fmax)
+                                                                              boundary_condition, fmax, fmin)
                 create_model(standard_ports.all_active_excitations(), standard)
                 util_calibration.write_key(sim_path, record)
 
