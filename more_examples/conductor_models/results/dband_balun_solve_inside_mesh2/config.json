@@ -23,7 +23,8 @@
             "KSPType": "GMRES",
             "Tol": 1e-06,
             "MaxIts": 400,
-            "ComplexCoarseSolve": true
+            "ComplexCoarseSolve": true,
+            "EstimatorTol": 0.01
         },
         "Order": 2,
         "Device": "CPU",

@@ -13,7 +13,8 @@ Models (conductor model, refined_cellsize):
   solve_inside_skin_mesh2  'solve_inside_skin', 2 um
   solve_inside_skin_mesh5  'solve_inside_skin', 5 um (widths of 10 and 20 um only: the cell must not exceed the trace)
 
-Reference data in reference/ (from the gds2palace filled_vs_surface study): filled metals at refined_cellsize 0.25 um
+Reference data in reference/ (models of the gds2palace filled_vs_surface study, solved with the same Palace version
+as the runs of this study): filled metals at refined_cellsize 0.25 um
 (converged, *_fill025) and the same lines with ideal conductors (*_pec2), which give the losses outside the conductor.
 Run in the palace venv:  python make_line_models.py      (writes gds/ and palace_model/)
 """
@@ -91,7 +92,7 @@ if __name__ == '__main__':
     os.chdir(HERE)
     for w, L, m in runs():
         name = name_of(w, L, m)
-        if os.path.exists(os.path.join(HERE, 'palace_model', name + '_data', 'config.json')):
+        if '--rebuild' not in sys.argv and os.path.exists(os.path.join(HERE, 'palace_model', name + '_data', 'config.json')):
             continue
         print('building', name, flush=True)
         create_model(w, L, m)
