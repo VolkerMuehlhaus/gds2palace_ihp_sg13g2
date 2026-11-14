@@ -56,9 +56,15 @@ The structures and their setups are those of the mesh convergence studies (`../m
 
 All runs, including the references, used gds2palace 0.10.6 and Palace 0.19.0 on the same machine (hpz2, AMD Ryzen AI Max+ 395), with 16 MPI processes, one run at a time. So their run times can be compared with each other.
 
-The references are the 1 µm models of the mesh convergence studies and the line models of the earlier line study, solved again for this study. Results from different Palace versions must not be mixed here: Palace 0.19 gives less loss than Palace 0.18 on these models, and the difference grows with frequency. As an example, the peak Q of the spiral inductor is 5-7 % higher with Palace 0.19 on the same mesh. The likely reason is the second-order absorbing boundary, which changed in Palace 0.19. The gds2palace version made no difference to the results.
+The references are the 1 µm models of the mesh convergence studies and the line models of the earlier line study, solved again for this study, so that every comparison is between runs of the same Palace version. The gds2palace version made no difference to the results.
 
-The reference itself is not the truth. It is the most accurate simulation we have, and its own error is a few percent. Only L6n2 has a measurement.
+### Palace version and the absorbing boundary
+
+An earlier version of this report used Palace 0.18. With Palace 0.19, the spiral inductor shows about 5 % more peak Q on the same mesh. This is not a change in how Palace calculates conductor loss. Palace 0.19 changed the second-order absorbing boundary, and this model has its box boundary only 20 µm from the coil, in the coil's near field.
+
+We checked this on the same meshes. With a first-order absorbing boundary or a PEC box, both Palace versions give identical results. With the boundary 350 µm or more from the coil (two coils of `../ground_cutout_inductor/`), the versions differ by less than 1 % in peak Q.
+
+The comparison of the conductor models is not affected: all runs and references of a structure use the same box and the same Palace version.
 
 ## 2. Coils: the surface model gives too much Q
 
