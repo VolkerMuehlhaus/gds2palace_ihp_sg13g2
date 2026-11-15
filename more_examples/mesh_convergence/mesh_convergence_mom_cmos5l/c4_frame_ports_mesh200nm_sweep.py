@@ -31,6 +31,10 @@ settings['merge_polygon_size'] = 0.0
 settings['fstart'] = 0.0e9
 settings['fstop'] = 50.0e9
 settings['fstep'] = 1.0e9
+# Real-only coarse solve, as in gds2palace until 30 September 2026. With 0.2 um cells, the low frequency points that
+# replace 0 Hz are close to the lowest frequency Palace can solve on this mesh. There the default complex coarse
+# solve can stop with "SuperLUSolver: Found a singular matrix", while the real one degrades gradually.
+settings['complex_coarse_solve'] = False
 settings['refined_cellsize'] = 0.2
 settings['order'] = 2
 settings['cells_per_wavelength'] = 10.0

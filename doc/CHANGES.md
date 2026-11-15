@@ -2,6 +2,15 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 15 November-2026
+
+gds2palace 0.10.7
+
+**Fix**  
+Models with a very fine mesh (`refined_cellsize` or a `refined_cellsize_override` value below 0.5 um) and `fstart = 0`: Palace could stop with `SuperLUSolver: Found a singular matrix`, or the solver did not converge. With `fstart = 0`, gds2palace simulates two low frequency points instead of 0 Hz, so far always 10 MHz and 20 MHz. On such a fine mesh the solver breaks down at low frequency, in all Palace versions tested (0.17 to 0.19). The low frequency points now move up for these meshes: the first one is 5 MHz/um divided by the smallest cell size (25 MHz at 0.2 um, 100 MHz at 0.05 um), the second one twice that. Models with cell sizes of 0.5 um and more are unchanged. See the FAQ, "Why can't I simulate at 0 Hz, and how is DC handled?".
+
+The `_dc` Touchstone file written by `combine_snp` (`combine_extend_snp.py` 1.5) keeps all simulated frequency points now and only adds the 0 Hz point in front. Before, a result with the two low frequency points of `fstart = 0` was resampled to a uniform frequency grid: the simulated points, among them the two low ones, were replaced by interpolated values at slightly different frequencies (e.g. 0.4902 GHz steps instead of 0.5 GHz). The 0 Hz value itself is unchanged. For the smooth results checked, the interpolated S-parameters were within 0.004 of the simulated ones. The file is no longer uniformly spaced when the sweep starts at 0 Hz.
+
 ## 13 November-2026
 
 gds2palace 0.10.6

@@ -251,6 +251,25 @@ def traverse_directories(path, level=0):
 
 # extrapolate down to DC 
 
+def network_with_dc_point (nw):
+    """The network with a 0 Hz point in front of its unchanged data.
+
+    The 0 Hz value is extrapolated from the first two frequencies, linear in magnitude and in unwrapped phase, and
+    its imaginary part is dropped: the same value as scikit-rf's Network.extrapolate_to_dc(). That method is not used
+    because it also resamples the whole result to a uniform frequency grid (for time domain use). With the two low
+    frequency points that gds2palace adds for fstart = 0, this removed the simulated points from the file and
+    replaced them by interpolated ones on a slightly finer grid (until 1.4).
+    """
+    if nw.f[0] == 0:
+        return nw.copy()
+    s2, f2 = nw.s[:2], nw.f[:2]
+    mag, rad = np.abs(s2), np.unwrap(np.angle(s2), axis=0)
+    t = -f2[0] / (f2[1] - f2[0])     # position of 0 Hz on the line through the two points
+    dc = ((mag[0] + t * (mag[1] - mag[0])) * np.exp(1j * (rad[0] + t * (rad[1] - rad[0])))).real
+    return rf.Network(frequency=rf.Frequency.from_f(np.insert(nw.frequency.f_scaled, 0, 0.0), unit=nw.frequency.unit),
+                      s=np.insert(nw.s, 0, dc, axis=0), z0=np.insert(nw.z0, 0, nw.z0[0], axis=0))
+
+
 def extrapolate_to_DC (snp_filename):
     nw = rf.Network(snp_filename)
 
@@ -258,22 +277,19 @@ def extrapolate_to_DC (snp_filename):
     # check if we have point below 1 GHz, otherwise exit
     if nw.frequency.npoints > 20:
         if nw.frequency.start <= 1e9:
-            if True: # nw.frequency.npoints > 50:
-                # extrapolate to DC
-                extrapolated = nw.extrapolate_to_dc(points=None, dc_sparam=None,  kind='cubic', coords='polar')
-                filename, file_extension = os.path.splitext(snp_filename)
-                # keep the original .sNp extension explicitly, rather than relying on
-                # write_touchstone() to re-append it - it only does that when its own
-                # get_extn() finds no dot at all in the name, and a model name containing
-                # a literal '.' (e.g. a dimension "do82.41" or temperature "T125.0C")
-                # makes it mistake that trailing fragment for an existing extension,
-                # silently writing the file with no extension at all
-                out_filename = filename + '_dc' + file_extension
-                extrapolated.write_touchstone(out_filename, skrf_comment='DC point added by extrapolation', form='db', write_noise=True)
-                returnval = out_filename
-                print('Created file with DC extrapolation: ', out_filename,'\n')
-            else:
-                print('Not enough frequency points, skipping DC extrapolation')    
+            # add the 0 Hz point, all simulated points stay as they are
+            extrapolated = network_with_dc_point(nw)
+            filename, file_extension = os.path.splitext(snp_filename)
+            # keep the original .sNp extension explicitly, rather than relying on
+            # write_touchstone() to re-append it - it only does that when its own
+            # get_extn() finds no dot at all in the name, and a model name containing
+            # a literal '.' (e.g. a dimension "do82.41" or temperature "T125.0C")
+            # makes it mistake that trailing fragment for an existing extension,
+            # silently writing the file with no extension at all
+            out_filename = filename + '_dc' + file_extension
+            extrapolated.write_touchstone(out_filename, skrf_comment='DC point added by extrapolation', form='db', write_noise=True)
+            returnval = out_filename
+            print('Created file with DC extrapolation: ', out_filename,'\n')
         else:
             print('No data at low frequency, skipping DC extrapolation')    
     else:
@@ -705,8 +721,9 @@ def _standard_folder_of(found_filename, port_info_data):
     return None
 
 
-__version__ = "1.4"      # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument;
+__version__ = "1.5"      # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument;
                          # 1.4: line loss of port walls linear in sqrt(f) between the standards' frequencies (0.10.6)
+                         # 1.5: _dc file keeps the simulated frequency points, no resampling (0.10.7)
                          # printed at the start so a log shows which copy ran
 
 

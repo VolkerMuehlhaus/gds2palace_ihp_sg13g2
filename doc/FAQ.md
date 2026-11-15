@@ -260,6 +260,19 @@ in the console â€” and `combine_snp` extrapolates a DC value into a separate
 `_dc` Touchstone file from the low simulated points. Always check that file
 before trusting it; it's an extrapolation, not a simulated data point.
 
+The two low points are normally 10 MHz and 20 MHz. A full-wave solver can't
+go arbitrarily low: the lower the frequency and the smaller the mesh cells,
+the less the frequency-dependent part of the equations counts against the
+rest, until it is lost in rounding. Palace then stops with
+`SuperLUSolver: Found a singular matrix`, or the solver doesn't converge.
+In our tests this started where frequency times cell size fell below about
+2 MHz·µm, so 10 MHz is fine for the usual cell sizes of 1 µm and more. For a
+`refined_cellsize` (or a `refined_cellsize_override` value) below 0.5 µm,
+gds2palace 0.10.7 and newer moves the two points up: the first one is
+5 MHz·µm divided by the smallest cell size, e.g. 25 MHz and 50 MHz for
+0.2 µm cells. The same limit applies to a low `fstart` or `fpoint` that you
+set yourself: gds2palace doesn't change those.
+
 ## Simulation settings
 
 ### Where's the full reference for what goes in the `settings` dict?

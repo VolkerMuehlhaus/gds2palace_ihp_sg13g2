@@ -15,8 +15,8 @@ keywords:
   - GDSII
   - Palace
   - IHP SG13G2
-version: 0.10.5
-date-released: 2026-11-13
+version: 0.10.7
+date-released: 2026-11-15
 references:
   - type: software
     title: "Palace: 3D Finite Element Solver for Computational Electromagnetics"
