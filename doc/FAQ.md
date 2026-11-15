@@ -266,11 +266,11 @@ the less the frequency-dependent part of the equations counts against the
 rest, until it is lost in rounding. Palace then stops with
 `SuperLUSolver: Found a singular matrix`, or the solver doesn't converge.
 In our tests this started where frequency times cell size fell below about
-2 MHz��m, so 10 MHz is fine for the usual cell sizes of 1 �m and more. For a
-`refined_cellsize` (or a `refined_cellsize_override` value) below 0.5 �m,
+2 MHz·µm, so 10 MHz is fine for the usual cell sizes of 1 µm and more. For a
+`refined_cellsize` (or a `refined_cellsize_override` value) below 0.5 µm,
 gds2palace 0.10.7 and newer moves the two points up: the first one is
-5 MHz��m divided by the smallest cell size, e.g. 25 MHz and 50 MHz for
-0.2 �m cells. The same limit applies to a low `fstart` or `fpoint` that you
+5 MHz·µm divided by the smallest cell size, e.g. 25 MHz and 50 MHz for
+0.2 µm cells. The same limit applies to a low `fstart` or `fpoint` that you
 set yourself: gds2palace doesn't change those.
 
 ## Simulation settings
@@ -312,9 +312,9 @@ settings['conductor_model'] = 'solve_inside_skin'  # volumes + thin layers along
 |---|---|---|---|
 | In HFSS | impedance boundary (Solve Inside off) | Solve Inside | Solve Inside with a skin-depth-based mesh operation |
 | Peak Q of coils on TopMetal1/2 | 18–30 % too high | 4–8 % too low | 2–3 % too low |
-| Insertion loss (baluns) | 0.02–0.14 dB too low | 0.03–0.15 dB too high | up to 0.05 dB too high |
+| Insertion loss (baluns) | 0.02–0.15 dB too low | 0.03–0.15 dB too high | up to 0.05 dB too high |
 | Unknowns at the same mesh | 1× | about 1.2× | 1.75–2.5× |
-| Run time at the same mesh | 1× | 1.25–1.7× | 1.5–3.5× |
+| Run time at the same mesh | 1× | 1.15–1.9× | 1.8–4.2× |
 
 The Q errors are for the peak Q of coils with 2–8 µm traces. Below the peak, the surface model is even more optimistic: 24–37 % at half the peak frequency. Coils with wider traces were not tested. Their error is probably smaller, because the side walls and edges carry a smaller part of the current.
 

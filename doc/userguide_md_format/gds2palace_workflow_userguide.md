@@ -1014,9 +1014,9 @@ The table below sums up the three models. The errors are for a 2 µm mesh, compa
 | In HFSS | impedance boundary (Solve Inside off) | Solve Inside | Solve Inside with a skin depth based mesh operation |
 | Before gds2palace 0.9.0 | `filled_metals = False` | `filled_metals = True` | not available |
 | Peak Q of coils on TopMetal1/2 | 18-30 % too high | 4-8 % too low | 2-3 % too low |
-| Insertion loss (baluns) | 0.02-0.14 dB too low | 0.03-0.15 dB too high | up to 0.05 dB too high |
+| Insertion loss (baluns) | 0.02-0.15 dB too low | 0.03-0.15 dB too high | up to 0.05 dB too high |
 | Unknowns at the same mesh | 1x | about 1.2x | 1.75-2.5x |
-| Run time at the same mesh | 1x | 1.25-1.7x | 1.5-3.5x |
+| Run time at the same mesh | 1x | 1.15-1.9x | 1.8-4.2x |
 
 The Q errors are for the peak Q of coils with 2-8 µm traces. Below the peak, the surface model is even more optimistic: 24-37 % at half the peak frequency. Coils with wider traces were not tested. Their error is probably smaller, because the side walls and edges carry a smaller part of the current.
 
