@@ -26,6 +26,29 @@ FILL_FACTOR_CORRECTION_SOLVERS = ("palace", "elmer", "elmer_thermal")
 # Palace linear solver settings this version understands (checked by setupEM)
 PALACE_LINEAR_SOLVER_SETTINGS = ("complex_coarse_solve", "solver_maxits", "solver_tol")
 
+# Low frequency point that replaces fstart = 0 (the solver has no DC solution), and 2x that value.
+# On a very fine mesh the solver breaks down at low frequency: the frequency dependent part of the system matrix gets
+# as small as the rounding error of the rest, and Palace stops with "SuperLUSolver: Found a singular matrix" or GMRES
+# does not converge. Single frequency points with Palace 0.17 to 0.19 (MOM capacitor at 0.2/0.1/0.05 um, MIM capacitor
+# at 1 to 0.1 um, inductor at 2 and 1 um, 2026-11-14): trouble starts at f x h = 1 to 2 MHz um, where h is the typical
+# cell size at the metal (1 to 1.6 x refined_cellsize); one model failed at 1.9. So 10 MHz is safe for cell sizes down
+# to about 0.5 um, and below that the point moves up in proportion.
+LOW_FREQUENCY_POINT = 10e6            # Hz
+LOW_FREQUENCY_TIMES_CELLSIZE = 5.0    # MHz um, lowest frequency x smallest refined cell size
+
+def low_frequency_point (smallest_cellsize, unit):
+    """The frequency (Hz) that replaces fstart = 0: 10 MHz, or higher for a refined cell size below 0.5 um.
+
+    Args:
+        smallest_cellsize: smallest of refined_cellsize and the refined_cellsize_override values, in model units
+        unit: model unit in m (settings['unit'])
+    """
+    cellsize_um = smallest_cellsize * unit / 1e-6
+    if cellsize_um <= 0:
+        return LOW_FREQUENCY_POINT
+    f_MHz = max(LOW_FREQUENCY_POINT / 1e6, math.ceil(LOW_FREQUENCY_TIMES_CELLSIZE / cellsize_um))
+    return f_MHz * 1e6
+
 # values of settings['conductor_model'] this version understands (checked by setupEM)
 CONDUCTOR_MODELS = ("surface", "solve_inside", "solve_inside_skin")
 
@@ -1648,10 +1671,14 @@ def create_model (excite_ports, settings):
         if fstart < 0.1e6:
             fstart = fstep # start sweep from next step
             # add low frequency to list of discrete frequencies, to replace 0 Hz from user input
-            f_DC = 10e6
+            smallest_cellsize = min([refined_cellsize] + list(refined_cellsize_override_dict.values()))
+            f_DC = low_frequency_point(smallest_cellsize, unit)
             f_discrete_list.append (f_DC)
             f_discrete_list.append (2*f_DC)
             print('WARNING: Start frequency changed from DC to ', f_DC/1e9, ' GHz!')
+            if f_DC > LOW_FREQUENCY_POINT:
+                print(f'  (above the usual {LOW_FREQUENCY_POINT/1e9:g} GHz because of the small mesh cell size {smallest_cellsize:g}: '
+                      'the solver fails at lower frequencies on such a fine mesh)')
 
 
     # AdaptiveTol value enables adaptive frequency sweep, 0 means regular sweep (not adaptive)
@@ -1670,6 +1697,8 @@ def create_model (excite_ports, settings):
         fmax = max(fmax, discrete_max)
     if len(f_dump_list) > 0:
         fmax = max(fmax, max(f_dump_list))
+    # the model's lowest frequency: the port wall standards are solved there too
+    fmin = min([f for f in ([fstart] if fstart is not None else []) + list(f_discrete_list) if f > 0], default=None)
 
     wavelength_air = 3e8/fmax / unit
     # max_cellsize = min((wavelength_air)/(math.sqrt(materials_list.eps_max)*cells_per_wavelength), meshsize_max)
@@ -3563,7 +3592,7 @@ def create_model (excite_ports, settings):
             for (tag, factor), record in zip(util_calibration.STANDARDS, group['standards']):
                 print(f"Writing calibration standard {record['name']}: thru line of length {record['length']:g}")
                 standard, standard_ports = util_calibration.standard_settings(settings, group, record, factor, margin, air_around,
-                                                                              boundary_condition, fmax)
+                                                                              boundary_condition, fmax, fmin)
                 create_model(standard_ports.all_active_excitations(), standard)
                 util_calibration.write_key(sim_path, record)
 

@@ -16,6 +16,7 @@ L6 = os.path.join('..', '..', 'measured_vs_simulated', 'more_accurate_models_L6n
 MODELS = {   # variant suffix: (line added to the settings, refined_cellsize)
     'surface_mesh2': ("settings['conductor_model'] = 'surface'", 2.0),
     'solve_inside_mesh2': ("settings['conductor_model'] = 'solve_inside'", 2.0),
+    'solve_inside_skin_mesh1': ("settings['conductor_model'] = 'solve_inside_skin'", 1.0),   # the reference
     'solve_inside_skin_mesh2': ("settings['conductor_model'] = 'solve_inside_skin'", 2.0),
     'solve_inside_skin_mesh3': ("settings['conductor_model'] = 'solve_inside_skin'", 3.0),
     'solve_inside_skin_mesh5': ("settings['conductor_model'] = 'solve_inside_skin'", 5.0),
@@ -23,15 +24,17 @@ MODELS = {   # variant suffix: (line added to the settings, refined_cellsize)
 
 STRUCTURES = {   # folder: (base script, source folder, model name prefix, variants)
     'inductor': ('palace_ind_frame_mesh2.py', os.path.join(MC, 'mesh_convergence_inductor'), 'ind_frame',
-                 ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh5']),
+                 ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh5',
+                  'solve_inside_skin_mesh1']),
     'transformer': ('palace_transformer_imn_mesh2.py', os.path.join(MC, 'mesh_convergence_transformer'), 'transformer',
-                    ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2']),
+                    ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh1']),
     'dband_balun': ('palace_balun_mesh2.py', os.path.join(MC, 'mesh_convergence_D-band_balun'), 'dband_balun',
-                    ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2']),
+                    ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh1']),
     'mim_balun': ('trans_100diff_to_80se_ports_mesh2.py', os.path.join(MC, 'mesh_convergence_balun_mim'), 'mim_balun',
-                  ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh3']),
+                  ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh3',
+                   'solve_inside_skin_mesh1']),
     'balun2x1': ('balun2x1_edgecoupled_do200_w8_s2_mesh2.py', os.path.join(MC, 'mesh_convergence_balun2x1'), 'balun2x1',
-                 ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2']),
+                 ['surface_mesh2', 'solve_inside_mesh2', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh1']),
     'l6n2': ('L6n2_with_ports_2um_passi3D.py', L6, 'l6n2',
              ['surface_mesh2', 'solve_inside_mesh2']),
 }

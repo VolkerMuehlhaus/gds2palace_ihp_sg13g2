@@ -105,7 +105,7 @@ def fig_coil_q():
         study, ref_file, deembed, _, _ = A.STRUCTURES[folder]
         mod = A.study_module(study)
         get = getattr(mod, fn)
-        ref = D.reference_network(study, ref_file)
+        ref = A.reference_network(folder)
         sel = ref.f <= fmax
         ax.plot(ref.f[sel] / 1e9, get(ref)[key][sel], color=INK, linewidth=2.2, label='reference (skin layers, 1 um)')
         for label, suffix in A.MODELS:
@@ -134,7 +134,7 @@ def fig_balun_il():
     for ax, (folder, title) in zip(axes, specs):
         study, ref_file, deembed, _, _ = A.STRUCTURES[folder]
         mod = A.study_module(study)
-        ref = D.reference_network(study, ref_file)
+        ref = A.reference_network(folder)
         band = getattr(mod, 'BAND', (ref.f[0], ref.f[-1]))
         sel = (ref.f >= band[0]) & (ref.f <= band[1])
         ax.plot(ref.f[sel] / 1e9, mod.merits(ref)['IL'][sel], color=INK, linewidth=2.2, label='reference (skin layers, 1 um)')

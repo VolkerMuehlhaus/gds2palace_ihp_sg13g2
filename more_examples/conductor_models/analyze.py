@@ -29,6 +29,16 @@ def study_module(study):
     return mod
 
 
+REFERENCE = 'solve_inside_skin_mesh1'   # the reference of each structure: 'solve_inside_skin' at a 1 um mesh
+
+
+def reference_network(folder):
+    """the reference run of a structure: solved in this study with the same gds2palace and Palace version as the other
+    runs (not the file of the mesh convergence study: a newer Palace version shifts the loss, see README), and
+    de-embedded the same way"""
+    return run_network(f'{PREFIX[folder]}_{REFERENCE}', STRUCTURES[folder][2])
+
+
 def run_network(name, deembed):
     ntw = D.palace_network(name)
     if deembed:
@@ -107,7 +117,7 @@ PREFIX = {'inductor': 'ind_frame', 'transformer': 'transformer', 'balun2x1': 'ba
 def analyze_structure(folder):
     study, ref_file, deembed, merits, rel = STRUCTURES[folder]
     S = study_module(study)
-    ref = D.reference_network(study, ref_file)
+    ref = reference_network(folder)
     rm = merits(S, ref)
     rows = []
     for label, suffix in MODELS:
@@ -129,7 +139,7 @@ def analyze_structure(folder):
             il = m['_IL'] if len(ntw.f) == len(ref.f) else np.interp(ref.f, ntw.f, m['_IL'])
             row['largest IL difference (dB)'] = float((il - rm['_IL'])[np.argmax(np.abs(il - rm['_IL']))])
         rows.append(row)
-    return {'reference': {'file': f'{study}/results/snp/{ref_file}', **{k: v for k, v in rm.items() if not k.startswith('_')}},
+    return {'reference': {'file': f'results/{PREFIX[folder]}_{REFERENCE}', **D.cost(f'{PREFIX[folder]}_{REFERENCE}'), **{k: v for k, v in rm.items() if not k.startswith('_')}},
             'runs': rows}
 
 

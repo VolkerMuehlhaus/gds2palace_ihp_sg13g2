@@ -13,16 +13,16 @@ import matplotlib.pyplot as plt
 import story_plots as S
 
 RUNS = [  # label, Touchstone file, DOF, color, line style
-    ("surface impedance, 1 µm", "balun2x1_mesh1.s4p", 1672974, S.BLUE, "-"),
-    ("solve_inside, 2 µm", "balun2x1_filled_mesh2.s4p", 1016742, S.ORANGE, "--"),
-    ("solve_inside_skin, 2 µm", "balun2x1_skin_mesh2.s4p", 1678800, S.AQUA, "--"),
-    ("solve_inside_skin, 1 µm", "balun2x1_skin_mesh1.s4p", 3737648, S.INK, "-"),
+    ("surface impedance, 1 µm", "balun2x1_mesh1.s4p", 1757854, S.BLUE, "-"),
+    ("solve_inside, 2 µm", "balun2x1_filled_mesh2.s4p", 1035766, S.ORANGE, "--"),
+    ("solve_inside_skin, 2 µm", "balun2x1_skin_mesh2.s4p", 1701490, S.AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "balun2x1_skin_mesh1.s4p", 3851706, S.INK, "-"),
 ]
-TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "balun2x1_skin_mesh2.s4p", 1678800, None, None),
-                     ("solve_inside_skin, 5 µm", "balun2x1_skin_mesh5.s4p", 598420, None, None),
-                     ("solve_inside, 2 µm", "balun2x1_filled_mesh2.s4p", 1016742, None, None),
-                     ("surface impedance, 1 µm", "balun2x1_mesh1.s4p", 1672974, None, None),
-                     ("surface impedance, 2 µm", "balun2x1_mesh2.s4p", 843390, None, None)]
+TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "balun2x1_skin_mesh2.s4p", 1701490, None, None),
+                     ("solve_inside_skin, 5 µm", "balun2x1_skin_mesh5.s4p", 610096, None, None),
+                     ("solve_inside, 2 µm", "balun2x1_filled_mesh2.s4p", 1035766, None, None),
+                     ("surface impedance, 1 µm", "balun2x1_mesh1.s4p", 1757854, None, None),
+                     ("surface impedance, 2 µm", "balun2x1_mesh2.s4p", 860902, None, None)]
 REFERENCE = "balun2x1_skin_mesh1.s4p"
 
 

@@ -781,7 +781,8 @@ within (or above) the directory tree holding the Palace/Elmer output — which i
    matrix directly (`s2t`, never through Y, which is singular for a half-wave line and for a
    DC-extrapolated inductor), and gets the port's shunt and series element from the double delay
    T_L^-1 T_2L T_L^-1 (`port_from_double`). The elements are interpolated to the device's frequencies
-   (imaginary part per omega, real part per sqrt(f), held outside the three standard frequencies). One
+   (imaginary part per omega linear in f, real part linear in sqrt(f), held outside the standards' frequencies; from
+   a frequency below fmax/20, the model's lowest one, only the series resistance is used). One
    2N-port error network at 50 ohm holds the calibrated blocks of all walls (plus `expm(A s)` of the
    line for a reference plane shift) and the estimated inductance of the other ports; it is removed in
    the S domain (`deembed_s`). Writes `_deembedded.s<N>p` with one `!` comment line per port and

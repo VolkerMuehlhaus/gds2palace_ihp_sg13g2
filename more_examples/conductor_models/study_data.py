@@ -28,11 +28,6 @@ def palace_network(name, folder=RESULTS):
     return rf.Network(frequency=rf.Frequency.from_f(a[:, 0], unit='GHz'), s=s, z0=50, name=name)
 
 
-def reference_network(study, fname):
-    """reference result of a mesh convergence study (Touchstone file in its results/snp folder)"""
-    return rf.Network(os.path.join(MESH_STUDIES, study, 'results', 'snp', fname))
-
-
 def cost(name, folder=RESULTS):
     """unknowns (finest level), run time (min), peak memory (GB), GMRES iterations per solve, linear solves"""
     log = open(os.path.join(folder, name, 'run.log'), errors='replace').read()

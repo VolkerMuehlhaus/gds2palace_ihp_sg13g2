@@ -23,14 +23,14 @@ PLOT_DIR = os.path.join(HERE, "plots")
 
 # (label, file, solve time in minutes from the Palace logs)
 ORDER2 = [
-    ("0.2 µm", "c4_frame_ports_mesh200nm.s2p", 0.5),
-    ("0.1 µm", "c4_frame_ports_mesh100nm.s2p", 1 + 12 / 60),
-    ("0.05 µm", "c4_frame_ports_mesh50nm.s2p", 3 + 23 / 60),
+    ("0.2 µm", "c4_frame_ports_mesh200nm.s2p", 14.5 / 60),
+    ("0.1 µm", "c4_frame_ports_mesh100nm.s2p", 39.1 / 60),
+    ("0.05 µm", "c4_frame_ports_mesh50nm.s2p", 2 + 4 / 60),
 ]
 ORDER3 = [
-    ("0.2 µm", "c4_frame_ports_mesh200nm_order3.s2p", 1 + 56 / 60),
-    ("0.1 µm", "c4_frame_ports_mesh100nm_order3.s2p", 5 + 5 / 60),
-    ("0.05 µm", "c4_frame_ports_mesh50nm_order3.s2p", 13 + 46 / 60),
+    ("0.2 µm", "c4_frame_ports_mesh200nm_order3.s2p", 32.4 / 60),
+    ("0.1 µm", "c4_frame_ports_mesh100nm_order3.s2p", 1 + 16 / 60),
+    ("0.05 µm", "c4_frame_ports_mesh50nm_order3.s2p", 4 + 2 / 60),
 ]
 SWEEP = "c4_frame_ports_mesh200nm_sweep.s2p"
 
@@ -66,9 +66,10 @@ def plot_c12_vs_cost():
         for (label, _, _), x, y in zip(runs, xs, ys):
             ax.annotate(label, (x, y), textcoords="offset points", xytext=(7, 5), fontsize=8, color=INK)
     ax.set_xscale("log")
-    ax.set_xticks([0.5, 1, 2, 5, 10, 20])
-    ax.set_xticklabels(["0.5", "1", "2", "5", "10", "20"])
-    ax.set_xlim(0.4, 20)
+    ax.set_xticks([0.2, 0.5, 1, 2, 5, 10])
+    ax.set_xticklabels(["0.2", "0.5", "1", "2", "5", "10"])
+    ax.set_xlim(0.15, 10)
+    ax.set_ylim(23.9, 25.8)
     ax.set_xlabel("Solve time (min, log scale)", color=INK2)
     ax.set_ylabel("C12 at 1 GHz (fF)", color=INK2)
     ax.legend(frameon=False, fontsize=9, loc="upper right", title="FEM order, label = refined_cellsize",

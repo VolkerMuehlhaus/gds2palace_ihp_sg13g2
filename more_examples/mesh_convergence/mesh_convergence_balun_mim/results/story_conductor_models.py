@@ -17,16 +17,16 @@ BLUE = "#2a78d6"
 ORANGE = "#eb6834"
 AQUA = "#1baf7a"
 RUNS = [  # label, Touchstone file, DOF, color, line style
-    ("surface impedance, 1 µm", "trans_100diff_to_80se_ports_mesh1.s3p", 1951380, BLUE, "-"),
-    ("solve_inside, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1150620, ORANGE, "--"),
-    ("solve_inside_skin, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1657992, AQUA, "--"),
-    ("solve_inside_skin, 1 µm", "trans_100diff_to_80se_ports_skin_mesh1.s3p", 3629376, S.INK, "-"),
+    ("surface impedance, 1 µm", "trans_100diff_to_80se_ports_mesh1.s3p", 2089338, BLUE, "-"),
+    ("solve_inside, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1160572, ORANGE, "--"),
+    ("solve_inside_skin, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1674686, AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "trans_100diff_to_80se_ports_skin_mesh1.s3p", 3909762, S.INK, "-"),
 ]
-TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1657992, None, None),
-                     ("solve_inside_skin, 3 µm", "trans_100diff_to_80se_ports_skin_mesh3.s3p", 1143524, None, None),
-                     ("solve_inside, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1150620, None, None),
-                     ("surface impedance, 1 µm", "trans_100diff_to_80se_ports_mesh1.s3p", 1951380, None, None),
-                     ("surface impedance, 2 µm", "trans_100diff_to_80se_ports_mesh2.s3p", 948860, None, None)]
+TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "trans_100diff_to_80se_ports_skin_mesh2.s3p", 1674686, None, None),
+                     ("solve_inside_skin, 3 µm", "trans_100diff_to_80se_ports_skin_mesh3.s3p", 1157358, None, None),
+                     ("solve_inside, 2 µm", "trans_100diff_to_80se_ports_filled_mesh2.s3p", 1160572, None, None),
+                     ("surface impedance, 1 µm", "trans_100diff_to_80se_ports_mesh1.s3p", 2089338, None, None),
+                     ("surface impedance, 2 µm", "trans_100diff_to_80se_ports_mesh2.s3p", 958742, None, None)]
 REFERENCE = "trans_100diff_to_80se_ports_skin_mesh1.s3p"
 
 

@@ -10,8 +10,10 @@
 
 The run order is fixed: one structure after another, and within a structure surface, solve_inside,
 solve_inside_skin, coarse solve_inside_skin, so that the models of one structure run back to back under the same
-thermal conditions. The 2:1 balun is not run again: its 2 um runs were made on the same machine under the same
-conditions before this study (copied into results/ by collect_balun2x1()).
+thermal conditions. collect replaces the results of an earlier run of the same model.
+
+The first runs of this study (gds2palace 0.9.0, Palace 0.18) are in palace_runs/conductor_models on the simulation
+machine; the rerun with gds2palace 0.10.6 and Palace 0.19.0 is in REMOTE below.
 """
 import io
 import os
@@ -22,15 +24,12 @@ import tarfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOST = 'hpz2'
-REMOTE = 'palace_runs/conductor_models'
-SIF = '~/palace_018.sif'
+REMOTE = 'palace_runs/conductor_models_0106'
+SIF = '~/palace_0190_x86_64_v3.sif'
 NP = 16
-ORDER = ['surface', 'solve_inside_mesh', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh3', 'solve_inside_skin_mesh5']
-FOLDERS = ['inductor', 'lines', 'l6n2', 'transformer', 'mim_balun', 'dband_balun']
-BALUN2X1_ARCHIVE = os.path.join(HERE, '..', '..', 'test_data', 'filled_vs_surface', 'results_hpz2_16')
-BALUN2X1_NAMES = {'balun2x1_surface_mesh2': 'balun2x1_edgecoupled_do200_w8_s2_mesh2',
-                  'balun2x1_solve_inside_mesh2': 'balun2x1_edgecoupled_do200_w8_s2_balanced_mesh2',
-                  'balun2x1_solve_inside_skin_mesh2': 'balun2x1_edgecoupled_do200_w8_s2_accurate_mesh2'}
+ORDER = ['surface', 'solve_inside_mesh', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh3', 'solve_inside_skin_mesh5',
+         'solve_inside_skin_mesh1']
+FOLDERS = ['inductor', 'lines', 'l6n2', 'transformer', 'balun2x1', 'mim_balun', 'dband_balun']
 
 
 def model_rank(name):
@@ -46,6 +45,8 @@ def lane_entries(folders):
     for folder in folders:
         pm = os.path.join(HERE, folder, 'palace_model')
         names = [d[:-5] for d in os.listdir(pm) if d.endswith('_data') and os.path.exists(os.path.join(pm, d, 'config.json'))]
+        if folder != 'lines':   # only models that still have a script (not leftovers of removed variants)
+            names = [n for n in names if os.path.exists(os.path.join(HERE, folder, n + '.py'))]
         if folder == 'lines':   # by width, then model, then length
             key = lambda n: (float(n.split('_')[1][1:].replace('p', '.')), model_rank(n), n)
         else:
@@ -109,8 +110,6 @@ def collect():
     files = []
     for d in done:
         name = d.rsplit('/', 1)[1][:-5]
-        if os.path.exists(os.path.join(out, name, 'run.log')):
-            continue
         files += [f'{d}/run.log', f'{d}/config.json', f'{d}/output/{name}/port-S.csv', f'{d}/output/{name}/palace.json']
     if files:
         tar = subprocess.run(['ssh', HOST, f'cd {REMOTE} && tar cf - --ignore-failed-read -T -'],
@@ -121,25 +120,14 @@ def collect():
                     name = m.name.split('/')[2][:-5]
                     os.makedirs(os.path.join(out, name), exist_ok=True)
                     open(os.path.join(out, name, os.path.basename(m.name)), 'wb').write(t.extractfile(m).read())
-    collect_balun2x1()
     # port geometry of each model, for the port de-embedding (written by gds2palace next to config.json)
-    for folder in FOLDERS + ['balun2x1']:
+    for folder in FOLDERS:
         pm = os.path.join(HERE, folder, 'palace_model')
         for d in os.listdir(pm) if os.path.isdir(pm) else []:
             src, dst = os.path.join(pm, d, 'port_information.json'), os.path.join(out, d[:-5])
             if os.path.exists(src) and os.path.isdir(dst):
                 shutil.copy(src, dst)
     print(f'{len(done)} finished runs on {HOST}, results in {out}')
-
-
-def collect_balun2x1():
-    for name, old in BALUN2X1_NAMES.items():
-        dst = os.path.join(HERE, 'results', name)
-        if os.path.exists(os.path.join(dst, 'run.log')) or not os.path.isdir(os.path.join(BALUN2X1_ARCHIVE, old)):
-            continue
-        os.makedirs(dst, exist_ok=True)
-        for f in ('run.log', 'config.json', 'port-S.csv', 'palace.json'):
-            shutil.copy(os.path.join(BALUN2X1_ARCHIVE, old, f), os.path.join(dst, f))
 
 
 if __name__ == '__main__':

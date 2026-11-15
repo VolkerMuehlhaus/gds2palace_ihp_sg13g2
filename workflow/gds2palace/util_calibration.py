@@ -25,7 +25,7 @@ wall ports on one side form one calibration group.
 
 For each group, two standards are written into the device's _data folder: the layout's cross-section at the wall,
 extruded to thru lines of length L and 2 L with ports at both ends, with the device's stackup and mesh settings, solved
-at three frequencies. combine_extend_snp.py removes the port with the double delay method (Rautio) and writes the
+at three frequencies, plus the model's lowest frequency. combine_extend_snp.py removes the port with the double delay method (Rautio) and writes the
 de-embedded Touchstone file.
 
 The rules come from test_data/port_deembedding_study (README.md, step 6):
@@ -70,6 +70,10 @@ TRANSVERSE = {'xmin': ('ymin', 'ymax'), 'xmax': ('ymin', 'ymax'), 'ymin': ('xmin
 STANDARD_PORT_LAYER = 60001    # port layers of the standards, in memory only
 STANDARDS = (('L', 1), ('2L', 2))
 STANDARD_FREQUENCY_FRACTIONS = (1 / 20, 1 / 5, 1)
+# The standards are also solved at the model's lowest frequency when that is below fmax/20: the loss of a feed line
+# does not follow sqrt(f) down to DC (a thin line's resistance stays at its DC value), so a reference plane shift
+# needs a solved point there, not an extrapolation (rfcmim with 35 um feeds, 2026-11-13: series R at 0.01 GHz
+# 0.74 ohm extrapolated, 0.25 ohm with the point, PDK model 0.25 ohm)
 
 # local frame per wall side: u from the wall into the layout, v along the wall (shapely affine parameters)
 _TO_LOCAL = {'xmin': lambda w: [1, 0, 0, 1, -w, 0], 'xmax': lambda w: [-1, 0, 0, 1, w, 0],
@@ -1091,9 +1095,19 @@ def standard_model(group, factor, metals_list):
     return polygons, ports
 
 
-def standard_settings(settings, group, record, factor, margin, air, boundary, fmax):
+def standard_frequencies(fmax, fmin=None):
+    """the frequencies of the standards in Hz: fmax/20, fmax/5 and fmax, and the model's lowest frequency fmin before
+    them when it is lower"""
+    frequencies = [fmax * x for x in STANDARD_FREQUENCY_FRACTIONS]
+    if fmin is not None and 0 < fmin < frequencies[0] * (1 - 1e-6):
+        frequencies.insert(0, fmin)
+    return frequencies
+
+
+def standard_settings(settings, group, record, factor, margin, air, boundary, fmax, fmin=None):
     """the device's settings for one standard: same stackup, mesh and solver settings, PEC walls at both ends, the
-    device's box on the two sides along the line, three frequencies, written into the device's _data folder"""
+    device's box on the two sides along the line, the standards' frequencies (fmin: the model's lowest frequency in
+    Hz), written into the device's _data folder"""
     polygons, ports = standard_model(group, factor, settings['metals_list'])
     lo, hi = TRANSVERSE[group['side']]
     i_lo, i_hi = BOX_SIDES.index(lo), BOX_SIDES.index(hi)
@@ -1105,7 +1119,7 @@ def standard_settings(settings, group, record, factor, margin, air, boundary, fm
         'boundary': ['PEC', 'PEC', boundary[i_lo], boundary[i_hi], boundary[4], boundary[5]],
         'margin': [0, 0, margin[i_lo], margin[i_hi]],
         'air_around': [0, 0, air[i_lo], air[i_hi], air[4], air[5]],
-        'fpoint': [fmax * x for x in STANDARD_FREQUENCY_FRACTIONS], 'adaptive_sweep': False,
+        'fpoint': standard_frequencies(fmax, fmin), 'adaptive_sweep': False,
         'model_basename': record['model'], 'config_suffix': '_' + record['name'],
         'no_gui': True, 'no_preview': True, '_calibration_standard': True,
     })
@@ -1130,6 +1144,16 @@ def port_information_record(result):
     return [{k: g[k] for k in keep if k in g} for g in result['groups']]
 
 
+def _frequency_count(config_filename):
+    """the number of frequencies in a standard's Palace config file (3 if it cannot be read)"""
+    try:
+        with open(config_filename, encoding='utf-8') as f:
+            samples = json.load(f)['Solver']['Driven']['Samples']
+        return sum(len(s['Freq']) for s in samples if s.get('Type') == 'Point')
+    except (OSError, ValueError, KeyError, TypeError):
+        return 3
+
+
 def run_script_lines(sim_path):
     """run_sim lines for the standards listed in port_information.json, before the device; an earlier result with the
     same key is reused"""
@@ -1146,7 +1170,8 @@ def run_script_lines(sim_path):
     lines = []
     for i, s in enumerate(records):
         out = s['output']
-        lines += [f'echo "calibration standard {i + 1} of {len(records)}: {s["name"]}, 3 frequencies"',
+        count = _frequency_count(os.path.join(sim_path, s['config']))
+        lines += [f'echo "calibration standard {i + 1} of {len(records)}: {s["name"]}, {count} frequencies"',
                   f'if [ -f {out}/port-S.csv ] && cmp -s {s["key"]} {out}/cal.key; then',
                   f'  echo "  reused, solved $(cat {out}/cal.date 2>/dev/null)"',
                   'else',

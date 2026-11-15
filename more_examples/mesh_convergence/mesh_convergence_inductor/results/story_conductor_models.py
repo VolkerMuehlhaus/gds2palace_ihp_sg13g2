@@ -14,15 +14,15 @@ import matplotlib.pyplot as plt
 import story_plots as S
 
 RUNS = [  # label, Touchstone file, DOF, color, line style
-    ("surface impedance, 1 µm", "ind_frame_mesh1.s2p", 881044, S.BLUE, "-"),
-    ("solve_inside, 2 µm", "ind_frame_filled_mesh2.s2p", 504076, S.ORANGE, "--"),
-    ("solve_inside_skin, 5 µm", "ind_frame_skin_mesh5.s2p", 382260, S.AQUA, ":"),
-    ("solve_inside_skin, 2 µm", "ind_frame_skin_mesh2.s2p", 1052830, S.AQUA, "--"),
-    ("solve_inside_skin, 1 µm", "ind_frame_skin_mesh1.s2p", 2375210, S.INK, "-"),
+    ("surface impedance, 1 µm", "ind_frame_mesh1.s2p", 895030, S.BLUE, "-"),
+    ("solve_inside, 2 µm", "ind_frame_filled_mesh2.s2p", 519120, S.ORANGE, "--"),
+    ("solve_inside_skin, 5 µm", "ind_frame_skin_mesh5.s2p", 400752, S.AQUA, ":"),
+    ("solve_inside_skin, 2 µm", "ind_frame_skin_mesh2.s2p", 1066672, S.AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "ind_frame_skin_mesh1.s2p", 2418008, S.INK, "-"),
 ]
-TABLE = RUNS + [("solve_inside_skin, 3 µm", "ind_frame_skin_mesh3.s2p", 692654, None, None),
-                ("surface impedance, 2 µm", "ind_frame_mesh2.s2p", 429096, None, None),
-                ("surface impedance, 5 µm", "ind_frame_mesh5.s2p", 161484, None, None)]
+TABLE = RUNS + [("solve_inside_skin, 3 µm", "ind_frame_skin_mesh3.s2p", 702498, None, None),
+                ("surface impedance, 2 µm", "ind_frame_mesh2.s2p", 442812, None, None),
+                ("surface impedance, 5 µm", "ind_frame_mesh5.s2p", 173650, None, None)]
 REFERENCE = "ind_frame_skin_mesh1.s2p"
 
 

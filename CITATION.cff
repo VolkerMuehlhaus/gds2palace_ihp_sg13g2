@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use gds2palace in a publication, please cite it as below, together with the Palace solver."
+type: software
+title: "gds2palace: Create Palace FEM models from GDSII layout files"
+abstract: "Python workflow that creates AWS Palace finite element models from RFIC GDSII layout files and an XML stackup."
+authors:
+  - family-names: "Mühlhaus"
+    given-names: "Volker"
+license: GPL-3.0-or-later
+repository-code: "https://github.com/VolkerMuehlhaus/gds2palace_ihp_sg13g2"
+keywords:
+  - RFIC
+  - electromagnetic simulation
+  - finite element method
+  - GDSII
+  - Palace
+  - IHP SG13G2
+version: 0.10.7
+date-released: 2026-11-15
+references:
+  - type: software
+    title: "Palace: 3D Finite Element Solver for Computational Electromagnetics"
+    authors:
+      - name: "Amazon.com, Inc. or its affiliates"
+    license: Apache-2.0
+    repository-code: "https://github.com/awslabs/palace"
+    url: "https://awslabs.github.io/palace/"

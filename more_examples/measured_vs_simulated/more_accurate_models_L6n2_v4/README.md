@@ -1,5 +1,7 @@
 # Stackup and Conductor Model Study: L6n2 Inductor vs. Measurement (IHP SG13G2), v4
 
+> **There is a newer version of this study:** [v5](../more_accurate_models_L6n2_v5/README.md) repeats the models with Palace 0.19 and a simulation boundary that is far enough away also above and below the chip (800 µm of air instead of 50 µm). L, peak Q and SRF move closer to the measurement; the comparisons between the model variants stay the same.
+
 ![(model)](results/plots/visualize_pointingvector.png)
 
 **Abstract.** A 4-turn inductor in IHP SG13G2 is simulated with AWS Palace in 12 model variants and compared to its measured differential L, Q and SRF.

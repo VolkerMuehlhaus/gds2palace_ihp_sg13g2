@@ -45,14 +45,14 @@ REFERENCE = "balun_mesh1um.s3p"
 
 # solve times in minutes, from the Palace logs of each run
 SOLVE_MIN = {
-    "balun_mesh5um.s3p": 1 + 42 / 60,
-    "balun_mesh4um.s3p": 1 + 55 / 60,
-    "balun_mesh3um.s3p": 2 + 16 / 60,
-    "balun_mesh2um.s3p": 3 + 14 / 60,
-    "balun_mesh1um.s3p": 7 + 11 / 60,
-    "balun_mesh2um_order3.s3p": 12 + 10 / 60,
+    "balun_mesh5um.s3p": 18.8 / 60,
+    "balun_mesh4um.s3p": 22.8 / 60,
+    "balun_mesh3um.s3p": 25.4 / 60,
+    "balun_mesh2um.s3p": 37.0 / 60,
+    "balun_mesh1um.s3p": 1 + 32 / 60,
+    "balun_mesh2um_order3.s3p": 1 + 47 / 60,
     # AMR: Palace reports elapsed time cumulatively, so the final value covers all 5 iterations
-    "balun_amr5_final.s3p": 142 + 31 / 60,
+    "balun_amr5_final.s3p": 58 + 1 / 60,
 }
 
 INK = "#0b0b0b"
@@ -60,6 +60,11 @@ INK2 = "#52514e"
 GRID = "#e4e3de"
 ORANGE = "#eb6834"
 AQUA = "#1baf7a"
+
+
+def minutes_label(m):
+    """solve time for a plot label: 1.5 min, 27 min"""
+    return f"{m:.1f} min" if m < 10 else f"{m:.0f} min"
 
 
 def load(fname):
@@ -172,14 +177,14 @@ def plot_accuracy_vs_cost():
                     xytext=(8, 4), fontsize=9, color=INK)
 
     ax.axvline(SOLVE_MIN[REFERENCE], color=INK2, linewidth=1, linestyle=":")
-    ax.text(SOLVE_MIN[REFERENCE], 0.112, " 1 µm reference run (7 min)", fontsize=8, color=INK2,
+    ax.text(SOLVE_MIN[REFERENCE], 0.112, f" 1 µm reference run ({minutes_label(SOLVE_MIN[REFERENCE])})", fontsize=8, color=INK2,
             va="top")
 
     ax.set_xscale("log")
-    ax.set_xlim(1, 400)
+    ax.set_xlim(0.2, 100)
     ax.set_ylim(0, 0.115)
-    ax.set_xticks([1, 2, 5, 10, 20, 50, 100, 200])
-    ax.set_xticklabels(["1", "2", "5", "10", "20", "50", "100", "200"])
+    ax.set_xticks([0.2, 0.5, 1, 2, 5, 10, 20, 50, 100])
+    ax.set_xticklabels(["0.2", "0.5", "1", "2", "5", "10", "20", "50", "100"])
     ax.set_xlabel("Solve time (min, log scale; AMR = all 5 iterations)", color=INK2)
     ax.set_ylabel("Max |ΔS| vs. 1 µm result", color=INK2)
     ax.legend(frameon=False, fontsize=9, loc="upper right", bbox_to_anchor=(1.0, 0.9))

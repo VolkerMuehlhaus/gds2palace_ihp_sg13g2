@@ -2,10 +2,10 @@
     "Problem": {
         "Type": "Driven",
         "Verbose": 3,
-        "Output": "output/balun2x1_edgecoupled_do200_w8_s2_accurate_mesh2"
+        "Output": "output/balun2x1_solve_inside_skin_mesh2"
     },
     "Model": {
-        "Mesh": "balun2x1_edgecoupled_do200_w8_s2_accurate_mesh2.msh",
+        "Mesh": "balun2x1_solve_inside_skin_mesh2.msh",
         "L0": 1e-06,
         "Refinement": {
             "UniformLevels": 0,
@@ -23,7 +23,8 @@
             "KSPType": "GMRES",
             "Tol": 1e-06,
             "MaxIts": 400,
-            "ComplexCoarseSolve": true
+            "ComplexCoarseSolve": true,
+            "EstimatorTol": 0.01
         },
         "Order": 2,
         "Device": "CPU",

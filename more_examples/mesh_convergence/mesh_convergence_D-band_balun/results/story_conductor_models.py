@@ -16,14 +16,14 @@ import story_plots as S
 
 BLUE = "#2a78d6"
 RUNS = [  # label, Touchstone file, DOF, iterations per solve, color, line style
-    ("surface impedance, 1 µm", "balun_mesh1um.s3p", 665874, None, BLUE, "-"),
-    ("solve_inside, 2 µm", "balun_filled_mesh2.s3p", 408116, 32, S.ORANGE, "--"),
-    ("solve_inside_skin, 2 µm", "balun_skin_mesh2.s3p", 741012, 37, S.AQUA, "--"),
-    ("solve_inside_skin, 1 µm", "balun_skin_mesh1.s3p", 1663836, 29, S.INK, "-"),
+    ("surface impedance, 1 µm", "balun_mesh1um.s3p", 678946, None, BLUE, "-"),
+    ("solve_inside, 2 µm", "balun_filled_mesh2.s3p", 395498, 37, S.ORANGE, "--"),
+    ("solve_inside_skin, 2 µm", "balun_skin_mesh2.s3p", 713252, 45, S.AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "balun_skin_mesh1.s3p", 1726254, 31, S.INK, "-"),
 ]
-TABLE = RUNS + [("solve_inside_skin, 3 µm", "balun_skin_mesh3.s3p", 487374, 50, None, None),
-                ("solve_inside_skin, 5 µm", "balun_skin_mesh5.s3p", 342894, 68, None, None),
-                ("surface impedance, 2 µm", "balun_mesh2um.s3p", 340226, None, None, None)]
+TABLE = RUNS + [("solve_inside_skin, 3 µm", "balun_skin_mesh3.s3p", 487182, 58, None, None),
+                ("solve_inside_skin, 5 µm", "balun_skin_mesh5.s3p", 337192, 83, None, None),
+                ("surface impedance, 2 µm", "balun_mesh2um.s3p", 331900, None, None, None)]
 
 
 def plot():

@@ -1,19 +1,19 @@
 Param,Comparison,Max|dS| (linear),|dS_dB| at 100 GHz,|dS_dB| at 155 GHz (design freq.),|dS_dB| at 200 GHz
-S11,5 um (uniform) -> 4 um (uniform),0.0179,0.3829,1.2171,0.1397
-S11,4 um (uniform) -> 3 um (uniform),0.0226,0.4419,1.6583,0.0433
-S11,3 um (uniform) -> 2 um (uniform),0.0282,0.3799,2.2381,0.1706
-S11,2 um (uniform) -> 1 um (uniform),0.0348,0.5230,4.0324,0.0478
-S11,"1 um (uniform) -> AMR (5 um start, 5 it.)",0.0233,0.3412,2.2935,0.0043
-S11,"2 um (uniform) -> 2 um, order 3",0.0444,0.6671,5.1849,0.0999
-S21,5 um (uniform) -> 4 um (uniform),0.0099,0.0590,0.0307,0.0529
-S21,4 um (uniform) -> 3 um (uniform),0.0128,0.0790,0.0340,0.0614
-S21,3 um (uniform) -> 2 um (uniform),0.0144,0.0532,0.0637,0.0704
-S21,2 um (uniform) -> 1 um (uniform),0.0183,0.0733,0.0684,0.0933
-S21,"1 um (uniform) -> AMR (5 um start, 5 it.)",0.0148,0.0582,0.0479,0.0851
-S21,"2 um (uniform) -> 2 um, order 3",0.0248,0.1036,0.0826,0.1257
-S23,5 um (uniform) -> 4 um (uniform),0.0095,0.1850,0.1120,0.0748
-S23,4 um (uniform) -> 3 um (uniform),0.0128,0.2693,0.1596,0.0840
-S23,3 um (uniform) -> 2 um (uniform),0.0152,0.3334,0.2206,0.1453
-S23,2 um (uniform) -> 1 um (uniform),0.0176,0.3689,0.2456,0.1525
-S23,"1 um (uniform) -> AMR (5 um start, 5 it.)",0.0123,0.2710,0.1668,0.0647
-S23,"2 um (uniform) -> 2 um, order 3",0.0230,0.4881,0.3141,0.1604
+S11,5 um (uniform) -> 4 um (uniform),0.0241,0.3650,1.4248,0.0833
+S11,4 um (uniform) -> 3 um (uniform),0.0283,0.4305,2.2155,0.1215
+S11,3 um (uniform) -> 2 um (uniform),0.0181,0.3754,1.5472,0.0497
+S11,2 um (uniform) -> 1 um (uniform),0.0392,0.5684,4.2291,0.0166
+S11,"1 um (uniform) -> AMR (5 um start, 5 it.)",0.0230,0.3426,2.3650,0.0532
+S11,"2 um (uniform) -> 2 um, order 3",0.0465,0.6911,5.2683,0.0681
+S21,5 um (uniform) -> 4 um (uniform),0.0107,0.0511,0.0477,0.0401
+S21,4 um (uniform) -> 3 um (uniform),0.0134,0.0460,0.0656,0.0655
+S21,3 um (uniform) -> 2 um (uniform),0.0115,0.0573,0.0355,0.0517
+S21,2 um (uniform) -> 1 um (uniform),0.0198,0.0901,0.0706,0.1041
+S21,"1 um (uniform) -> AMR (5 um start, 5 it.)",0.0151,0.0580,0.0479,0.0889
+S21,"2 um (uniform) -> 2 um, order 3",0.0256,0.1142,0.0831,0.1326
+S23,5 um (uniform) -> 4 um (uniform),0.0127,0.2577,0.1772,0.1526
+S23,4 um (uniform) -> 3 um (uniform),0.0144,0.2905,0.1940,0.1548
+S23,3 um (uniform) -> 2 um (uniform),0.0107,0.2338,0.1146,0.0099
+S23,2 um (uniform) -> 1 um (uniform),0.0198,0.4215,0.2899,0.1920
+S23,"1 um (uniform) -> AMR (5 um start, 5 it.)",0.0122,0.2688,0.1613,0.0526
+S23,"2 um (uniform) -> 2 um, order 3",0.0244,0.5200,0.3390,0.1796
