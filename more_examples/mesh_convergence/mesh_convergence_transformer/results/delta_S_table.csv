@@ -1,13 +1,13 @@
 Param,Comparison,Max|dS| (linear),|dS_dB| at f_low,|dS_dB| at 30GHz (design freq.),|dS_dB| at f_high
-Sdd11,4 um (uniform) -> 3 um (uniform),0.0165,0.0002,0.0399,0.0059
-Sdd11,3 um (uniform) -> 2 um (uniform),0.0381,0.0067,0.0496,0.0148
-Sdd11,2 um (uniform) -> 1 um (uniform),0.0368,0.0002,0.0443,0.0130
-Sdd11,"1 um (uniform) -> AMR (2 um start, 3 it.)",0.0305,0.0015,0.0333,0.0219
-Sdd21,4 um (uniform) -> 3 um (uniform),0.0089,0.0049,0.0287,0.0839
-Sdd21,3 um (uniform) -> 2 um (uniform),0.0132,0.0604,0.0371,0.1278
-Sdd21,2 um (uniform) -> 1 um (uniform),0.0130,0.0003,0.0335,0.1155
-Sdd21,"1 um (uniform) -> AMR (2 um start, 3 it.)",0.0115,0.0173,0.0079,0.1973
-Sdd22,4 um (uniform) -> 3 um (uniform),0.0185,0.0005,0.0413,0.0063
-Sdd22,3 um (uniform) -> 2 um (uniform),0.0178,0.0042,0.0519,0.0020
-Sdd22,2 um (uniform) -> 1 um (uniform),0.0152,0.0005,0.0446,0.0108
-Sdd22,"1 um (uniform) -> AMR (2 um start, 3 it.)",0.0161,0.0014,0.0353,0.0158
+Sdd11,4 um (uniform) -> 3 um (uniform),0.0119,0.0005,0.0340,0.0064
+Sdd11,3 um (uniform) -> 2 um (uniform),0.0466,0.0017,0.0566,0.0170
+Sdd11,2 um (uniform) -> 1 um (uniform),0.0333,0.0007,0.0472,0.0185
+Sdd11,"1 um (uniform) -> AMR (2 um start, 3 it.)",0.0324,0.0014,0.0332,0.0211
+Sdd21,4 um (uniform) -> 3 um (uniform),0.0072,0.0037,0.0255,0.0424
+Sdd21,3 um (uniform) -> 2 um (uniform),0.0159,0.0001,0.0429,0.1007
+Sdd21,2 um (uniform) -> 1 um (uniform),0.0122,0.0049,0.0355,0.0853
+Sdd21,"1 um (uniform) -> AMR (2 um start, 3 it.)",0.0123,0.0225,0.0070,0.2378
+Sdd22,4 um (uniform) -> 3 um (uniform),0.0160,0.0007,0.0376,0.0074
+Sdd22,3 um (uniform) -> 2 um (uniform),0.0194,0.0018,0.0575,0.0040
+Sdd22,2 um (uniform) -> 1 um (uniform),0.0167,0.0012,0.0491,0.0139
+Sdd22,"1 um (uniform) -> AMR (2 um start, 3 it.)",0.0157,0.0023,0.0343,0.0132

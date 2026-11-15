@@ -304,8 +304,9 @@ completed run.
 For each variant, copy the de-embedded `.snp` file into a `results/snp/`
 folder with a short, clear name (e.g. `<name>_mesh2.s2p`, not the raw
 generated filename). For AMR iterations, copy the `iterationN_deembedded`
-file, not `iterationN.snp`: the iteration files archived in the existing
-studies are raw by mistake, so don't overlay them on de-embedded results.
+file, not `iterationN.snp`, so that the iterations can be overlaid on the
+de-embedded results (until the November 2026 rerun, the archived iteration
+files were raw by mistake).
 Then:
 
 - **S-parameter convergence** (always do this): overlay magnitude/phase

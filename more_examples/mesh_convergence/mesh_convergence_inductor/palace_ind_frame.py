@@ -49,7 +49,7 @@ os.chdir(modelDir)
 settings = {}
 
 settings['unit']   = 1e-6  # geometry is in microns
-settings['margin'] = 20    # distance in microns from GDSII geometry boundary to simulation boundary 
+settings['margin'] = 100   # distance in microns from GDSII geometry boundary to simulation boundary 
 
 settings['fstart']  = 0e9
 settings['fstop']   = 20e9

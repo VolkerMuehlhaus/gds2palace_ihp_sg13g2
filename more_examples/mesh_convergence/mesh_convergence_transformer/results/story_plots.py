@@ -31,15 +31,15 @@ PLOT_DIR = os.path.join(HERE, "plots")
 F_DESIGN = 30e9
 F_PLOT_MAX = 40e9  # primary self-resonance near 47 GHz; k loses its meaning there
 
-# uniform sweep, coarse -> fine; ordinal blue ramp, light -> dark (5 um crashed, see README)
+# uniform sweep, coarse -> fine; ordinal blue ramp, light -> dark (5 um fails, see README)
 UNIFORM = [
-    ("4 µm", "transformer_mesh4um.s5p", "#86b6ef", 171460, "4m 2s"),
-    ("3 µm", "transformer_mesh3um.s5p", "#3987e5", 209202, "4m 50s"),
-    ("2 µm", "transformer_mesh2um.s5p", "#1c5cab", 312234, "7m 4s"),
-    ("1 µm", "transformer_mesh1um.s5p", "#0d366b", 576114, "14m 4s"),
+    ("4 µm", "transformer_mesh4um.s5p", "#86b6ef", 187956, "48 s"),
+    ("3 µm", "transformer_mesh3um.s5p", "#3987e5", 217134, "54 s"),
+    ("2 µm", "transformer_mesh2um.s5p", "#1c5cab", 316408, "1m 15s"),
+    ("1 µm", "transformer_mesh1um.s5p", "#0d366b", 581542, "2m 28s"),
 ]
 # Palace reports elapsed time cumulatively, so this covers all 3 AMR iterations
-AMR = ("AMR final", "transformer_amr3_final.s5p", 2070680, "1h 47m")
+AMR = ("AMR final", "transformer_amr3_final.s5p", 2075562, "36m")
 REFERENCE = "transformer_mesh1um.s5p"
 
 INK = "#0b0b0b"

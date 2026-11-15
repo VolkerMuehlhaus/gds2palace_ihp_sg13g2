@@ -13,17 +13,16 @@ import matplotlib.pyplot as plt
 import story_plots as S
 
 RUNS = [  # label, Touchstone file, DOF, color, line style
-    ("surface impedance, 1 µm", "transformer_mesh1um.s5p", 576114, S.BLUE, "-"),
-    ("solve_inside, 2 µm", "transformer_filled_mesh2.s5p", 371626, S.ORANGE, "--"),
-    ("solve_inside_skin, 2 µm", "transformer_skin_mesh2.s5p", 686496, S.AQUA, "--"),
-    ("solve_inside_skin, 1 µm", "transformer_skin_mesh1.s5p", 1461740, S.INK, "-"),
+    ("surface impedance, 1 µm", "transformer_mesh1um.s5p", 581542, S.BLUE, "-"),
+    ("solve_inside, 2 µm", "transformer_filled_mesh2.s5p", 374162, S.ORANGE, "--"),
+    ("solve_inside_skin, 2 µm", "transformer_skin_mesh2.s5p", 670058, S.AQUA, "--"),
+    ("solve_inside_skin, 1 µm", "transformer_skin_mesh1.s5p", 1445492, S.INK, "-"),
 ]
-TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "transformer_skin_mesh2.s5p", 686496, None, None),
-                     ("solve_inside_skin, 4 µm", "transformer_skin_mesh4.s5p", 352338, None, None),
-                     ("solve_inside_skin, layers for 50 GHz, 2 µm", "transformer_skin50_mesh2.s5p", 674028, None, None),
-                     ("solve_inside, 2 µm", "transformer_filled_mesh2.s5p", 371626, None, None),
-                     ("surface impedance, 1 µm", "transformer_mesh1um.s5p", 576114, None, None),
-                     ("surface impedance, 2 µm", "transformer_mesh2um.s5p", 312234, None, None)]
+TABLE = RUNS[-1:] + [("solve_inside_skin, 2 µm", "transformer_skin_mesh2.s5p", 670058, None, None),
+                     ("solve_inside_skin, 4 µm", "transformer_skin_mesh4.s5p", 369766, None, None),
+                     ("solve_inside, 2 µm", "transformer_filled_mesh2.s5p", 374162, None, None),
+                     ("surface impedance, 1 µm", "transformer_mesh1um.s5p", 581542, None, None),
+                     ("surface impedance, 2 µm", "transformer_mesh2um.s5p", 316408, None, None)]
 REFERENCE = "transformer_skin_mesh1.s5p"
 
 

@@ -45,13 +45,13 @@ REFERENCE = "balun2x1_mesh1.s4p"
 
 # solve times in minutes, from the Palace logs; AMR value is cumulative over all iterations
 SOLVE_MIN = {
-    "balun2x1_mesh5.s4p": 4 + 3 / 60,
-    "balun2x1_mesh2.s4p": 11 + 18 / 60,
-    "balun2x1_mesh1.s4p": 27 + 5 / 60,
-    "balun2x1_mesh5_order1.s4p": 25.6 / 60,
-    "balun2x1_mesh2_order1.s4p": 1 + 17 / 60,
-    "balun2x1_mesh1_order1.s4p": 2 + 24 / 60,
-    "balun2x1_amr2_final.s4p": 32 + 36 / 60,
+    "balun2x1_mesh5.s4p": 1 + 3 / 60,
+    "balun2x1_mesh2.s4p": 2 + 45 / 60,
+    "balun2x1_mesh1.s4p": 5 + 45 / 60,
+    "balun2x1_mesh5_order1.s4p": 14.6 / 60,
+    "balun2x1_mesh2_order1.s4p": 34.7 / 60,
+    "balun2x1_mesh1_order1.s4p": 1 + 14 / 60,
+    "balun2x1_amr2_final.s4p": 17 + 39 / 60,
 }
 
 INK = "#0b0b0b"
@@ -60,6 +60,11 @@ GRID = "#e4e3de"
 BLUE = "#2a78d6"
 ORANGE = "#eb6834"
 AQUA = "#1baf7a"
+
+
+def minutes_label(m):
+    """solve time for a plot label: 1.5 min, 27 min"""
+    return f"{m:.1f} min" if m < 10 else f"{m:.0f} min"
 
 
 def load(fname):
@@ -166,7 +171,7 @@ def plot_accuracy_vs_cost():
         ax.set_ylim(bottom=0)
         ax.set_xlabel("Solve time (min, log scale)", color=INK2)
         ax.axvline(SOLVE_MIN[REFERENCE], color=INK2, linewidth=1, linestyle=":")
-    axes[0].text(SOLVE_MIN[REFERENCE], axes[0].get_ylim()[1], " 1 µm reference\n run (27 min)",
+    axes[0].text(SOLVE_MIN[REFERENCE], axes[0].get_ylim()[1], f" 1 µm reference\n run ({minutes_label(SOLVE_MIN[REFERENCE])})",
                  fontsize=8, color=INK2, va="top")
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=3, frameon=False, fontsize=9,

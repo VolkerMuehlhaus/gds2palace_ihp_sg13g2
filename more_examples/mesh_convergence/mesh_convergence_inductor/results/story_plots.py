@@ -42,15 +42,15 @@ REFERENCE = "ind_frame_mesh1.s2p"
 
 # solve times in minutes, from the Palace logs of each run
 SOLVE_MIN = {
-    "ind_frame_mesh5.s2p": 47.5 / 60,
-    "ind_frame_mesh3.s2p": 1 + 29 / 60,
-    "ind_frame_mesh2.s2p": 2 + 20 / 60,
-    "ind_frame_mesh1.s2p": 5 + 5 / 60,
-    "ind_frame_mesh3_order1.s2p": 9.0 / 60,
-    "ind_frame_mesh2_order1.s2p": 17.9 / 60,
-    "ind_frame_mesh1_order1.s2p": 36.1 / 60,
+    "ind_frame_mesh5.s2p": 14.1 / 60,
+    "ind_frame_mesh3.s2p": 26.6 / 60,
+    "ind_frame_mesh2.s2p": 46.8 / 60,
+    "ind_frame_mesh1.s2p": 1 + 39 / 60,
+    "ind_frame_mesh3_order1.s2p": 7.7 / 60,
+    "ind_frame_mesh2_order1.s2p": 13.9 / 60,
+    "ind_frame_mesh1_order1.s2p": 25.5 / 60,
     # AMR: cumulative over all iterations
-    "ind_frame_amr2_final.s2p": 9 + 54 / 60,
+    "ind_frame_amr2_final.s2p": 5 + 15 / 60,
 }
 
 INK = "#0b0b0b"
@@ -59,6 +59,11 @@ GRID = "#e4e3de"
 BLUE = "#2a78d6"
 ORANGE = "#eb6834"
 AQUA = "#1baf7a"
+
+
+def minutes_label(m):
+    """solve time for a plot label: 1.5 min, 27 min"""
+    return f"{m:.1f} min" if m < 10 else f"{m:.0f} min"
 
 
 def load(fname):
@@ -146,7 +151,7 @@ def plot_accuracy_vs_cost():
         ax.set_ylim(bottom=0)
         ax.set_xlabel("Solve time (min, log scale)", color=INK2)
         ax.axvline(SOLVE_MIN[REFERENCE], color=INK2, linewidth=1, linestyle=":")
-    axes[1].text(SOLVE_MIN[REFERENCE], axes[1].get_ylim()[1], " 1 µm reference\n run (5 min)",
+    axes[1].text(SOLVE_MIN[REFERENCE], axes[1].get_ylim()[1], f" 1 µm reference\n run ({minutes_label(SOLVE_MIN[REFERENCE])})",
                  fontsize=8, color=INK2, va="top")
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=3, frameon=False, fontsize=9,

@@ -18,7 +18,9 @@ The findings apply to this balun, with this stackup, in this frequency range. Ot
 - **Solver:** AWS Palace (FEM), ABC boundaries, 50 µm air margin, order 2 unless noted
 - **Sweep:** 100–200 GHz in 1 GHz steps (adaptive frequency sweep)
 - **Mesh:** `refined_cellsize` varied as described below. Metal3 is a wide ground plane and is always kept at 5 µm (`refined_cellsize_override`).
-- **Execution:** `hpz2`, Palace 0.17, 16 of 32 cores
+- **Execution:** `hpz2`, 16 of 32 cores, Palace 0.19.0, models from gds2palace 0.10.7 (rerun in November 2026)
+
+**What changed with the November 2026 rerun.** The first version of this study used Palace 0.17 (steps 1–3) and 0.18.0 (step 4), with gds2palace from before October 2026. The results hardly changed: the S11 null of the 5 µm mesh moved by 1 GHz, and the in-band figures by a few hundredths of a dB. With 50 µm air around the balun, the absorbing boundary fixed in Palace 0.19 is far enough away not to matter here. The runs are 4 to 5 times faster, because gds2palace now sets Palace's complex coarse solve by default (since 30 September 2026). It needs more memory.
 
 ## 0. Layout
 
@@ -42,8 +44,8 @@ We ran the same model at `refined_cellsize` = 5, 4, 3, 2 and 1 µm, all at FEM o
 The four panels respond very differently:
 
 - **Amplitude balance is insensitive to the mesh.** In the target band, all five curves stay within about 0.1 dB of each other. Even the 5 µm mesh would give a usable amplitude-balance prediction.
-- **Phase balance shifts only slightly.** The 1 µm mesh predicts about 1.5° less phase imbalance than the 5 µm mesh. Most of that change happens below 3 µm.
-- **Input match and insertion loss move the most**, because the whole response **shifts up in frequency** as the mesh is refined. The S11 null, and with it the best-matched point, moves from 132 GHz (5 µm, below the target band) to 146 GHz (1 µm, inside it). The insertion-loss minimum moves with it. At the upper band edge (170 GHz), this improves the match from −16.1 to −19.4 dB and lowers the insertion loss from 1.29 to 1.08 dB.
+- **Phase balance shifts only slightly.** The 1 µm mesh predicts about 2° less phase imbalance than the 5 µm mesh, in steps of similar size.
+- **Input match and insertion loss move the most**, because the whole response **shifts up in frequency** as the mesh is refined. The S11 null, and with it the best-matched point, moves from 131 GHz (5 µm, below the target band) to 146 GHz (1 µm, inside it). The insertion-loss minimum moves with it. At the upper band edge (170 GHz), this improves the match from −15.8 to −19.4 dB and lowers the insertion loss from 1.30 to 1.08 dB.
 
 Every refinement step moves the curves the same way, and the steps get smaller. So the mesh is converging, but at 1 µm we can't yet tell whether it has stopped. That is the question for step 2.
 
@@ -51,9 +53,9 @@ Cost stays moderate across this sweep:
 
 | Mesh | DOF | Solve time | Peak RAM |
 |---|---:|---:|---:|
-| 5 µm | 178,262 | 1m 42s | 2.54 GB |
-| 2 µm | 340,226 | 3m 14s | 4.17 GB |
-| 1 µm | 665,874 | 7m 11s | 7.22 GB |
+| 5 µm | 176,660 | 19 s | 3.5 GB |
+| 2 µm | 331,900 | 37 s | 5.7 GB |
+| 1 µm | 678,946 | 1m 32s | 9.9 GB |
 
 ## 2. Is 1 µm converged? Two independent cross-checks
 
@@ -68,9 +70,9 @@ If all three routes land on the same answer, we can trust that answer. The plot 
 
 The three runs agree closely with each other, and all of them differ from the 2 µm order-2 run in the same way:
 
-- The **S11 null sits at 146–148 GHz** in all three runs, compared with 141 GHz at 2 µm order 2. Its *depth* varies (−40 to −52 dB), but a null that sharp and deep is very sensitive to small changes and doesn't matter for the design. What matters is its frequency position.
+- The **S11 null sits at 146–148 GHz** in all three runs, compared with 141 GHz at 2 µm order 2. Its *depth* varies (−40 to −47 dB), but a null that sharp and deep is very sensitive to small changes and doesn't matter for the design. What matters is its frequency position.
 - **Insertion loss** agrees within about 0.05 dB across the target band.
-- Measured over all S-parameters and frequencies, the three runs differ from each other by Max|ΔS| = 0.010 to 0.023 (linear). That is the remaining uncertainty of the "converged" answer for this model.
+- Measured over all S-parameters and frequencies, the three runs differ from each other by Max|ΔS| = 0.009 to 0.023 (linear). That is the remaining uncertainty of the "converged" answer for this model.
 
 AMR ends up at slightly lower loss than the other two runs, so the true answer may lie a little beyond the 1 µm result. The difference is small compared with everything we saw in step 1.
 
@@ -82,15 +84,15 @@ Now we can put every run on one chart. The vertical axis shows how far each run 
 
 | Variant | DOF | Solve time | Peak RAM | Max\|ΔS\| vs. 1 µm |
 |---|---:|---:|---:|---:|
-| 2 µm, order 2 | 340,226 | 3m 14s | 4.17 GB | 0.035 |
-| 1 µm, order 2 | 665,874 | 7m 11s | 7.22 GB | (reference) |
-| 2 µm, order 3 | 969,582 | 12m 10s | 7.23 GB | 0.010 |
-| AMR, 5 iterations | 4,654,886 (final) | 2h 23m (all iterations) | 51 GB | 0.023 |
+| 2 µm, order 2 | 331,900 | 37 s | 5.7 GB | 0.039 |
+| 1 µm, order 2 | 678,946 | 1m 32s | 9.9 GB | (reference) |
+| 2 µm, order 3 | 944,910 | 1m 47s | 8.1 GB | 0.009 |
+| AMR, 5 iterations | 4,531,352 (final) | 58m (all iterations) | 60 GB | 0.023 |
 
 For this balun:
 
-- **1 µm order 2 and 2 µm order 3 give practically the same answer.** For this model, the 1 µm uniform mesh gets there faster (7 min vs. 12 min) at the same memory.
-- **AMR reaches the same answer, at about 20× the time and 7× the memory** of the 1 µm run. The last iterations kept refining after the S-parameters had stopped changing much. For this model, it didn't pay off.
+- **1 µm order 2 and 2 µm order 3 give practically the same answer, at about the same cost** (1m 32s vs. 1m 47s). Order 3 needs a little less memory (8.1 vs. 9.9 GB).
+- **AMR reaches the same answer, at about 40× the time and 6× the memory** of the 1 µm run. The last iterations kept refining after the S-parameters had stopped changing much. For this model, it didn't pay off.
 
 ## 4. Conductor model: surface, solve_inside, solve_inside_skin
 
@@ -100,22 +102,22 @@ Steps 1–3 use the default surface impedance conductor model. Here the same bal
 
 | Model | DOF | GMRES iterations per solve | Insertion loss in band | S11 null |
 |---|---:|---:|---:|---:|
-| `'solve_inside_skin'`, 1 µm (reference) | 1.66 M | 29 | 1.06–1.21 dB | 144 GHz |
-| `'solve_inside_skin'`, 2 µm | 0.74 M | 37 | 1.06–1.23 dB | 141 GHz |
-| `'solve_inside_skin'`, 3 µm | 0.49 M | 50 | 1.09–1.27 dB | 137 GHz |
-| `'solve_inside_skin'`, 5 µm | 0.34 M | 68 | 1.15–1.35 dB | 131 GHz |
-| `'solve_inside'`, 2 µm | 0.41 M | 32 | 1.19–1.36 dB | 138 GHz |
-| surface impedance, 1 µm | 0.67 M | | 0.96–1.08 dB | 146 GHz |
-| surface impedance, 2 µm | 0.34 M | | 1.00–1.15 dB | 141 GHz |
+| `'solve_inside_skin'`, 1 µm (reference) | 1.73 M | 31 | 1.06–1.21 dB | 144 GHz |
+| `'solve_inside_skin'`, 2 µm | 0.71 M | 45 | 1.05–1.22 dB | 140 GHz |
+| `'solve_inside_skin'`, 3 µm | 0.49 M | 58 | 1.08–1.27 dB | 137 GHz |
+| `'solve_inside_skin'`, 5 µm | 0.34 M | 83 | 1.17–1.38 dB | 130 GHz |
+| `'solve_inside'`, 2 µm | 0.40 M | 37 | 1.19–1.36 dB | 137 GHz |
+| surface impedance, 1 µm | 0.68 M | | 0.96–1.08 dB | 146 GHz |
+| surface impedance, 2 µm | 0.33 M | | 1.00–1.15 dB | 141 GHz |
 
-- **For this balun, the mesh matters more than the conductor model.** With every conductor model, the response moves up by 3–5 GHz per refinement step, as in step 1. The 2 µm coupling gap sets the mesh, and skin layers don't change that. Amplitude and phase balance agree within about 0.1 dB and 1° between the models at the same mesh.
+- **For this balun, the mesh matters more than the conductor model.** With every conductor model, the response moves up by 3–7 GHz per refinement step, as in step 1. The 2 µm coupling gap sets the mesh, and skin layers don't change that. Amplitude and phase balance agree within about 0.1 dB and 1° between the models at the same mesh.
 - **The conductor model shifts the loss by about 0.1–0.15 dB.** `'solve_inside'` is about 0.15 dB too lossy at 2 µm, because the current near the conductor surface is under-resolved at these frequencies. `'solve_inside_skin'` at 2 µm is within 0.02 dB of the reference. The surface impedance model is about 0.1 dB more optimistic than the reference.
-- **Cost:** skin layers nearly double the unknowns at 2 µm (0.74 M instead of 0.41 M) and need a few more solver iterations per frequency (37 instead of 32), more so on coarse meshes (68 at 5 µm), where the thin layers make flat cells.
+- **Cost:** skin layers nearly double the unknowns at 2 µm (0.71 M instead of 0.40 M) and need more solver iterations per frequency (45 instead of 37), more so on coarse meshes (83 at 5 µm), where the thin layers make flat cells.
 
 ## Summary for this balun
 
-- **2 µm uniform mesh, order 2, is a good working point for design iterations.** It gets amplitude and phase balance right and finishes in about 3 minutes. Its main error is a frequency shift of the response of about 5 GHz (S11 null at 141 GHz instead of 146 GHz), which makes insertion loss look up to about 0.07 dB worse in the target band.
-- **For final numbers, run 1 µm once** (about 7 minutes here). This moves the result into the range where three independent methods agree.
+- **2 µm uniform mesh, order 2, is a good working point for design iterations.** It gets amplitude and phase balance right and finishes in under a minute. Its main error is a frequency shift of the response of about 5 GHz (S11 null at 141 GHz instead of 146 GHz), which makes insertion loss look up to about 0.07 dB worse in the target band.
+- **For final numbers, run 1 µm once** (about 1.5 minutes here). This moves the result into the range where three independent methods agree.
 - **Mesh size mostly shifts this balun's response in frequency rather than changing its balance.** That is plausibly because the 2 µm coupling gap is under-resolved at coarse settings, but this study doesn't prove the cause.
 - **The conductor model shifts the insertion loss by about 0.1 dB.** `'solve_inside_skin'` at 2 µm is the accurate choice for loss.
 
@@ -127,7 +129,7 @@ All runs above use a planar stackup, where TopMetal2 is buried in a flat block o
 
 ## Follow-up: AMR settings
 
-The follow-up study [amr_conformal](amr_conformal/README.md) reruns AMR on this balun with conformal refinement, smaller `UpdateFraction` values, and AMR at 150 GHz only followed by one full sweep on that mesh. Conformal refinement gave the same accuracy as the default at the same number of unknowns. AMR at 150 GHz gave a mesh that holds over the whole 100–200 GHz band and reached the converged answer in about 60 % of the time of full-band AMR.
+The follow-up study [amr_conformal](amr_conformal/README.md) reruns AMR on this balun with conformal refinement, smaller `UpdateFraction` values, and AMR at 150 GHz only followed by one full sweep on that mesh. Conformal refinement gave the same accuracy as the default at the same number of unknowns. AMR at 150 GHz gave a mesh that holds over the whole 100–200 GHz band and reached the converged answer in about 60 % of the time of full-band AMR. That study was not rerun with Palace 0.19; its times are from the earlier versions.
 
 ## Files
 
@@ -146,8 +148,8 @@ mesh_convergence_D-band_balun/
     ├── story_conductor_models.py # step 4 plot and numbers
     ├── delta_S_table.csv         # Max|ΔS| between successive runs, per S-parameter
     ├── delta_S_vs_finest.csv     # Max|ΔS| of every run vs. 1 µm, per S-parameter
-    ├── snp/                      # Touchstone files, one per run (_raw = without port de-embedding;
-    │                             #   the AMR iteration files balun_amr5_iter1..4 are also raw)
+    ├── snp/                      # Touchstone files, one per run and AMR iteration
+    │                             #   (_raw = without port de-embedding)
     └── plots/
 ```
 

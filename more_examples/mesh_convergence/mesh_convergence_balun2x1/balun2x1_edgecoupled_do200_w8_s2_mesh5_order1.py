@@ -28,8 +28,8 @@ settings['cells_per_wavelength'] = 10.0
 settings['meshsize_max'] = 100.0
 settings['adaptive_mesh_iterations'] = 0
 settings['boundary'] = ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
-settings['margin'] = 100.0
-settings['air_around'] = 20.0
+settings['margin'] = 200.0
+settings['air_around'] = 200.0
 settings['fstep'] = 1.0e9
 settings['no_gui'] = ('nogui' in sys.argv)  # check if nogui specified on command line, then create files without showing 3D model
 
