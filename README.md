@@ -166,6 +166,10 @@ Current density at 93 Ghz:
 
 If you use gds2palace in a publication, please cite it. The **Cite this repository** button on the GitHub repository page gives APA and BibTeX entries, generated from [CITATION.cff](./CITATION.cff).
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23984876.svg)](https://doi.org/10.5281/zenodo.23984876)
+
+Each release of gds2palace is archived on Zenodo with its own DOI. The DOI above, 10.5281/zenodo.23984876, always resolves to the latest version; the record lists the DOIs of all versions, so you can cite the version you used.
+
 Please also cite the [Palace](https://github.com/awslabs/palace) solver that computed your results.
 
 # License
