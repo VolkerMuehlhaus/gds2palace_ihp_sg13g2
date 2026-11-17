@@ -17,6 +17,7 @@ keywords:
   - IHP SG13G2
 version: 0.10.7
 date-released: 2026-11-15
+doi: 10.5281/zenodo.23984876
 references:
   - type: software
     title: "Palace: 3D Finite Element Solver for Computational Electromagnetics"
