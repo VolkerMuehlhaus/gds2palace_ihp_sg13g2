@@ -97,8 +97,10 @@ clone, it is [`workflow/gds2palace/`](workflow/gds2palace/).
 
 ### GDSII layout
 
-- `read_gds()` reads the cell named `cellname`, or the first top-level cell if
-  that name doesn't exist. Hierarchy is flattened.
+- `read_gds()` reads the cell named `cellname`, or else the design cell: the
+  top-level cell with the largest bounding box, never KLayout's
+  `$$$CONTEXT_INFO$$$` (gds2palace 0.11 and newer; before, the first top-level
+  cell). Hierarchy is flattened.
 - Only the layer numbers in `layerlist` and the datatypes in `purposelist` are
   read. IHP drawing data is datatype 0: use `purposelist=[0]`.
 - Units: the GDSII coordinates are used as they are, in units of
@@ -193,7 +195,7 @@ from gds2palace import *     # stackup_reader, gds_reader, simulation_setup, uti
 # ---------- input files ----------
 gds_filename = "my_layout.gds"           # ASK
 XML_filename = utilities.get_stackup_path("SG13G2_FEM_200um.xml")   # ships with gds2palace; or a path to the user's own copy
-cellname = ""                            # "" = first top-level cell
+cellname = ""                            # "" = the design cell (largest top-level cell)
 merge_polygon_size = 0                   # via array merging distance in um, 0 = off (see below)
 
 script_path = utilities.get_script_path(__file__)

@@ -144,7 +144,10 @@ def model_groups():
 def raw_layout(filename, cellname=''):
     """{layer: {datatype: [point arrays]}} of the cell that read_gds() reads, flattened - read here with gdstk only"""
     library = gdstk.read_gds(filename)
-    cell = {c.name: c for c in library.cells}.get(cellname) or library.top_level()[0]
+    by_name = {c.name: c for c in library.cells}
+    tops = [c for c in library.top_level() if not c.name.startswith('$$$')] or library.top_level()
+    size = lambda c: 0 if c.bounding_box() is None else float(np.prod(np.subtract(*c.bounding_box()[::-1])))
+    cell = by_name.get(cellname) or max(tops, key=size)       # the design cell, as read_gds() chooses it
     out = {}
     for p in cell.get_polygons(include_paths=True):
         out.setdefault(int(p.layer), {}).setdefault(int(p.datatype), []).append(p.points)
