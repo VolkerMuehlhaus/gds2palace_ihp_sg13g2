@@ -120,7 +120,7 @@ python3 -m venv ~/venv/palace
 
 ### Recommended installation of gds2palace as Python module 
 
-The easiest method to install the gds2palace Python workflow is to use the preconfigured package which automatically installs all dependencies (gdspy, gmsh, scikit-rf). We activate the virtual environment and install to there:  
+The easiest method to install the gds2palace Python workflow is to use the preconfigured package which automatically installs all dependencies (gdstk, gmsh, scikit-rf). We activate the virtual environment and install to there:  
 
 ```
 source ~/venv/palace/bin/activate
@@ -145,7 +145,7 @@ In this case, Python module dependencies must be installed manually:
 
 ```
 source ~/venv/palace/bin/activate
-pip install gdspy
+pip install gdstk
 pip install gmsh
 pip install scikit-rf
 ```

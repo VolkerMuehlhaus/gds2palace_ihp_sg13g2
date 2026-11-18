@@ -110,9 +110,11 @@ clone, it is [`workflow/gds2palace/`](workflow/gds2palace/).
 - Holes and cutouts are handled automatically. The `preprocess` argument of
   `read_gds()` is obsolete and only prints a note. (Older documentation says
   it is required for cutouts; that is no longer true.)
-- A user can generate GDSII by code, e.g. with gdspy:
+- A user can generate GDSII by code, e.g. with gdstk (which gds2palace itself
+  uses) or gdspy:
   [`more_examples/inductor_synthesis_no_external_library/`](more_examples/inductor_synthesis_no_external_library/)
-  builds layouts entirely in Python.
+  builds layouts entirely in Python. That example and the pcLab examples use
+  gdspy, which is no longer installed with gds2palace: `pip install gdspy`.
 
 ### XML stackup
 
