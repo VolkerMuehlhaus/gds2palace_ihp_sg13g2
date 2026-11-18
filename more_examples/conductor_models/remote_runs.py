@@ -13,7 +13,8 @@ solve_inside_skin, coarse solve_inside_skin, so that the models of one structure
 thermal conditions. collect replaces the results of an earlier run of the same model.
 
 The first runs of this study (gds2palace 0.9.0, Palace 0.18) are in palace_runs/conductor_models on the simulation
-machine; the rerun with gds2palace 0.10.6 and Palace 0.19.0 is in REMOTE below.
+machine, the rerun with gds2palace 0.10.6 and Palace 0.19.0 in palace_runs/conductor_models_0106; the rerun of
+the inductor, transformer, 2:1 balun and L6n2 with the larger boxes (gds2palace 0.10.7) is in REMOTE below.
 """
 import io
 import os
@@ -24,7 +25,7 @@ import tarfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOST = 'hpz2'
-REMOTE = 'palace_runs/conductor_models_0106'
+REMOTE = 'palace_runs/conductor_models_0107'
 SIF = '~/palace_0190_x86_64_v3.sif'
 NP = 16
 ORDER = ['surface', 'solve_inside_mesh', 'solve_inside_skin_mesh2', 'solve_inside_skin_mesh3', 'solve_inside_skin_mesh5',

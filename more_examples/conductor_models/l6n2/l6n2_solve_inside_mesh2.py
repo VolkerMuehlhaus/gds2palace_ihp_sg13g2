@@ -1,5 +1,5 @@
 # Conductor model study: solve_inside at refined_cellsize 2 um
-# Written by make_variants.py from ../../measured_vs_simulated/more_accurate_models_L6n2_v3/L6n2_with_ports_2um_passi3D.py; edit the base script or the generator, not this file.
+# Written by make_variants.py from ../../measured_vs_simulated/more_accurate_models_L6n2_v5/L6n2_with_ports_2um_passi3D.py; edit the base script or the generator, not this file.
 # Model for IHP OpenPDK EM workflow created using setupEM
 import os, sys, subprocess
 
@@ -20,8 +20,8 @@ sim_path = utilities.create_sim_path (script_path,model_basename)
 settings={}
 settings['unit'] = 1e-06
 settings['purpose'] = [0]
-settings['GdsFile'] = '../../measured_vs_simulated/more_accurate_models_L6n2_v3/L6n2_with_ports.gds'
-settings['SubstrateFile'] = '../../measured_vs_simulated/more_accurate_models_L6n2_v3/SG13G2_200um_conformal.xml'
+settings['GdsFile'] = '../../measured_vs_simulated/more_accurate_models_L6n2_v5/L6n2_with_ports.gds'
+settings['SubstrateFile'] = '../../measured_vs_simulated/more_accurate_models_L6n2_v5/SG13G2_200um_conformal.xml'
 settings['preprocess_gds'] = True
 settings['cellname'] = 'L_6n2'
 settings['variable_overrides'] = {}
@@ -39,7 +39,7 @@ settings['amr_tol'] = 0.01
 settings['amr_max_dof'] = 2000000
 settings['boundary'] = ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
 settings['margin'] = 400.0
-settings['air_around'] = 50.0
+settings['air_around'] = 800.0
 settings['fstep'] = 0.1e9
 settings['fill_factor_correction'] = True
 settings['preview_only'] = False

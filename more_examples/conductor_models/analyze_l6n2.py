@@ -1,7 +1,7 @@
-"""L6n2 inductor (4 turns) against the measurement, with the setup of the L6n2 v3 study (conformal passivation, via
+"""L6n2 inductor (4 turns) against the measurement, with the setup of the L6n2 v5 study (conformal passivation, via
 merging with fill factor correction, 400 um margin). Differential impedance Zdiff = Z11 - Z12 - Z21 + Z22:
 L = Im(Zdiff)/w at 1 GHz, peak Q = max of Im(Zdiff)/Re(Zdiff), SRF = first zero crossing of Im(Zdiff).
-The L6n2 v3 filled metal runs at 2 and 1 um are shown for comparison (same model, earlier runs).
+The L6n2 v5 filled metal runs at 2 and 1 um are shown for comparison (same model, earlier runs).
 Usage: imported by analyze.py, or  python analyze_l6n2.py
 """
 import os
@@ -11,10 +11,10 @@ import skrf as rf
 
 import study_data as D
 
-V3 = os.path.join(D.HERE, '..', 'measured_vs_simulated', 'more_accurate_models_L6n2_v3')
+V3 = os.path.join(D.HERE, '..', 'measured_vs_simulated', 'more_accurate_models_L6n2_v5')
 MEAS = os.path.join(V3, 'meas_L5_6n2_THRU_deemb.S2P')
-V3_RUNS = [("v3 study: 'solve_inside', 2 um", 'L6n2_with_ports_2um_passi3D.s2p'),
-           ("v3 study: 'solve_inside', 1 um", 'L6n2_with_ports_1um_passi3D.s2p')]
+V3_RUNS = [("v5 study: 'solve_inside', 2 um", 'L6n2_with_ports_2um_passi3D.s2p'),
+           ("v5 study: 'solve_inside', 1 um", 'L6n2_with_ports_1um_passi3D.s2p')]
 MODELS = [('surface', 'l6n2_surface_mesh2'), ('solve_inside', 'l6n2_solve_inside_mesh2')]
 
 

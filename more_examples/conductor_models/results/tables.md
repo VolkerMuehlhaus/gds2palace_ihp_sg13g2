@@ -2,34 +2,34 @@
 
 ### inductor
 
-Reference: `results/ind_frame_solve_inside_skin_mesh1`: unknowns 2.41e+06, minutes 5.706, peak_gb 33.7, its_per_solve 15.46, solves 13, R at 1 GHz 2.271, L at 10 GHz 0.782, peak Q 18.09, f peak Q (GHz) 28.5
+Reference: `results/ind_frame_solve_inside_skin_mesh1`: unknowns 2.418e+06, minutes 6.054, peak_gb 34.1, its_per_solve 21.83, solves 12, R at 1 GHz 2.277, L at 10 GHz 0.7842, peak Q 17.6, f peak Q (GHz) 28
 
 | model | unknowns | minutes | peak_gb | its_per_solve | solves | R at 1 GHz | d R at 1 GHz (%) | L at 10 GHz | d L at 10 GHz (%) | peak Q | d peak Q (%) | f peak Q (GHz) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| surface | 0.43 M | 0.7 | 6.5 | 17.3 | 12 | 1.63 | -28.1 | 0.773 | -1.1 | 22.6 | +25.0 | 26 |
-| solve_inside | 0.51 M | 1.3 | 7.9 | 17.4 | 18 | 2.26 | -0.4 | 0.779 | -0.4 | 16.5 | -8.6 | 27 |
-| solve_inside_skin | 1.06 M | 2.5 | 15.7 | 18.9 | 13 | 2.27 | -0.3 | 0.78 | -0.2 | 17.6 | -2.5 | 28 |
-| solve_inside_skin, 5 um | 0.39 M | 0.9 | 6.2 | 23.6 | 13 | 2.26 | -0.7 | 0.774 | -1.0 | 17.1 | -5.6 | 27 |
+| surface | 0.44 M | 0.8 | 6.8 | 20.2 | 12 | 1.64 | -28.0 | 0.776 | -1.1 | 21.9 | +24.5 | 25 |
+| solve_inside | 0.52 M | 1.0 | 7.9 | 20.6 | 13 | 2.27 | -0.4 | 0.781 | -0.4 | 16.1 | -8.3 | 27 |
+| solve_inside_skin | 1.07 M | 2.7 | 16 | 23.4 | 13 | 2.27 | -0.3 | 0.783 | -0.2 | 17.2 | -2.4 | 27.5 |
+| solve_inside_skin, 5 um | 0.40 M | 0.9 | 6.3 | 27.6 | 12 | 2.26 | -0.7 | 0.776 | -1.1 | 16.7 | -5.3 | 26.5 |
 
 ### transformer
 
-Reference: `results/transformer_solve_inside_skin_mesh1`: unknowns 1.429e+06, minutes 9.979, peak_gb 22.4, its_per_solve 31.24, solves 29, Lp at 30 GHz 0.7526, k at 30 GHz 0.7096, Qp at 30 GHz 9.588, Qs at 30 GHz 9.277, peak Qp 9.611, peak Qs 9.687
+Reference: `results/transformer_solve_inside_skin_mesh1`: unknowns 1.446e+06, minutes 9.523, peak_gb 22.9, its_per_solve 29.59, solves 29, Lp at 30 GHz 0.753, k at 30 GHz 0.7098, Qp at 30 GHz 9.527, Qs at 30 GHz 9.212, peak Qp 9.553, peak Qs 9.631
 
 | model | unknowns | minutes | peak_gb | its_per_solve | solves | Lp at 30 GHz | d Lp at 30 GHz (%) | k at 30 GHz | d k at 30 GHz (%) | Qp at 30 GHz | d Qp at 30 GHz (%) | Qs at 30 GHz | d Qs at 30 GHz (%) | peak Qp | d peak Qp (%) | peak Qs | d peak Qs (%) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| surface | 0.30 M | 1.4 | 5.1 | 25.3 | 27 | 0.751 | -0.2 | 0.715 | +0.7 | 12.3 | +28.6 | 11.2 | +20.6 | 12.5 | +29.6 | 11.7 | +21.2 |
-| solve_inside | 0.36 M | 2.3 | 6.3 | 35.3 | 31 | 0.755 | +0.4 | 0.714 | +0.6 | 9.2 | -4.0 | 8.77 | -5.5 | 9.26 | -3.7 | 9.28 | -4.2 |
-| solve_inside_skin | 0.66 M | 4.2 | 10.8 | 35.2 | 27 | 0.755 | +0.3 | 0.714 | +0.6 | 9.34 | -2.6 | 8.97 | -3.3 | 9.38 | -2.5 | 9.43 | -2.7 |
+| surface | 0.32 M | 1.2 | 5.6 | 22.4 | 27 | 0.751 | -0.2 | 0.715 | +0.7 | 12.2 | +28.4 | 11.1 | +20.9 | 12.4 | +29.5 | 11.7 | +21.8 |
+| solve_inside | 0.37 M | 1.9 | 6.4 | 30.7 | 28 | 0.756 | +0.4 | 0.714 | +0.6 | 9.14 | -4.0 | 8.71 | -5.4 | 9.2 | -3.7 | 9.23 | -4.2 |
+| solve_inside_skin | 0.67 M | 4.3 | 11 | 33.1 | 29 | 0.755 | +0.2 | 0.714 | +0.6 | 9.27 | -2.7 | 8.9 | -3.4 | 9.31 | -2.5 | 9.37 | -2.7 |
 
 ### balun2x1
 
-Reference: `results/balun2x1_solve_inside_skin_mesh1`: unknowns 3.843e+06, minutes 18.15, peak_gb 56, its_per_solve 23.38, solves 21, Lp at 10 GHz 1.183, k at 10 GHz 0.6642, peak Qp 16.02, peak Qs 12.49, peak |Sdd21| (dB) -1.365
+Reference: `results/balun2x1_solve_inside_skin_mesh1`: unknowns 3.852e+06, minutes 17.71, peak_gb 55.9, its_per_solve 27.37, solves 19, Lp at 10 GHz 1.186, k at 10 GHz 0.665, peak Qp 15.67, peak Qs 12.19, peak |Sdd21| (dB) -1.369
 
 | model | unknowns | minutes | peak_gb | its_per_solve | solves | Lp at 10 GHz | d Lp at 10 GHz (%) | k at 10 GHz | d k at 10 GHz (%) | peak Qp | d peak Qp (%) | peak Qs | d peak Qs (%) | peak |Sdd21| (dB) | d peak |Sdd21| (dB) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| surface | 0.85 M | 2.6 | 12.5 | 21.3 | 19 | 1.18 | -0.6 | 0.673 | +1.4 | 19.6 | +22.5 | 14.7 | +17.8 | -1.21 | +0.16 |
-| solve_inside | 1.02 M | 4.9 | 15.3 | 29.2 | 22 | 1.18 | +0.1 | 0.666 | +0.3 | 15.1 | -5.7 | 11.6 | -7.3 | -1.4 | -0.03 |
-| solve_inside_skin | 1.69 M | 8.8 | 25.6 | 28.8 | 22 | 1.18 | +0.1 | 0.667 | +0.3 | 15.7 | -1.9 | 12.3 | -1.9 | -1.34 | +0.02 |
+| surface | 0.86 M | 2.7 | 12.6 | 21.7 | 18 | 1.18 | -0.6 | 0.674 | +1.4 | 19.1 | +22.0 | 14.3 | +17.6 | -1.21 | +0.16 |
+| solve_inside | 1.04 M | 4.7 | 15.7 | 31.5 | 21 | 1.19 | +0.1 | 0.667 | +0.3 | 14.8 | -5.5 | 11.3 | -7.2 | -1.4 | -0.03 |
+| solve_inside_skin | 1.70 M | 8.8 | 26.1 | 30.8 | 21 | 1.19 | +0.1 | 0.667 | +0.4 | 15.4 | -1.8 | 12 | -2.0 | -1.34 | +0.03 |
 
 ### dband_balun
 
@@ -93,8 +93,8 @@ Measured: L at 1 GHz (nH) 5.009, peak Q 15.96, SRF (GHz) 11.07
 
 | model | L at 1 GHz (nH) | peak Q | SRF (GHz) | d L at 1 GHz vs. measured (%) | d peak Q vs. measured (%) | d SRF vs. measured (%) | unknowns | minutes | peak_gb | its_per_solve | solves |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| v3 study: 'solve_inside', 2 um | 4.96 | 15.2 | 10.9 | -0.9 | -4.6 | -1.6 |  |  |  |  |  |
-| v3 study: 'solve_inside', 1 um | 4.96 | 15.4 | 11 | -0.9 | -3.3 | -1.0 |  |  |  |  |  |
-| surface | 4.92 | 21.1 | 10.9 | -1.9 | +32.3 | -1.3 | 1.30 M | 3.71 | 19.1 | 36.2 | 12 |
-| solve_inside | 4.96 | 15.8 | 10.9 | -0.9 | -0.7 | -1.6 | 1.51 M | 4.86 | 23 | 40.6 | 12 |
+| v5 study: 'solve_inside', 2 um | 5.02 | 15.6 | 10.8 | +0.3 | -2.2 | -2.1 |  |  |  |  |  |
+| v5 study: 'solve_inside', 1 um | 5.02 | 15.8 | 10.9 | +0.3 | -0.7 | -1.6 |  |  |  |  |  |
+| surface | 4.97 | 20.6 | 10.9 | -0.7 | +29.2 | -1.9 | 1.36 M | 3.37 | 19.7 | 37.9 | 10 |
+| solve_inside | 5.02 | 15.6 | 10.8 | +0.3 | -2.2 | -2.1 | 1.57 M | 4.01 | 23 | 38.1 | 10 |
 
