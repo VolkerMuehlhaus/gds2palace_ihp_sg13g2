@@ -12,7 +12,7 @@ import runpy
 import sys
 import tomllib
 
-import gdspy
+import gdstk
 import gmsh
 import numpy as np
 from shapely.geometry import LineString
@@ -26,7 +26,7 @@ from gds2palace import gds_reader, simulation_setup, utilities
 TESTS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(TESTS)
 DATA = os.path.join(TESTS, 'data')
-GRID = 0.001             # gdspy's booleans (in the reader and here) snap to this grid, in layout units
+GRID = 0.001             # the booleans (in the reader and here) snap to this grid, in layout units
 SLIVER = 2 * GRID        # a difference thinner than twice this is rounding along an edge, not a changed shape
 
 
@@ -142,30 +142,29 @@ def model_groups():
 # ----------------------------------------- layout reference -----------------------------------------
 
 def raw_layout(filename, cellname=''):
-    """{layer: {datatype: [point arrays]}} of the cell that read_gds() reads, flattened - read here with gdspy only"""
-    library = gdspy.GdsLibrary(infile=filename)
-    cell = library.cells.get(cellname, library.top_level()[0])
+    """{layer: {datatype: [point arrays]}} of the cell that read_gds() reads, flattened - read here with gdstk only"""
+    library = gdstk.read_gds(filename)
+    cell = {c.name: c for c in library.cells}.get(cellname) or library.top_level()[0]
     out = {}
-    for (layer, datatype), polygons in cell.get_polygons(by_spec=True).items():
-        out.setdefault(int(layer), {}).setdefault(int(datatype), []).extend(polygons)
+    for p in cell.get_polygons(include_paths=True):
+        out.setdefault(int(p.layer), {}).setdefault(int(p.datatype), []).append(p.points)
     return out
 
 
 def _area(polygons):
     if not polygons:
         return 0.0
-    merged = gdspy.boolean(polygons, None, 'or', max_points=0)
-    return 0.0 if merged is None else merged.area()
+    return sum(p.area() for p in gdstk.boolean(polygons, [], 'or'))
 
 
 def _difference(a, b, operation):
     """(area, bounds of the largest piece) of a xor b / a not b, counting only what is wider than rounding: where
-    the reader cuts a polygon into pieces, new points on slanted edges are snapped to gdspy's grid, which leaves
+    the reader cuts a polygon into pieces, new points on slanted edges are snapped to the booleans' grid, which leaves
     slivers of a fraction of a grid step along those edges."""
-    result = gdspy.boolean(a, b, operation, max_points=0, precision=GRID / 10)
-    if result is None:
+    result = gdstk.boolean(a, b, operation, precision=GRID / 10)
+    if not result:
         return 0.0, None
-    shape = unary_union([ShapelyPolygon(p).buffer(0) for p in result.polygons]).buffer(-SLIVER)
+    shape = unary_union([ShapelyPolygon(p.points).buffer(0) for p in result]).buffer(-SLIVER)
     if shape.is_empty:
         return 0.0, None
     parts = list(shape.geoms) if hasattr(shape, 'geoms') else [shape]
