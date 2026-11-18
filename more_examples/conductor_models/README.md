@@ -26,7 +26,7 @@ The study below reviews these conductor models for different test cases and answ
 
 ![Error of each model against its run time, relative to the surface model of the same structure](results/plots/accuracy_vs_cost.png)
 
-Each point is one run. Left: the peak Q of the coils, against the reference (for L6n2: against the measurement). Right: the largest insertion loss error of the two baluns in their band. The surface model is the fastest, but its coil Q is 18-32 % too high. `'solve_inside'` costs up to twice as much and is a few percent pessimistic. `'solve_inside_skin'` is close to the reference, at three to four times the cost of the surface model on most structures.
+Each point is one run. Left: the peak Q of the coils, against the reference (for L6n2: against the measurement). Right: the largest insertion loss error of the two baluns in their band. The surface model is the fastest, but its coil Q is 18-30 % too high. `'solve_inside'` costs up to twice as much and is a few percent pessimistic. `'solve_inside_skin'` is close to the reference, at three to four times the cost of the surface model on most structures.
 
 ## What this means for results with the surface model
 
@@ -34,7 +34,7 @@ The surface model is not wrong. It is the usual way to model good conductors in 
 
 - **Inductance, coupling, self-resonance, match, amplitude and phase balance** hardly depend on the conductor model. All three models agree within about 1 % in L and k, and the mesh convergence studies reached the same conclusions about mesh size with every conductor model.
 - **Insertion loss of baluns and matching networks** is off by 0.02-0.16 dB here. That is often within the design margin, but it matters where every tenth of a dB counts, e.g. at an LNA input or a PA output.
-- **Coil Q** is where the surface model is clearly off: 18-32 % too high at the peak, for coils with 2-8 µm traces on the thick top metals. This was a known limitation (see "Limits of conductor loss calculation" in the user's guide); this study puts numbers on it. A surface model Q of such a coil is an optimistic value, not a design value.
+- **Coil Q** is where the surface model is clearly off: 18-30 % too high at the peak, for coils with 2-8 µm traces on the thick top metals. This was a known limitation (see "Limits of conductor loss calculation" in the user's guide); this study puts numbers on it. A surface model Q of such a coil is an optimistic value, not a design value.
 
 So earlier surface model results don't need to be redone for L, k, resonances or matching. Rerun them with `'solve_inside'` or `'solve_inside_skin'` where Q or loss sets a design decision, e.g. the phase noise of a VCO or the noise figure of an LNA.
 
@@ -52,27 +52,27 @@ Six SG13G2 structures from earlier studies, each with its most accurate model as
 | L6n2 inductor, measured | L, peak Q, SRF | the measurement |
 | straight TopMetal2 lines, 2-20 µm wide | line resistance R', attenuation in dB/mm | 2D calculation of R' (`lines/peec2d.py`), filled metals at 0.25 µm for the attenuation |
 
-The structures and their setups are those of the mesh convergence studies (`../mesh_convergence/`) and of the L6n2 v3 study (`../measured_vs_simulated/more_accurate_models_L6n2_v3/`). Only the conductor model and, for a few runs, the mesh size change. All runs except the references use a 2 µm mesh (`refined_cellsize`), plus `'solve_inside_skin'` at a coarser mesh where the gaps allow it.
+The structures and their setups, including the size of the simulation box, are those of the mesh convergence studies (`../mesh_convergence/`) and of the L6n2 v5 study (`../measured_vs_simulated/more_accurate_models_L6n2_v5/`). The box boundary is 50-200 µm from the layout, 400 µm for L6n2. Only the conductor model and, for a few runs, the mesh size change. All runs except the references use a 2 µm mesh (`refined_cellsize`), plus `'solve_inside_skin'` at a coarser mesh where the gaps allow it.
 
-All runs, including the references, used gds2palace 0.10.6 and Palace 0.19.0 on the same machine (hpz2, AMD Ryzen AI Max+ 395), with 16 MPI processes, one run at a time. So their run times can be compared with each other.
+All runs, including the references, used gds2palace 0.10.6 or 0.10.7 and Palace 0.19.0 on the same machine (hpz2, AMD Ryzen AI Max+ 395), with 16 MPI processes, one run at a time. So their run times can be compared with each other.
 
 The references are the 1 µm models of the mesh convergence studies and the line models of the earlier line study, solved again for this study, so that every comparison is between runs of the same Palace version. The gds2palace version made no difference to the results.
 
 ### Palace version and the absorbing boundary
 
-An earlier version of this report used Palace 0.18. With Palace 0.19, the spiral inductor shows about 5 % more peak Q on the same mesh. This is not a change in how Palace calculates conductor loss. Palace 0.19 changed the second-order absorbing boundary, and this model has its box boundary only 20 µm from the coil, in the coil's near field.
+An earlier version of this report used Palace 0.18 and smaller boxes (the spiral inductor's boundary was 20 µm from the coil). With Palace 0.19, that small box gave about 5 % more peak Q on the same mesh. This is not a change in how Palace calculates conductor loss: Palace 0.19 changed the second-order absorbing boundary, which then sat in the coil's near field.
 
-We checked this on the same meshes. With a first-order absorbing boundary or a PEC box, both Palace versions give identical results. With the boundary 350 µm or more from the coil (two coils of `../ground_cutout_inductor/`), the versions differ by less than 1 % in peak Q.
+We checked this on the same meshes. With a first-order absorbing boundary or a PEC box, both Palace versions give identical results. With the boundary 350 µm or more from the coil (two coils of `../ground_cutout_inductor/`), the versions differ by less than 1 % in peak Q. The coils of this study now use the larger boxes of their mesh studies.
 
-The comparison of the conductor models is not affected: all runs and references of a structure use the same box and the same Palace version.
+The comparison of the conductor models is not affected either way: all runs and references of a structure use the same box and the same Palace version.
 
 ## 2. Coils: the surface model gives too much Q
 
 ![Q of the coils against frequency for the conductor models](results/plots/coil_q.png)
 
-On all three coils, the surface model's Q is far above the reference: +25 % for the spiral inductor, +30 % for the transformer primary, +22 % for the balun primary, at the peak. The reason is the current crowding at the edges and corners of the thick top metal traces. A surface impedance per face cannot describe it (see "Accuracy at high frequency" in the gds2palace user's guide).
+On all three coils, the surface model's Q is far above the reference: +24 % for the spiral inductor, +30 % for the transformer primary, +22 % for the balun primary, at the peak. The reason is the current crowding at the edges and corners of the thick top metal traces. A surface impedance per face cannot describe it (see "Accuracy at high frequency" in the gds2palace user's guide).
 
-The two volume models agree with the reference much better, and both are slightly pessimistic. `'solve_inside'` is 4-9 % low in peak Q. Its 2 µm cells are too thick to follow the current decay into the metal at high frequency. `'solve_inside_skin'` is 2-3 % low: the thin layers at the surface resolve the skin effect.
+The two volume models agree with the reference much better, and both are slightly pessimistic. `'solve_inside'` is 4-8 % low in peak Q. Its 2 µm cells are too thick to follow the current decay into the metal at high frequency. `'solve_inside_skin'` is 2-3 % low: the thin layers at the surface resolve the skin effect.
 
 Inductance and coupling hardly depend on the conductor model: all models are within about 1 % of the reference.
 
@@ -104,7 +104,7 @@ For the 10 and 20 µm lines, `'solve_inside_skin'` at a 5 µm mesh is within 7 %
 
 ![Differential Q of L6n2 for the conductor models and the measurement](results/plots/l6n2_q.png)
 
-L6n2 is a 4-turn inductor with peak Q at 5 GHz, simulated with the setup of the L6n2 v3 study (conformal passivation, via merging with fill factor correction, 400 µm margin). The surface model's peak Q is 32 % above the measurement. `'solve_inside'` is 0.7 % below it, and within 2 % in inductance and SRF.
+L6n2 is a 4-turn inductor with peak Q at 5 GHz, simulated with the setup of the L6n2 v5 study (conformal passivation, via merging with fill factor correction, 400 µm margin, 800 µm air). The surface model's peak Q is 29 % above the measurement. `'solve_inside'` is 2 % below it, and within about 2 % in inductance and SRF. In the v5 study, the same model at a 1 µm mesh comes within 1 % of the measured peak Q.
 
 `'solve_inside_skin'` builds the same model as `'solve_inside'` here. The sweep ends at 14 GHz, where the 3 µm TopMetal2 is just under 4 skin depths thick, so gds2palace adds no skin layers. At low GHz frequencies, `'solve_inside'` is already close to converged.
 
@@ -114,28 +114,28 @@ Run time and peak memory relative to the surface model of the same structure, at
 
 | structure | surface model | `'solve_inside'` | `'solve_inside_skin'` |
 |---|---|---|---|
-| spiral inductor | 0.7 min, 6.5 GB | 1.8x, 1.2x | 3.6x, 2.4x |
-| transformer | 1.4 min, 5.1 GB | 1.7x, 1.2x | 3.1x, 2.1x |
-| 2:1 balun | 2.6 min, 12.5 GB | 1.9x, 1.2x | 3.3x, 2.0x |
+| spiral inductor | 0.8 min, 6.8 GB | 1.3x, 1.2x | 3.6x, 2.4x |
+| transformer | 1.2 min, 5.6 GB | 1.6x, 1.1x | 3.5x, 2.0x |
+| 2:1 balun | 2.7 min, 12.6 GB | 1.7x, 1.3x | 3.2x, 2.1x |
 | D-band balun | 0.6 min, 5.2 GB | 1.9x, 1.2x | 4.2x, 2.1x |
 | MIM-loaded balun | 3.2 min, 13.6 GB | 1.2x, 1.2x | 1.7x, 1.7x |
-| L6n2 | 3.7 min, 19.1 GB | 1.3x, 1.2x | (same model) |
+| L6n2 | 3.4 min, 19.7 GB | 1.2x, 1.2x | (same model) |
 | lines, 2-20 µm | 0.8-0.9 min, 5.3-5.6 GB | 1.0-1.1x, 1.0-1.1x | 1.5-2.0x, 1.2-1.5x |
 
-The cost follows the number of unknowns. Skin layers add thin cells along all faces of the thick metals, which doubles the unknowns of a coil model. The volume models also need a few more solver iterations per frequency (29-45 instead of 21-27 in the baluns and the transformer). Where only one layer gets skin layers, as TopMetal2 in the 22 GHz MIM balun, they cost much less.
+The cost follows the number of unknowns. Skin layers add thin cells along all faces of the thick metals, which doubles the unknowns of a coil model. The volume models also need a few more solver iterations per frequency (30-45 instead of 22-27 in the baluns and the transformer). Where only one layer gets skin layers, as TopMetal2 in the 22 GHz MIM balun, they cost much less.
 
 ![Mesh of the transformer with 'solve_inside_skin' at a 2 µm mesh, cross-section through the TopMetal2 (top) and TopMetal1 (bottom) traces](results/plots/mesh_skin.png)
 
 The cross-section through the transformer shows where the extra unknowns come from. Each trace has a ring of thin cells along all its faces, the skin layers. Inside the trace and along its surface, the cells keep the normal size.
 
-A coarser mesh can pay back the cost, but only where the mesh is not limited by small gaps. The spiral inductor (5 µm gaps) with skin layers at 5 µm was 6 % low in Q, at 1.2x the run time of the surface model at 2 µm. The MIM balun with skin layers at 3 µm was within 0.08 dB, at 1.2x. Where traces are 2 µm apart, the mesh must stay at 2 µm for every conductor model (see the mesh convergence studies).
+A coarser mesh can pay back the cost, but only where the mesh is not limited by small gaps. The spiral inductor (5 µm gaps) with skin layers at 5 µm was 5 % low in Q, at 1.2x the run time of the surface model at 2 µm. The MIM balun with skin layers at 3 µm was within 0.08 dB, at 1.2x. Where traces are 2 µm apart, the mesh must stay at 2 µm for every conductor model (see the mesh convergence studies).
 
 ## 7. Conclusions
 
-1. **The surface model remains the fast choice for most of the design work.** Inductance, coupling, resonances, match and balance agree with the volume models within about 1 %. Its weak point is loss: coil Q is 18-32 % too high on every coil here, and thin layers with current on one face can get up to twice their loss. On a complete circuit, the two loss errors can add up or cancel.
+1. **The surface model remains the fast choice for most of the design work.** Inductance, coupling, resonances, match and balance agree with the volume models within about 1 %. Its weak point is loss: coil Q is 18-30 % too high on every coil here, and thin layers with current on one face can get up to twice their loss. On a complete circuit, the two loss errors can add up or cancel.
 2. **`'solve_inside'` is a good working choice for Q and loss.** It is a few percent pessimistic at a 2 µm mesh, and costs up to 1.9x the run time of the surface model.
 3. **`'solve_inside_skin'` gives final numbers.** It was within about 3 % in Q and 0.05 dB in loss on every structure, at 1.5-4.2x the run time and up to 2.4x the memory of the surface model.
-4. **The stackup matters as much as the conductor model** when comparing with a measurement: see the L6n2 v3 study for the effect of conformal passivation.
+4. **The stackup matters as much as the conductor model** when comparing with a measurement: see the L6n2 v5 study for the effect of conformal passivation.
 
 These results come from six SG13G2 structures. Other layouts can show other numbers, but the pattern (surface too high in coil Q, `'solve_inside'` slightly low, `'solve_inside_skin'` close) was the same on all of them.
 

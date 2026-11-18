@@ -1,5 +1,5 @@
 """Write the model scripts of the conductor model study from the 2 um base scripts of the mesh convergence studies and
-the L6n2 v3 study. Each variant script is the base script with:
+the L6n2 v5 study. Each variant script is the base script with:
   - settings['conductor_model'] = 'surface' | 'solve_inside' | 'solve_inside_skin'
   - refined_cellsize set to the variant's mesh size
   - the GDSII and stackup paths pointing to the base study folder (no copies of these files here)
@@ -11,7 +11,7 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MC = os.path.join('..', '..', 'mesh_convergence')
-L6 = os.path.join('..', '..', 'measured_vs_simulated', 'more_accurate_models_L6n2_v3')
+L6 = os.path.join('..', '..', 'measured_vs_simulated', 'more_accurate_models_L6n2_v5')
 
 MODELS = {   # variant suffix: (line added to the settings, refined_cellsize)
     'surface_mesh2': ("settings['conductor_model'] = 'surface'", 2.0),
