@@ -632,12 +632,12 @@ def test_derived_layers_cut_at_the_walls_only():
 
 def test_read_gds_knows_the_derived_layers(tmp_path):
     """read_gds records the derived layers, so that the drawn layout edge leaves them out (passi3D stackup)"""
-    import gdspy
+    import gdstk
     from gds2palace import gds_reader
-    lib = gdspy.GdsLibrary()
+    lib = gdstk.Library()
     cell = lib.new_cell('TOP')
-    cell.add(gdspy.Rectangle((0, -5), (100, 5), layer=TM2))
-    cell.add(gdspy.Rectangle((0, -5), (0, 5), layer=201))
+    cell.add(gdstk.rectangle((0, -5), (100, 5), layer=TM2))
+    cell.add(gdstk.rectangle((0, -5), (0, 5), layer=201))
     gds = str(tmp_path / 'line.gds')
     lib.write_gds(gds)
     materials, dielectrics, metals = stackup_reader.read_substrate(utilities.get_stackup_path('SG13G2_FEM_200um_passi3D.xml'))

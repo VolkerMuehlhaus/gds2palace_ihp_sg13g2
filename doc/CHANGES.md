@@ -2,6 +2,19 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 18 November-2026
+
+gds2palace 0.11.0
+
+**Changed dependency: gdstk instead of gdspy**  
+The GDSII reader uses [gdstk](https://github.com/heitzmann/gdstk) instead of gdspy, which is no longer maintained and whose polygon fracturing could hang. `pip install gds2palace` installs gdstk. The results are the same: every layer of the shipped examples reads with the same area as before, and their model files are unchanged. The examples that build layouts with gdspy (`inductor_synthesis_no_external_library`, the pcLab examples) need `pip install gdspy`. The mirror/offset options of `read_gds()` now also move paths; before, only polygons moved.
+
+**Changed behaviour: the cell read without a cell name**  
+With `cellname=""` (or a name not in the file), `read_gds()` reads the design cell: the top-level cell with the largest bounding box, never KLayout's `$$$CONTEXT_INFO$$$`. Before, it read the first top-level cell, which depends on the order in the file and was `$$$CONTEXT_INFO$$$` in some KLayout files. gds_prepare_for_EM 1.8, gds2openEMS, setupEM and the MCP server use the same rule (`select_design_cell()`).
+
+**Fix**  
+Via array merging (`merge_polygon_size > 0`) no longer cuts strips out of merged vias. A via array around an opening, e.g. a guard ring of contacts, came out cut open: shrinking back after merging opened the slit that encodes the hole, and, for large arrays, the lines along which the merged shape was split into pieces. The same for derived layers with a negative `Oversize`. None of the shipped examples is affected.
+
 ## 15 November-2026
 
 gds2palace 0.10.7

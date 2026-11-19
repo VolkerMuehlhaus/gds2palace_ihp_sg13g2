@@ -2,6 +2,7 @@
 
     python -m pytest tests/test_gds_reader.py
 """
+import pytest
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
@@ -32,3 +33,24 @@ def test_repair_does_not_split_into_pieces_of_five_points():
     import inspect
     candidates = inspect.signature(reader._fracture_valid_pieces).parameters['max_points_candidates'].default
     assert min(candidates) >= 6
+
+
+def test_read_gds_takes_the_design_cell(tmp_path):
+    """Without a cell name: the largest top-level cell, not $$$CONTEXT_INFO$$$ or a small device cell placed nowhere,
+    whatever their order in the file. A named cell is taken as it is."""
+    import gdstk
+    lib = gdstk.Library()
+    lib.new_cell('$$$CONTEXT_INFO$$$').add(gdstk.rectangle((0, 0), (1000, 1000), layer=1))
+    lib.new_cell('small_device').add(gdstk.rectangle((0, 0), (2, 2), layer=8))
+    lib.new_cell('DESIGN').add(gdstk.rectangle((0, 0), (50, 40), layer=8))
+    path = str(tmp_path / 'multi.gds')
+    lib.write_gds(path)
+    assert gdstk.read_gds(path).top_level()[0].name != 'DESIGN'
+    library = gdstk.read_gds(path)
+    assert reader.select_design_cell(library).name == 'DESIGN'
+    assert reader.select_design_cell(library, 'small_device').name == 'small_device'
+    assert reader.select_design_cell(library, 'nope').name == 'DESIGN'
+    from gds2palace import stackup_reader, utilities
+    _, _, metals = stackup_reader.read_substrate(utilities.get_stackup_path('SG13G2_FEM_200um.xml'))
+    result = reader.read_gds(path, [8], purposelist=[0], metals_list=metals)
+    assert result.get_bounding_box() == pytest.approx((0, 50, 0, 40))

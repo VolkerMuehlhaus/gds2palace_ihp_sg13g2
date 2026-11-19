@@ -622,7 +622,8 @@ temperatures) in one headless script run with no user interaction.
 
 ### Can an agent generate the GDSII geometry itself, not just the stackup and ports?
 
-Yes, with plain [gdspy](https://gdspy.readthedocs.io/) — no GUI needed
+Yes, with plain [gdstk](https://heitzmann.github.io/gdstk/) or
+[gdspy](https://gdspy.readthedocs.io/) — no GUI needed
 there either. [`more_examples/inductor_synthesis_no_external_library`](../more_examples/inductor_synthesis_no_external_library)
 is the deep end of this: a fully automated pipeline that generates candidate
 inductor layouts by code across a geometry sweep, runs a fast gds2palace

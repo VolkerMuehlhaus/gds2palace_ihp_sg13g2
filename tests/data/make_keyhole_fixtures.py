@@ -88,6 +88,8 @@ def write_klayout():
 
 
 def write_gdspy():
+    """keyholes_gdspy.gds: the same shapes as gdspy writes holes. gds2palace itself no longer uses gdspy, but files
+    written by it are still read: regenerating this fixture needs gdspy (pip install gdspy)."""
     import gdspy
     library = gdspy.GdsLibrary(unit=1e-6, precision=1e-9)
     top = library.new_cell('KEYHOLES')

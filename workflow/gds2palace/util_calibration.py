@@ -43,7 +43,7 @@ import json
 import math
 import os
 
-import gdspy
+import gdstk
 import numpy as np
 import shapely
 from shapely.affinity import affine_transform
@@ -843,7 +843,7 @@ def clip_derived_layers(allpolygons, sides):
     outer = dict(zip(WALL_SIDES, allpolygons.get_bounding_box()))
     lo = [edge[s] if s in sides else outer[s] - 1.0 for s in ('xmin', 'ymin')]
     hi = [edge[s] if s in sides else outer[s] + 1.0 for s in ('xmax', 'ymax')]
-    window = gdspy.Rectangle((lo[0], lo[1]), (hi[0], hi[1]))
+    window = gdstk.rectangle((lo[0], lo[1]), (hi[0], hi[1]))
     keep, cut = [], {}
     for poly in allpolygons.polygons:
         number = int(poly.layernum)
@@ -851,8 +851,8 @@ def clip_derived_layers(allpolygons, sides):
                                      and poly.ymin >= lo[1] - TOL and poly.ymax <= hi[1] + TOL):
             keep.append(poly)
             continue
-        result = gdspy.boolean([np.column_stack((poly.pts_x, poly.pts_y))], window, 'and', max_points=199)
-        cut.setdefault(number, []).extend(result.polygons if result is not None else [])
+        result = gdstk.boolean([np.column_stack((poly.pts_x, poly.pts_y))], window, 'and')
+        cut.setdefault(number, []).extend(q.points for p in result for q in p.fracture(max_points=199))
     if not cut:
         return []
     allpolygons.polygons = keep
