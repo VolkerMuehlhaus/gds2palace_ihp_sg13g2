@@ -385,7 +385,8 @@ utilities.create_run_script(sim_path)
 - **`gds_reader.read_gds(filename, layerlist, purposelist, metals_list, preprocess=False,
   merge_polygon_size=0, mirror=False, offset_x=0, offset_y=0, gds_boundary_layers=[],
   layernumber_offset=0, cellname="", derived_layers=None)`** (`util_gds_reader.py:700`) opens
-  the GDS via `gdspy.GdsLibrary`, flattens the top-level cell, and for each requested layer number
+  the GDS with `gdstk.read_gds`, flattens the design cell (`select_design_cell`: the named cell, else the
+  largest top-level cell that is not a `$$$` cell), and for each requested layer number
   extracts layer/datatype polygons matching `purposelist`. Via-array polygons get merged when
   `metal.is_via` and `merge_polygon_size > 0` (`merge_via_array`, `:796-797`). The unmerged vias
   are kept in `all_polygons.via_originals` (keyed by layer number); `create_model()` uses them only
@@ -476,11 +477,13 @@ quadratic-direct.sif  quadratic-iterative.sif  run_elmer  port_information.json
 name = "gds2palace"
 ...
 dependencies = [
-    "gdspy>1.6.0",
+    "gdstk",
     "gmsh",
+    "numpy",
+    "shapely>=2.0",
 ]
 ```
-Only `gdspy` and `gmsh` are pip dependencies. **No `palace`, no MPI bindings, nothing
+Only these are pip dependencies (gdstk replaced gdspy in 0.11). **No `palace`, no MPI bindings, nothing
 solver-related.** `pip install gds2palace` gives you the model-file *generator*, nothing that can
 actually run an FEM solve.
 

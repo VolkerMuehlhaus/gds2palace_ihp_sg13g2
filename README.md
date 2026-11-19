@@ -28,7 +28,7 @@ This workflow is designed for Linux systems. It creates model files for the AWS 
 At least 32 GB of RAM is recommended for this workflow, complex model might require 64 GB or more.  
 In addition to Palace that is required for simulation of the output files, these Python modules are required to use the gds2palace workflow:
 
-- gdspy (version 1.6.13 or later recommended)
+- gdstk (gds2palace 0.10 and older used gdspy)
 - gmsh
 - numpy
 - matplotlib (for the inductor synthesis example scripts)

@@ -63,18 +63,7 @@ def test_dipole_plane_keeps_both_strips():
 def test_checks_catch_the_lost_strip(monkeypatch):
     """With the 0.10.3 fix switched off (the repair trusts make_valid() again), the reader loses the strip in the
     dipole plane and in the KLayout fixtures: the comparison with the layout has to report that."""
-    class WithoutReference:
-        def __getattr__(self, name):
-            return getattr(gdspy_module, name)
-
-        @staticmethod
-        def boolean(a, b, operation, **kwargs):
-            if b is None and operation == 'or' and kwargs.get('max_points') == 199:
-                return None         # the area reference of the fix
-            return gdspy_module.boolean(a, b, operation, **kwargs)
-
-    gdspy_module = reader.gdspy
-    monkeypatch.setattr(reader, 'gdspy', WithoutReference())
+    monkeypatch.setattr(reader, '_union_reference', lambda points: [])     # the area reference of the fix
     dipole = er.read_layout(DIPOLE)
     keyholes = er.read_layout(os.path.join(er.DATA, 'keyholes_klayout.gds'))
     monkeypatch.undo()
