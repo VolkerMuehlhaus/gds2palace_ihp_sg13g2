@@ -310,7 +310,7 @@ def test_model_files_and_run_script(stack, tmp_path):
     info = json.load(open(os.path.join(sim_path, 'port_information.json')))
     assert info['port_walls'][0]['ports'] == [1, 2] and info['port_walls'][0]['standards'][1]['length'] == 400
     std = json.load(open(os.path.join(sim_path, 'config_cal_xmin_L.json')))
-    assert std['Solver']['Driven']['Samples'] == [{'Type': 'Point', 'Freq': [0.01, 5.0, 20.0, 100.0], 'SaveStep': 0}]
+    assert std['Solver']['Driven']['Samples'] == [{'Type': 'Point', 'Freq': [0.01, 1.0, 2.0, 3.0, 5.0, 10.0, 20.0, 40.0, 70.0, 100.0], 'SaveStep': 0}]
     assert std['Problem']['Output'] == 'output/line_cal_xmin_L' and len(std['Boundaries']['LumpedPort']) == 4
     run = open(os.path.join(sim_path, 'run_sim')).read()
     assert run.index('config_cal_xmin_L.json') < run.index('config_cal_xmin_2L.json') < run.index('run_palace config.json')
@@ -320,6 +320,31 @@ def test_model_files_and_run_script(stack, tmp_path):
     assert run.index('run_palace config.json') < run.index('WARNING: your combine_snp') < run.rindex('combine_snp\n')
     assert open(os.path.join(sim_path, 'combine_extend_snp.py')).read() == \
         open(os.path.join(utilities.get_scripts_dir(), 'combine_extend_snp.py')).read()
+
+
+def test_no_air_on_any_side_wall(stack, tmp_path):
+    """without air on the four side walls, the dielectrics cut the airbox into the air below and the air above the
+    stack: both parts get the air material, in the model and in the standards (one part had none, and Palace drops
+    the elements of a volume without material)"""
+    materials, dielectrics, metals = stack
+    ports = ports_for([1, 2])
+    sim_path = utilities.create_sim_path(str(tmp_path), 'line', dirname='palace_model')
+    settings = dict(unit=1e-6, margin=100, air_around=[0, 0, 0, 0, 50, 50], boundary=BOUNDARY, fstart=0, fstop=100e9,
+                    fstep=5e9, refined_cellsize=4, meshsize_max=70, order=1, no_gui=True, no_preview=True,
+                    simulation_ports=ports, materials_list=materials, dielectrics_list=dielectrics, metals_list=metals,
+                    allpolygons=gssg(length=250), sim_path=sim_path, model_basename='line')
+    simulation_setup.create_palace(ports.all_active_excitations(), settings)
+    for config_name in ('config.json', 'config_cal_xmin_L.json'):
+        config = json.load(open(os.path.join(sim_path, config_name)))
+        with_material = {a for material in config['Domains']['Materials'] for a in material['Attributes']}
+        mesh = open(os.path.join(sim_path, config['Model']['Mesh']), errors='replace').read()
+        volumes = {name: int(tag) for tag, name in re.findall(r'^3 (\d+) "(.*)"$', mesh[:4000], re.M)}
+        assert 'airbox' in volumes and 'unknown' not in volumes
+        assert set(volumes.values()) == with_material
+        # the air above the stack is in the mesh: the box is 50 higher than the stack's own air layer
+        zs = [float(line.split()[3]) for line in mesh.split('$Nodes')[1].split('$EndNodes')[0].splitlines()[2:]]
+        assert max(zs) == pytest.approx(max(d.zmax for d in dielectrics.dielectrics) + 50)
+        assert min(zs) == pytest.approx(min(d.zmin for d in dielectrics.dielectrics) - 50)
 
 
 @pytest.mark.parametrize('display, windows', [(None, 0), (':0', 1)])

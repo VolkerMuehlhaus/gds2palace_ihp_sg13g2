@@ -25,7 +25,7 @@ wall ports on one side form one calibration group.
 
 For each group, two standards are written into the device's _data folder: the layout's cross-section at the wall,
 extruded to thru lines of length L and 2 L with ports at both ends, with the device's stackup and mesh settings, solved
-at three frequencies, plus the model's lowest frequency. combine_extend_snp.py removes the port with the double delay method (Rautio) and writes the
+at nine frequencies from fmax/100 to fmax, plus the model's lowest frequency. combine_extend_snp.py removes the port with the double delay method (Rautio) and writes the
 de-embedded Touchstone file.
 
 The rules come from test_data/port_deembedding_study (README.md, step 6):
@@ -69,7 +69,14 @@ OPPOSITE = {'xmin': 'xmax', 'xmax': 'xmin', 'ymin': 'ymax', 'ymax': 'ymin'}
 TRANSVERSE = {'xmin': ('ymin', 'ymax'), 'xmax': ('ymin', 'ymax'), 'ymin': ('xmin', 'xmax'), 'ymax': ('xmin', 'xmax')}
 STANDARD_PORT_LAYER = 60001    # port layers of the standards, in memory only
 STANDARDS = (('L', 1), ('2L', 2))
-STANDARD_FREQUENCY_FRACTIONS = (1 / 20, 1 / 5, 1)
+# The standards' frequencies as fractions of fmax. combine_extend_snp.py interpolates the port and the line linearly
+# between them, and a line over a thin ground changes most at low frequency, so the points are closer there. Until
+# 0.11.0 they were fmax/20, fmax/5 and fmax only, and the interpolation error of a reference plane shift was the
+# largest error of a port wall (zero-length thru, TopMetal2 line over Metal1, 1760 um, 50 GHz, 2026-11-21: residual
+# -38 dB and 0.9 degrees with three frequencies, -53 dB and 0.22 degrees with these nine; 22 points gain nothing
+# further). The points below fmax/20 are used for the line's L and C only if they agree with the one at fmax/20
+# (combine_extend_snp.py 1.6).
+STANDARD_FREQUENCY_FRACTIONS = (1 / 100, 1 / 50, 3 / 100, 1 / 20, 1 / 10, 1 / 5, 2 / 5, 7 / 10, 1)
 # The standards are also solved at the model's lowest frequency when that is below fmax/20: the loss of a feed line
 # does not follow sqrt(f) down to DC (a thin line's resistance stays at its DC value), so a reference plane shift
 # needs a solved point there, not an extrapolation (rfcmim with 35 um feeds, 2026-11-13: series R at 0.01 GHz
@@ -1096,8 +1103,8 @@ def standard_model(group, factor, metals_list):
 
 
 def standard_frequencies(fmax, fmin=None):
-    """the frequencies of the standards in Hz: fmax/20, fmax/5 and fmax, and the model's lowest frequency fmin before
-    them when it is lower"""
+    """the frequencies of the standards in Hz: fmax times STANDARD_FREQUENCY_FRACTIONS (fmax/100 to fmax), and the
+    model's lowest frequency fmin before them when it is lower"""
     frequencies = [fmax * x for x in STANDARD_FREQUENCY_FRACTIONS]
     if fmin is not None and 0 < fmin < frequencies[0] * (1 - 1e-6):
         frequencies.insert(0, fmin)

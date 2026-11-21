@@ -17,6 +17,8 @@ import skrf as rf  # noqa: E402
 F_DEV = np.linspace(1e9, 100e9, 12)
 F_STD = np.array([5e9, 20e9, 100e9])
 F_STD_LOW = np.array([1e9, 5e9, 20e9, 100e9])   # with the model's lowest frequency, as gds2palace writes them
+# gds2palace 0.11.1: nine frequencies from fmax/100 to fmax, and the model's lowest frequency before them
+F_STD_NINE = np.array([0.1e9, 1e9, 2e9, 3e9, 5e9, 10e9, 20e9, 40e9, 70e9, 100e9])
 UNIT = 1e-6
 
 
@@ -28,10 +30,13 @@ def port_elements(f):
     return 1j * w * C, 1j * w * Ls
 
 
-def line_t(f, length, loss=False):
+def line_t(f, length, loss=False, thin_ground=False):
     """coupled 2-line section, length in drawing units: T = expm(K length), K = [[0, Z'], [Y', 0]]"""
     w = 2 * np.pi * f[:, None, None]
     Lp = np.array([[0.45e-6, 0.10e-6], [0.10e-6, 0.45e-6]])           # H/m
+    if thin_ground:
+        # a line over a thin ground: the inductance rises towards low frequency, here by 40 % below about 3 GHz
+        Lp = Lp * (1 + 0.4 / (1 + (f[:, None, None] / 3e9) ** 2))
     Cp = np.array([[0.20e-9, -0.04e-9], [-0.04e-9, 0.20e-9]])         # F/m
     # loss: skin effect, R' ~ sqrt(f); loss 'dc': a thin line, R' flat at low frequency and ~ sqrt(f) above 10 GHz
     Rp = {False: 0, True: 2e3 * np.sqrt(f[:, None, None] / 1e9),
@@ -74,17 +79,23 @@ def write_palace_csv(path, f, S):
             fh.write(', '.join(row) + ',\n')
 
 
-def make_case(tmp_path, shift=0.0, loss=False, interior=False, extension=0.0, f_std=F_STD):
+def make_case(tmp_path, shift=0.0, loss=False, interior=False, extension=0.0, f_std=F_STD, thin_ground=False,
+              bad_standards_below=0.0):
     """sim folder with port_information.json, the two standards' results and the device's result"""
     sim = tmp_path / 'dev_data'
     L = 200.0
     Ys, Zs = port_elements(f_std)
     P = ce.shunt_t(Ys) @ ce.series_t(Zs)
     for name, factor in (('cal_xmin_L', 1), ('cal_xmin_2L', 2)):
-        T = P @ line_t(f_std, factor * L, loss) @ ce.rev_t(P)
+        T = P @ line_t(f_std, factor * L, loss, thin_ground) @ ce.rev_t(P)
+        if bad_standards_below:
+            # a solver that is not accurate at low frequency: there, the standards see a port with 1.5 x the capacitance
+            Pb = ce.shunt_t(1.5 * Ys) @ ce.series_t(Zs)
+            Tb = Pb @ line_t(f_std, factor * L, loss, thin_ground) @ ce.rev_t(Pb)
+            T = np.where((f_std < bad_standards_below)[:, None, None], Tb, T)
         write_palace_csv(str(sim / 'output' / f'dev_{name}' / 'port-S.csv'), f_std, ce.t2s(T))
     Ys, Zs = port_elements(F_DEV)
-    E = ce.shunt_t(Ys) @ ce.series_t(Zs) @ line_t(F_DEV, shift + extension, loss)
+    E = ce.shunt_t(Ys) @ ce.series_t(Zs) @ line_t(F_DEV, shift + extension, loss, thin_ground)
     S_dut = dut_s(F_DEV)
     if interior:
         # 3-port device: ports 1 and 3 on the wall, port 2 interior with the estimated port inductance
@@ -184,6 +195,36 @@ def test_lossy_line_with_shift_is_close(tmp_path, loss):
     effect loss, and for a thin line whose resistance is flat down to the model's lowest frequency"""
     sim, S_dut = make_case(tmp_path, shift=60.0, loss=loss, f_std=F_STD_LOW)
     run_combine(sim)
+    out = rf.Network(str(sim / 'output' / 'dev' / 'dev_deembedded.s2p'))
+    assert np.max(np.abs(out.s - S_dut)) < 2e-3
+
+
+def test_line_inductance_below_a_twentieth_of_fmax(tmp_path):
+    """a line over a thin ground, its inductance rising below 3 GHz, with a long reference plane shift: with the
+    standards' points between fmax/100 and fmax/20 the shift follows the line (with fmax/20, fmax/5 and fmax only, the
+    inductance at 1 GHz was that of 5 GHz, and the error 10 times larger)"""
+    errors = {}
+    for name, f_std in (('nine', F_STD_NINE), ('three', F_STD_LOW)):
+        sim, S_dut = make_case(tmp_path / name, shift=400.0, thin_ground=True, f_std=f_std)
+        run_combine(sim)
+        out = rf.Network(str(sim / 'output' / 'dev' / 'dev_deembedded.s2p'))
+        errors[name] = np.max(np.abs(out.s - S_dut))
+    assert errors['nine'] < 1e-3 and errors['three'] > 5 * errors['nine']
+    sidecar = json.loads((tmp_path / 'nine' / 'dev_data' / 'output' / 'dev' / 'dev_deembedding.json').read_text())['port_walls'][0]
+    assert sidecar['frequencies_GHz'] == [1, 2, 3, 5, 10, 20, 40, 70, 100]
+    assert sidecar['line_resistance_also_solved_at_GHz'] == [0.1] and sidecar['low_points_not_used_for_L_and_C_GHz'] == []
+
+
+def test_low_points_that_disagree_are_used_for_resistance_only(tmp_path, capsys):
+    """standards that are wrong below 2.5 GHz (the port's capacitance 1.5 times that at fmax/20): the points at 1 and
+    2 GHz are not used for L and C, the one at 3 GHz is, and the report says so"""
+    sim, S_dut = make_case(tmp_path, shift=60.0, f_std=F_STD_NINE, bad_standards_below=2.5e9)
+    run_combine(sim)
+    sidecar = json.loads((sim / 'output' / 'dev' / 'dev_deembedding.json').read_text())['port_walls'][0]
+    assert sidecar['frequencies_GHz'] == [3, 5, 10, 20, 40, 70, 100]
+    assert sidecar['low_points_not_used_for_L_and_C_GHz'] == [1, 2]
+    assert sidecar['line_resistance_also_solved_at_GHz'] == [0.1, 1, 2]
+    assert "the standards at 1, 2 GHz don't agree" in capsys.readouterr().out
     out = rf.Network(str(sim / 'output' / 'dev' / 'dev_deembedded.s2p'))
     assert np.max(np.abs(out.s - S_dut)) < 2e-3
 

@@ -978,8 +978,12 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
         # apply a boolean difference to create the "airbox minus others" shape:
         try:
             out = gmsh.model.occ.cut([(3, box_tag)], tool_tags, -1, removeTool=False)
-            box_tag = out[0][0][1]
-            gmsh.model.setEntityName(dim=3,tag=box_tag, name= 'airbox')
+            # the airbox can be more than one volume: without air on any of the four sides, the dielectrics
+            # reach all side walls and cut it into the air below and the air above the stack. Every piece is
+            # the airbox, so that all of them get the air material
+            airbox_tags = [tag for dim, tag in out[0] if dim == 3]
+            for box_tag in airbox_tags:
+                gmsh.model.setEntityName(dim=3,tag=box_tag, name= 'airbox')
             gmsh.model.occ.synchronize()
         except:
             print('Error when processing dieelectrics to create surrounding airbox.')
@@ -989,7 +993,7 @@ def add_dielectrics (materials_list, dielectrics_list, gds_layers_list, allpolyg
             print('  <Layer Name="LBE" Type="dielectric" Zmin="-183.75" Zmax="0" Material="AIR" Layer="157"/>')
             exit(51)
 
-        tags_created_3D['airbox'] = [box_tag]
+        tags_created_3D['airbox'] = airbox_tags
 
     return tags_created_3D, airbox_bounds
 
@@ -2144,7 +2148,7 @@ def create_model (excite_ports, settings):
         elif name in dielectric_volume_dict.keys():
             dielectric_volume_dict[name].append(tag)
         elif name == "airbox":
-            dielectric_volume_dict['airbox']=[tag]
+            dielectric_volume_dict.setdefault('airbox', []).append(tag)   # one volume, or the air below and above the stack
             # get all surfaces 
             _, surfaceloops = gmsh.model.occ.getSurfaceLoops(tag)
             for surfaceloop in surfaceloops:

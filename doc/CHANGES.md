@@ -2,6 +2,16 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 21 November-2026
+
+gds2palace 0.11.1
+
+**Port walls: smaller error of a reference plane shift**  
+The calibration standards are solved at nine frequencies from fstop/100 to fstop, instead of fstop/20, fstop/5 and fstop. The port and the line are interpolated between these frequencies, and with three of them, this was the largest error of a reference plane shift: a line over a thin ground plane changes its inductance towards low frequency. The line's inductance and capacitance are now also taken from the three points between fstop/100 and fstop/20, when they agree with the point at fstop/20; otherwise `combine_snp` prints a note and uses them for the resistance only, as before. In a zero-length thru test (a TopMetal2 line between two port walls, both reference planes shifted to its middle, 0 to 50 GHz), the remaining S11 went from -44 dB to -58 dB for an 880 µm line, and the same for a pair of coupled lines. The standards take longer to solve (ten instead of four frequencies). Results of models with port walls change slightly; standards solved before are solved again. `combine_extend_snp.py` is version 1.6. The test is described in `more_examples/calibrated_boxwall_ports`, section "Sanity check: a zero-length thru".
+
+**Fix**  
+A model without air on all four side walls (`air_around` 0 on xmin, xmax, ymin and ymax, e.g. `[0, 0, 0, 0, 200, 200]`, or two port walls and 0 on the other two sides) lost the air above or below the stack: the dielectrics cut the airbox into two volumes, only one of them got the air material, and Palace removed the elements of the other without an error. The simulation boundary on that side was then at the top or bottom of the stack. Both volumes now get the air material.
+
 ## 19 November-2026
 
 gds2palace 0.11.0

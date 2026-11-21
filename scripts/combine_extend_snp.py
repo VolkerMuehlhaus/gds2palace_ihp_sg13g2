@@ -534,6 +534,14 @@ def _line_report(T_line, length, f, unit):
     return out
 
 
+LINE_FROM_FRACTION = 100       # the line's L and C are taken from the standards from fmax / this value up
+LOW_POINT_C_TOLERANCE = 0.03   # a point below fmax/20 is used if its capacitances agree this well with fmax/20.
+                               # Solved standards agree within 0.1 % from fmax/100 up (single line, pair and the two
+                               # rfcmim feeds, 2026-11-21); the rfcmim feeds at 10 MHz, known to be noisy, are 4 and
+                               # 27 % off
+LOW_POINT_L_MAX = 3.0          # and its inductance per length is at most this many times that at fmax/20
+
+
 def _calibrate_group(group, sim_path, unit):
     """port elements and line of one port wall from its two standards; returns a dict with the standards' frequencies,
     the shunt Y and series Zs of the port, the line's A = log(T_line) / L, and the diagnostics"""
@@ -556,10 +564,36 @@ def _calibrate_group(group, sim_path, unit):
     # noise, but its inductance and capacitance and the port's capacitance are below it (rfcmim example, three runs:
     # R' 3.545 to 3.548 ohm/mm, port C 1.0 to 4.4 fF). Those are taken from the lowest regular frequency: L and C
     # unchanged, shunt loss in proportion to f. The diagnostics and the report use the regular frequencies only.
+    #
+    # 1.6 (gds2palace 0.11.1 solves the standards at more frequencies, three of them between fmax/100 and fmax/20):
+    # the line's L and C are also taken from the points between fmax/100 and fmax/20, where a line over a thin
+    # ground still changes (zero-length thru, 1760 um TopMetal2 line over Metal1, 50 GHz: residual below 2.5 GHz
+    # -38 dB with L and C held from 2.5 GHz, -61 dB with the points at 0.5, 1 and 1.5 GHz). A low frequency point
+    # can be noisy in other models, so each one is used only if it agrees with the point at fmax/20: the port's
+    # capacitance and the line's capacitance per length within LOW_POINT_C_TOLERANCE, the line's inductance per
+    # length not below and not more than LOW_POINT_L_MAX times it. The first point that fails and all below it are
+    # used as before, for the resistance only.
     fmax = group.get('fmax_GHz')
     regular = f1 >= (fmax * 1e9 / 20 if fmax else f1[0]) * (1 - 1e-3)
     if not np.any(regular):
         regular = np.ones(len(f1), dtype=bool)
+    k_ref = int(np.argmax(regular))
+    rejected = []
+    if fmax:
+        per_omega = lambda M, k: M[k].imag.diagonal() / (2 * np.pi * f1[k])
+        for k in range(k_ref - 1, -1, -1):
+            if f1[k] < fmax * 1e9 / LINE_FROM_FRACTION * (1 - 1e-3):
+                break
+            with np.errstate(divide='ignore', invalid='ignore'):
+                c_port = per_omega(Ys, k) / per_omega(Ys, k_ref)
+                c_line = per_omega(A[:, n:, :n], k) / per_omega(A[:, n:, :n], k_ref)
+                l_line = per_omega(A[:, :n, n:], k) / per_omega(A[:, :n, n:], k_ref)
+            if (np.all(np.abs(c_port - 1) <= LOW_POINT_C_TOLERANCE) and np.all(np.abs(c_line - 1) <= LOW_POINT_C_TOLERANCE)
+                    and np.all(l_line >= 1 - LOW_POINT_C_TOLERANCE) and np.all(l_line <= LOW_POINT_L_MAX)):
+                regular[k] = True
+            else:
+                rejected = [float(x) for x in f1[:k + 1] if x >= fmax * 1e9 / LINE_FROM_FRACTION * (1 - 1e-3)]
+                break
     k0 = int(np.argmax(regular))
     for k in np.flatnonzero(~regular):
         ratio = f1[k] / f1[k0]
@@ -591,7 +625,7 @@ def _calibrate_group(group, sim_path, unit):
     n_top = max(float(m['n_eff'][-1]) for m in report)
     valid = min(f1[-1], C0 / (n_top * 5 * L * unit)) if n_top > 0 else f1[-1]
     return {'f': f_all, 'Ys': Ys_all, 'Zs': Zs_all, 'A': A_all, 'regular': regular, 'report': report, 'doubtful': doubtful,
-            'valid_to_GHz': valid / 1e9}
+            'valid_to_GHz': valid / 1e9, 'rejected_low_points_GHz': [x / 1e9 for x in rejected]}
 
 
 def _error_network(f, N, port_info, groups_cal, unit):
@@ -690,6 +724,7 @@ def calibrated_deembedding(snp_filename, port_info, sim_path):
                  'gaps': {str(p['portnumber']): p['gap'] for p in g.get('port_details', [])},
                  'frequencies_GHz': (f_reg / 1e9).tolist(),
                  'line_resistance_also_solved_at_GHz': (cal['f'][~reg] / 1e9).tolist(),
+                 'low_points_not_used_for_L_and_C_GHz': cal['rejected_low_points_GHz'],
                  'port_C_fF': (Ys_reg.imag / w[:, None, None] * 1e15).round(4).tolist(),
                  'port_G_mS': (Ys_reg.real * 1e3).round(5).tolist(),
                  'port_series_L_pH': (Zs_reg.imag / w[:, None, None] * 1e12).round(4).tolist(),
@@ -705,6 +740,9 @@ def calibrated_deembedding(snp_filename, port_info, sim_path):
                           f", n_eff {m['n_eff'][mid]:.4g}, loss {m['loss_dB_per_mm'][mid]:.3g} dB/mm" for m in cal['report'])
         print(f"  feed line at port wall {g['side']}, {f_reg[mid] / 1e9:.4g} GHz: {modes}")
         print(f"  calibration valid up to about {cal['valid_to_GHz']:.4g} GHz")
+        if cal['rejected_low_points_GHz']:
+            print(f"  note: the standards at {', '.join(f'{x:g}' for x in cal['rejected_low_points_GHz'])} GHz don't agree "
+                  f"with those at higher frequency: used for the line's resistance only")
         for warning in cal['doubtful']:
             print(f"  WARNING, calibration doubtful: {warning}")
     with open(filename + '_deembedding.json', 'w', encoding='utf-8') as fh:
@@ -721,9 +759,10 @@ def _standard_folder_of(found_filename, port_info_data):
     return None
 
 
-__version__ = "1.5"      # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument;
+__version__ = "1.6"      # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument;
                          # 1.4: line loss of port walls linear in sqrt(f) between the standards' frequencies (0.10.6)
                          # 1.5: _dc file keeps the simulated frequency points, no resampling (0.10.7)
+                         # 1.6: line L and C of port walls also from the standards between fmax/100 and fmax/20 (0.11.1)
                          # printed at the start so a log shows which copy ran
 
 
