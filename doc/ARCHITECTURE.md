@@ -713,8 +713,11 @@ technology layers via `from_layername`/`to_layername` (vertical/via port) or `ta
    structure, not a bug.
 
 Port shape requirement: ports are **2D-sheet lumped ports**. For a vertical (via) port, draw a
-zero-width box in GDSII (a line, effectively) — a finite-area box still works, but the port sheet
-is placed along its centerline. Composite ports (multiple EM ports grouped into one logical port)
+zero-width box in GDSII (a line, effectively): one vertical sheet. A long, narrow box (short side
+up to 10 % of the long side) also gives one sheet, along its xmin or ymin edge. A shape with more
+area gives a tube port: the four side walls of its bounding box as one multielement port
+(`via_port_is_tube()` in `util_simulation_setup.py`; its walls are marked `"tube": true` in
+`port_information.json` and are not de-embedded by `combine_snp`). Composite ports (multiple EM ports grouped into one logical port)
 are **not supported**.
 
 ---

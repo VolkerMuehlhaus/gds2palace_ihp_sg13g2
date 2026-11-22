@@ -317,9 +317,15 @@ def port_deembedding (snp_filename, port_info_available, port_info_data):
 
         # calculate parasitic port inductance for all ports
         Lport = {}
+        # tube ports (via port shape drawn with area) stand for a real conductor, e.g. a copper pillar:
+        # their inductance belongs to the result and is not removed
+        tube_ports = set()
         portlist = port_info_data["ports"]
         for port in portlist:
             portnum = port.get("portnumber", None)    
+            if port.get("tube", False):
+                tube_ports.add(str(portnum))
+                continue
             length  = port.get("length", None)
             width   = port.get("width", None)
             if (length is not None) and (width is not None) and (portnum is not None):
@@ -351,6 +357,9 @@ def port_deembedding (snp_filename, port_info_available, port_info_data):
             if str(n+1) in Lport:
                 L = -Lport[str(n+1)]
                 print(f'Cascading L= {L*1e12:.2f} pH at port {n+1}')
+            elif str(n+1) in tube_ports:
+                L = 0.0
+                print(f'Port {n+1} is a tube port that stands for a conductor, port not de-embedded')
             else:
                 L = 0.0
                 print(f'No geometry data for port {n+1}, port not de-embedded')
@@ -759,10 +768,11 @@ def _standard_folder_of(found_filename, port_info_data):
     return None
 
 
-__version__ = "1.6"      # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument;
+__version__ = "1.7"      # 1.3: port wall calibration (gds2palace 0.10.0); 1.3.1: --help, --version, folder argument;
                          # 1.4: line loss of port walls linear in sqrt(f) between the standards' frequencies (0.10.6)
                          # 1.5: _dc file keeps the simulated frequency points, no resampling (0.10.7)
                          # 1.6: line L and C of port walls also from the standards between fmax/100 and fmax/20 (0.11.1)
+                         # 1.7: tube ports are not de-embedded (0.12.0)
                          # printed at the start so a log shows which copy ran
 
 

@@ -299,9 +299,16 @@ an unattended run seems to hang. Double-check key names against the source.
   `read_gds()`, or the port shapes are not read.
 - **Via port** (vertical): `from_layername` and `to_layername`, `direction='z'`
   or `'-z'`. Draw it as a **zero-width box** (a line) in GDSII: the port is a
-  vertical 2D sheet. A box with an area is turned into a sheet along its left
-  edge (xmin) if it is taller than wide, else along its bottom edge (ymin), not
-  along its center line.
+  vertical 2D sheet. A long, narrow box (short side up to 10 % of the long
+  side) is turned into a sheet along its left edge (xmin) if it is taller than
+  wide, else along its bottom edge (ymin), not along its center line.
+- **Tube port**: a via port shape whose short side is more than 10 % of its
+  long side becomes the four side walls of its bounding box, as one
+  multielement port (gds2palace 0.12.0 and newer; before, one sheet along an
+  edge). Use it only where the port stands for a real conductor with a cross
+  section, e.g. a copper pillar between two chips that are simulated
+  separately: draw the conductor's outline. `combine_snp` doesn't de-embed
+  tube ports. Palace only, not Elmer.
 - **In-plane port**: `target_layername`, `direction='x'`, `'-x'`, `'y'` or
   `'-y'`. Draw it as a rectangle on that metal's level.
 - The sign of `direction` sets the polarity.
@@ -456,7 +463,8 @@ These are design decisions that the files can't tell you:
 | No output in a log file for a long time | Python buffers stdout: use `python -u` |
 | Meshing error between two metals | Two conductor layers touch directly: a via layer must be between them |
 | Meshing errors or wrong results with a stackup that "should work" | A gds2openEMS stackup used with gds2palace |
-| Port missing or at the wrong place | Port layer not in `layernumbers`, wrong `source_layernum`, or the via port drawn with an area |
+| Port missing or at the wrong place | Port layer not in `layernumbers`, wrong `source_layernum`, or the via port drawn as a narrow box instead of a line (the sheet is at its edge) |
+| A via port has four elements in `config.json` | The port shape was drawn with an area: it is a tube port. Draw a line for a normal via port |
 | Zero rows in the S-parameter file | Ports with `voltage=0` are not excited |
 | Wrong resistance of narrow lines at low frequency | Surface impedance model: see "Limits of conductor loss calculation" in the user's guide; consider `conductor_model = 'solve_inside'` |
 | Unreliable S-parameters at some frequencies | `did NOT converge` in the Palace log; keep `complex_coarse_solve` on, raise `solver_maxits`, check the model |

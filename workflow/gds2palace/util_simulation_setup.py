@@ -1004,6 +1004,25 @@ def port_number_from_group (groupname):
     return int(groupname[1:].split('_')[0])
 
 
+VIA_PORT_TUBE_RATIO = 0.1   # short side / long side of a via port shape above which the port is a tube
+
+
+def via_port_is_tube (size_x, size_y):
+    """A via port shape drawn as a line gives one vertical port sheet. A shape with area, whose short
+    side is more than VIA_PORT_TUBE_RATIO of its long side, gives a tube: the four side walls of its
+    bounding box as one multielement port.
+
+    Args:
+        size_x (float): size of the shape's bounding box in x
+        size_y (float): size of the shape's bounding box in y
+
+    Returns:
+        bool: True for a tube port
+    """
+    long_side = max(size_x, size_y)
+    return long_side > 0 and min(size_x, size_y) > VIA_PORT_TUBE_RATIO * long_side
+
+
 def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
     """Add ports from special port layers to gmsh
 
@@ -1033,34 +1052,25 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
                 # mark polygon for special handling in meshing
                 poly.is_port = True 
 
-                port_dimtag = []
                 # find port definition for this GDSII source layer number
                 port = simulation_ports.get_port_by_layernumber(poly.layernum)
                 if port is not None:
-
-                    port_information_data = {}
-                    port_information_data['portnumber'] = port.portnumber
-                    port_information_data['Z0'] = port.port_Z0
-                    port_information_data['direction'] = port.direction.upper()
 
                     portnum = port.portnumber
                     xmin = poly.xmin
                     xmax = poly.xmax
                     ymin = poly.ymin
                     ymax = poly.ymax
-                    
+
+                    # each face is one port surface: corner points, length, width and bounding box
+                    faces = []
+
                     # port z coordinates are different between in-plane ports and via ports
                     if port.target_layername is not None:
                         # in-plane port   
                         port_metal = metals_list.getbylayername(port.target_layername)
                         zmin = port_metal.zmin
                         zmax = port_metal.zmin # port has zero thickness
-
-                        # rectangle in xy plane
-                        pt1 = gmsh.model.occ.addPoint(xmin, ymin, zmin, meshseed, -1)
-                        pt2 = gmsh.model.occ.addPoint(xmin, ymax, zmin, meshseed, -1)
-                        pt3 = gmsh.model.occ.addPoint(xmax, ymax, zmin, meshseed, -1)
-                        pt4 = gmsh.model.occ.addPoint(xmax, ymin, zmin, meshseed, -1)
 
                         # port information that we write to Palace output directory
                         if 'X' in port.direction.upper():
@@ -1069,8 +1079,10 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
                         else:    
                             length = ymax-ymin
                             width  = xmax-xmin
-                        port_information_data['length'] = length                           
-                        port_information_data['width']  = width      
+
+                        # rectangle in xy plane
+                        corners = [(xmin, ymin, zmin), (xmin, ymax, zmin), (xmax, ymax, zmin), (xmax, ymin, zmin)]
+                        faces.append((corners, length, width, (xmin, xmax, ymin, ymax), False))
 
                     else:
                        # via port 
@@ -1095,60 +1107,72 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
                        zmax = upper.zmin
                        length = zmax-zmin
 
-                       # port is expected to be a line only (no area), we now create surface in z direction
-                       # to make sure that we have a line only, we check size in x and y direction
                        size_x = xmax - xmin
                        size_y = ymax - ymin 
-                       
-                       if size_y > size_x:
-                            # ports are line in y direction
-                            pt1 = gmsh.model.occ.addPoint(xmin, ymin, zmin, meshseed, -1)
-                            pt2 = gmsh.model.occ.addPoint(xmin, ymax, zmin, meshseed, -1)
-                            pt3 = gmsh.model.occ.addPoint(xmin, ymax, zmax, meshseed, -1)
-                            pt4 = gmsh.model.occ.addPoint(xmin, ymin, zmax, meshseed, -1)
-                            width = size_y
+
+                       def wall_x (y):
+                           # vertical sheet along x, at the given y
+                           return ([(xmin, y, zmin), (xmin, y, zmax), (xmax, y, zmax), (xmax, y, zmin)], length, size_x, (xmin, xmax, y, y))
+
+                       def wall_y (x):
+                           # vertical sheet along y, at the given x
+                           return ([(x, ymin, zmin), (x, ymax, zmin), (x, ymax, zmax), (x, ymin, zmax)], length, size_y, (x, x, ymin, ymax))
+
+                       if via_port_is_tube(size_x, size_y):
+                            # shape with area: the port is the four side walls of the bounding box (a tube),
+                            # so that the port current flows on the outline of the conductor that the port stands for
+                            for wall in (wall_y(xmin), wall_y(xmax), wall_x(ymin), wall_x(ymax)):
+                                faces.append(wall + (True,))
+                       elif size_y > size_x:
+                            # port is a line in y direction: one sheet, at xmin
+                            faces.append(wall_y(xmin) + (False,))
                        else: 
-                            # ports are line in x direction
-                            pt1 = gmsh.model.occ.addPoint(xmin, ymin, zmin, meshseed, -1)
-                            pt2 = gmsh.model.occ.addPoint(xmin, ymin, zmax, meshseed, -1)
-                            pt3 = gmsh.model.occ.addPoint(xmax, ymin, zmax, meshseed, -1)
-                            pt4 = gmsh.model.occ.addPoint(xmax, ymin, zmin, meshseed, -1)
-                            width = size_x
+                            # port is a line in x direction: one sheet, at ymin
+                            faces.append(wall_x(ymin) + (False,))
 
-                       port_information_data['length'] = length                            
-                       port_information_data['width']  = width      
+                    for corners, length, width, bbox, is_tube in faces:
+                        port_information_data = {}
+                        port_information_data['portnumber'] = port.portnumber
+                        port_information_data['Z0'] = port.port_Z0
+                        port_information_data['direction'] = port.direction.upper()
+                        port_information_data['length'] = length
+                        port_information_data['width']  = width
+                        port_information_data['xmin'] = bbox[0]
+                        port_information_data['xmax'] = bbox[1]
+                        port_information_data['ymin'] = bbox[2]
+                        port_information_data['ymax'] = bbox[3]
+                        port_information_data['zmin'] = zmin
+                        port_information_data['zmax'] = zmax
+                        if is_tube:
+                            # combine_snp leaves tube ports as they are: the port stands for a real conductor
+                            port_information_data['tube'] = True
 
-                    port_information_data['xmin'] = xmin                           
-                    port_information_data['xmax'] = xmax      
-                    port_information_data['ymin'] = ymin                           
-                    port_information_data['ymax'] = ymax      
-                    port_information_data['zmin'] = zmin                           
-                    port_information_data['zmax'] = zmax      
+                        all_port_information.append(port_information_data)
 
-                    all_port_information.append(port_information_data)
+                        pt1, pt2, pt3, pt4 = [gmsh.model.occ.addPoint(x, y, z, meshseed, -1) for x, y, z in corners]
 
-                    # for both in-plane and vertical
-                    line1 = gmsh.model.occ.addLine(pt1,pt2,-1) 
-                    line2 = gmsh.model.occ.addLine(pt2,pt3,-1) 
-                    line3 = gmsh.model.occ.addLine(pt3,pt4,-1) 
-                    line4 = gmsh.model.occ.addLine(pt4,pt1,-1) 
-                    linetaglist = [line1, line2, line3, line4]
+                        # for both in-plane and vertical
+                        line1 = gmsh.model.occ.addLine(pt1,pt2,-1) 
+                        line2 = gmsh.model.occ.addLine(pt2,pt3,-1) 
+                        line3 = gmsh.model.occ.addLine(pt3,pt4,-1) 
+                        line4 = gmsh.model.occ.addLine(pt4,pt1,-1) 
+                        linetaglist = [line1, line2, line3, line4]
 
-                    # after creating the lines, we can create a curve loop and a surface 
-                    # to do so, we need the line segment numbers again
-                    curvetag   = gmsh.model.occ.addCurveLoop(linetaglist, tag=-1)
-                    surfacetag = gmsh.model.occ.addPlaneSurface([curvetag], tag=-1)
+                        # after creating the lines, we can create a curve loop and a surface 
+                        # to do so, we need the line segment numbers again
+                        curvetag   = gmsh.model.occ.addCurveLoop(linetaglist, tag=-1)
+                        surfacetag = gmsh.model.occ.addPlaneSurface([curvetag], tag=-1)
 
-                    port_dimtag.append(surfacetag)
-                    # several shapes on one port layer: each is one element of a multielement lumped port
-                    # (elements in parallel), stored as P<n>, P<n>_2, P<n>_3, ...
-                    key = 'P'+str(portnum)
-                    element = 1
-                    while key in tags_created_2D:
-                        element += 1
-                        key = 'P'+str(portnum)+'_'+str(element)
-                    port_information_data['element'] = element
-                    tags_created_2D[key]=port_dimtag
+                        # several surfaces of one port (several shapes on the port layer, or the walls of a tube):
+                        # each is one element of a multielement lumped port (elements in parallel),
+                        # stored as P<n>, P<n>_2, P<n>_3, ...
+                        key = 'P'+str(portnum)
+                        element = 1
+                        while key in tags_created_2D:
+                            element += 1
+                            key = 'P'+str(portnum)+'_'+str(element)
+                        port_information_data['element'] = element
+                        tags_created_2D[key]=[surfacetag]
 
     gmsh.model.occ.synchronize()
 
@@ -3105,8 +3129,9 @@ def create_model (excite_ports, settings):
                 layername, portname, grouptag = item.values()
 
                 if '_' in portname:
-                    print(f'ERROR: port {port_number_from_group(portname)} has several shapes on its port layer '
-                          '(a multielement port). This is supported for Palace only, not for Elmer.')
+                    print(f'ERROR: port {port_number_from_group(portname)} has several shapes on its port layer, '
+                          'or its shape is drawn with an area (a tube port): a multielement port. '
+                          'This is supported for Palace only, not for Elmer.')
                     exit(1)
                 portnum = int(portname.replace('P',''))
                 port = simulation_ports.get_port_by_number(portnum)

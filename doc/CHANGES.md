@@ -4,6 +4,14 @@ This is an (incomplete) list of changes and new features.
 
 ## 21 November-2026
 
+gds2palace 0.12.0
+
+**New: tube ports, for via ports that stand for a conductor with a cross section**  
+A via port shape drawn with an area now gives a tube port: the four side walls of the shape's bounding box, as one Palace multielement port with the given Z0. This is meant for ports that stand for a real conductor, e.g. the copper pillars between two chips that are simulated as two separate models and joined at the pillars. The port current flows on the outline of the drawn shape, as it does on the conductor. In a test with a chip on an interposer, joined by 50 µm copper pillars (a line through two ground-signal-ground pillar groups, 0 to 100 GHz), each half model ended at a PEC sheet at half pillar height and a port stood for each half signal pillar. The two half models joined at these ports differed from the model of the whole assembly by at most 0.012 in |S| with tube ports and by 0.032 with single sheet ports of the same width.
+
+**Changed behaviour: a via port shape with an area**  
+Via ports are drawn as lines, and those are unchanged: one vertical sheet. A shape counts as a line when its short side is at most 10 % of its long side. A shape with more area gave one sheet along its xmin or ymin edge before, and gives a tube port now. All via ports of the shipped examples are lines. `combine_snp` leaves tube ports as they are in the `_deembedded` file: the port's inductance belongs to the conductor that it stands for. The walls of a tube port are marked `"tube": true` in `port_information.json`. Tube ports are for Palace only, like other multielement ports. `combine_extend_snp.py` is version 1.7.
+
 gds2palace 0.11.1
 
 **Port walls: smaller error of a reference plane shift**  
