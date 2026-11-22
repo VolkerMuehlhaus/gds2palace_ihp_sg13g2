@@ -175,6 +175,7 @@ structure), not from scratch. Good starting points:
 | MIM capacitor | [`workflow/palace_rfcmim.py`](workflow/palace_rfcmim.py) |
 | Many ports, field dump | [`workflow/palace_butlermatrix.py`](workflow/palace_butlermatrix.py), [`workflow/palace_butlermatrix_dump93.py`](workflow/palace_butlermatrix_dump93.py) |
 | Transistor parasitics, ports to an artificial ground | [`more_examples/core_transistor_3port_bce/`](more_examples/core_transistor_3port_bce/) |
+| Two stacked chips (flip-chip): one model, or two models split at the pillars | [`more_examples/chiplet_split_at_pillars/`](more_examples/chiplet_split_at_pillars/) |
 | Resistors from derived layers, stackup variables | [`more_examples/derived_layers_and_resistors/`](more_examples/derived_layers_and_resistors/) |
 | Several model variants from one script | [`more_examples/EM_temperature_coefficient/`](more_examples/EM_temperature_coefficient/) |
 | PCB instead of RFIC | [`workflow/palace_pcb_lowpass.py`](workflow/palace_pcb_lowpass.py) |
@@ -308,7 +309,8 @@ an unattended run seems to hang. Double-check key names against the source.
   edge). Use it only where the port stands for a real conductor with a cross
   section, e.g. a copper pillar between two chips that are simulated
   separately: draw the conductor's outline. `combine_snp` doesn't de-embed
-  tube ports. Palace only, not Elmer.
+  tube ports. Palace only, not Elmer. Complete example: two chips split at
+  their copper pillars, [`more_examples/chiplet_split_at_pillars/`](more_examples/chiplet_split_at_pillars/).
 - **In-plane port**: `target_layername`, `direction='x'`, `'-x'`, `'y'` or
   `'-y'`. Draw it as a rectangle on that metal's level.
 - The sign of `direction` sets the polarity.

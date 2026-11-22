@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<!--
+  Split model, upper part: the interposer and the upper half of the copper pillars, down to a PEC cut plane at z = 39.2303
+  (half pillar height). Values as in assembly.xml.
+  All z values are absolute, in um, z = 0 at the top of the die's EPI layer.
+
+  Die: IHP SG13G2, values of XML_stackup/legacy/SG13G2_200um.xml, with 50 um of air below the substrate.
+  Copper pillars: GDS 41/35 on the die (pillar pad opening = pillar footprint), from the top of the die's
+    TopMetal2 up to the interposer's TopMetal2. Height and conductivity are assumed values.
+  Underfill: permittivity 1 (air), an assumed value.
+  Interposer: IHP IntM4TM2, values of libs.tech/intm4tm2_stack.json and libs.tech/palace/workflow/INTM4TM2.xml
+    in https://github.com/IHP-GmbH/OpenIntM4TM2 (Apache License 2.0), mirrored: z = 75.0406 - z(json).
+    250 um silicon carrier with 2 S/m (the value of the SG13G2 substrate, assumed), 50 um of air above its
+    backside. GDS layer numbers +1000 (the script reads the interposer GDS with layernumber_offset=1000).
+-->
+  <Stackup schemaVersion="2.0">
+    <Materials>
+      <Material Name="Activ" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="357141.0" Color="00ff00"/>
+      <Material Name="Metal1" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="21640000.0" Color="39bfff"/>
+      <Material Name="Metal2" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="23190000.0" Color="ccccd9"/>
+      <Material Name="Metal3" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="23190000.0" Color="d80000"/>
+      <Material Name="Metal4" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="23190000.0" Color="93e837"/>
+      <Material Name="Metal5" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="23190000.0" Color="dcd146"/>
+      <Material Name="TopMetal1" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="27800000.0" Color="ffe6bf"/>
+      <Material Name="TopMetal2" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="30300000.0" Color="ff8000"/>
+      <Material Name="TopVia2" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="3143000.0" Color="ff8000"/>
+      <Material Name="TopVia1" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="2191000.0" Color="ffe6bf"/>
+      <Material Name="Via4" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="1660000.0" Color="deac5e"/>
+      <Material Name="Via3" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="1660000.0" Color="9ba940"/>
+      <Material Name="Via2" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="1660000.0" Color="ff3736"/>
+      <Material Name="Via1" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="1660000.0" Color="ccccff"/>
+      <Material Name="Cont" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="2390000.0" Color="00ffff"/>
+      <Material Name="Vmim" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="2191000.0" Color="ffe6bf"/>
+      <Material Name="MIM" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="500000.0" Color="e6ffbf"/>
+      <Material Name="CuPillar" Type="Conductor" Permittivity="1" DielectricLossTangent="0" Conductivity="33000000.0" Color="ff0000"/>
+      <Material Name="Passive" Type="Dielectric" Permittivity="6.6" DielectricLossTangent="0.0" Conductivity="0" Color="a0a0f0"/>
+      <Material Name="SiO2" Type="Dielectric" Permittivity="4.1" DielectricLossTangent="0.0" Conductivity="0" Color="fffcad"/>
+      <Material Name="Substrate" Type="Semiconductor" Permittivity="11.9" DielectricLossTangent="0" Conductivity="2.0" Color="01e0ff"/>
+      <Material Name="EPI" Type="Semiconductor" Permittivity="11.9" DielectricLossTangent="0" Conductivity="5.0" Color="294fff"/>
+      <Material Name="Underfill" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" Conductivity="0" Color="d0d0d0"/>
+      <Material Name="AIR" Type="Dielectric" Permittivity="1.0" DielectricLossTangent="0.0" Conductivity="0" Color="d0d0d0"/>
+    </Materials>
+    <ELayers LengthUnit="um">
+      <Dielectrics>
+        <!-- interposer, outline 39/4 of the interposer GDS = 1039 -->
+        <Dielectric Name="iAIR" Material="AIR" Zmin="325.0406" Zmax="375.0406" Boundary="1039"/>
+        <Dielectric Name="iSubstrate" Material="Substrate" Zmin="75.0406" Zmax="325.0406" Boundary="1039"/>
+        <Dielectric Name="iSiO2" Material="SiO2" Zmin="62.7303" Zmax="75.0406" Boundary="1039"/>
+        <Dielectric Name="iPassive" Material="Passive" Zmin="62.3303" Zmax="62.7303" Boundary="1039"/>
+        <!-- between the cut plane and the interposer -->
+        <Dielectric Name="Underfill" Material="Underfill" Zmin="39.2303" Zmax="62.3303" Boundary="1039"/>
+      </Dielectrics>
+      <Layers>
+        <!-- the half of the ground pillars in this model (GDS 221 in split_shapes.gds); the signal pillars are replaced by tube ports -->
+        <Layer Name="CuPillarGnd" Type="via" Zmin="39.2303" Zmax="64.2303" Material="CuPillar" Layer="221" />
+        <!-- cut plane: PEC sheet at half pillar height (GDS 220 in split_shapes.gds), the same in both models -->
+        <Layer Name="CUT" Type="sheet" Zmin="39.2303" Zmax="39.2303" Material="PEC" Layer="220" />
+        <!-- interposer -->
+        <Layer Name="iTopMetal2" Type="conductor" Zmin="64.2303" Zmax="67.2303" Material="TopMetal2" Layer="1134" />
+        <Layer Name="iTopVia2" Type="via" Zmin="67.2303" Zmax="70.0303" Material="TopVia2" Layer="1133" />
+        <Layer Name="iTopMetal1" Type="conductor" Zmin="70.0303" Zmax="72.0303" Material="TopMetal1" Layer="1126" />
+        <Layer Name="iTopVia1" Type="via" Zmin="72.0303" Zmax="72.8806" Material="TopVia1" Layer="1125" />
+        <Layer Name="iMetal5" Type="conductor" Zmin="72.8806" Zmax="73.3706" Material="Metal5" Layer="1067" />
+        <Layer Name="iVia4" Type="via" Zmin="73.3706" Zmax="73.9106" Material="Via4" Layer="1066" />
+        <Layer Name="iMetal4" Type="conductor" Zmin="73.9106" Zmax="74.4006" Material="Metal4" Layer="1050" />
+      </Layers>
+    </ELayers>
+  </Stackup>

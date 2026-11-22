@@ -20,6 +20,7 @@ New to gds2palace? Start with [`../workflow`](../workflow), then pick the how-to
 |---|---|
 | [`calibrated_boxwall_ports`](calibrated_boxwall_ports) | Beginner's step-by-step guide to calibrated box wall ports (double delay, after J. C. Rautio and V. I. Okhmatovski): an RF MIM capacitor without its feed lines and port parasitics, reference planes at the pcell pins, compared with the PDK model `cap_rfcmim` |
 | [`core_transistor_3port_bce`](core_transistor_3port_bce) | Parasitic network of a transistor with 5 ports: 2 via ports at the RF pads, plus 3 via ports directly at the base, collector and emitter, referenced to an artificial ground plane |
+| [`chiplet_split_at_pillars`](chiplet_split_at_pillars) | A die flip-chip mounted on an interposer, simulated as two models cut at half pillar height: tube ports on the signal pillars to a PEC cut plane, results joined with scikit-rf and compared with the one-model reference. Also shows reading two GDS files, mirrored and with a layer number offset |
 
 ### Generating the layout by code
 

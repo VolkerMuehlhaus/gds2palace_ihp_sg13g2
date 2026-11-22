@@ -12,6 +12,9 @@ A via port shape drawn with an area now gives a tube port: the four side walls o
 **Changed behaviour: a via port shape with an area**  
 Via ports are drawn as lines, and those are unchanged: one vertical sheet. A shape counts as a line when its short side is at most 10 % of its long side. A shape with more area gave one sheet along its xmin or ymin edge before, and gives a tube port now. All via ports of the shipped examples are lines. `combine_snp` leaves tube ports as they are in the `_deembedded` file: the port's inductance belongs to the conductor that it stands for. The walls of a tube port are marked `"tube": true` in `port_information.json`. Tube ports are for Palace only, like other multielement ports. `combine_extend_snp.py` is version 1.7.
 
+**New example: two stacked chips split at the copper pillars**  
+`more_examples/chiplet_split_at_pillars` simulates a die flip-chip mounted on an interposer, from the public example layouts of IHP OpenIntM4TM2, as two models cut at half pillar height: tube ports on the signal pillars to a PEC cut plane, the results joined with scikit-rf. With one 50 Ω GSG port at each end of the line, the joined 2-port agrees with the one-model reference within 0.03 in |S| up to 100 GHz, mostly a 1.9° phase difference in S21 at 100 GHz. The example also shows how to read two GDS files into one model (mirrored, with a layer number offset) and a stackup with absolute z values for both chips.
+
 gds2palace 0.11.1
 
 **Port walls: smaller error of a reference plane shift**  

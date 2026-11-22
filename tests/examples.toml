@@ -62,7 +62,8 @@ tiers = ["reader", "geometry", "model"]
 # conductor_models, measured_vs_simulated: L6n2 is in once), the D-band balun and inductor frame of
 # mesh_convergence (the same structures are in workflow/), ground_cutout_inductor and conductor_models/lines
 # (study drivers that build many models), the two inductor synthesis scripts (they also run the solver; one needs
-# an external library).
+# an external library), chiplet_split_at_pillars (each model reads two GDS files, the example tests expect one
+# read_gds() call per model).
 
 [[example]]
 script = "more_examples/EM_temperature_coefficient/palace_tcoef.py"
