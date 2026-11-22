@@ -1123,12 +1123,11 @@ def add_ports (allpolygons, metals_list, simulation_ports, meshseed = 0):
                             # so that the port current flows on the outline of the conductor that the port stands for
                             for wall in (wall_y(xmin), wall_y(xmax), wall_x(ymin), wall_x(ymax)):
                                 faces.append(wall + (True,))
-                       elif size_y > size_x:
-                            # port is a line in y direction: one sheet, at xmin
-                            faces.append(wall_y(xmin) + (False,))
-                       else: 
-                            # port is a line in x direction: one sheet, at ymin
-                            faces.append(wall_x(ymin) + (False,))
+                       else:
+                            # port is a line: one sheet, at xmin (line in y direction) or ymin (line in x direction);
+                            # port_information keeps the drawn shape's bounding box, as before 0.12.0
+                            corners, length, width, _ = wall_y(xmin) if size_y > size_x else wall_x(ymin)
+                            faces.append((corners, length, width, (xmin, xmax, ymin, ymax), False))
 
                     for corners, length, width, bbox, is_tube in faces:
                         port_information_data = {}
