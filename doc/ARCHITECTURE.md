@@ -713,8 +713,11 @@ technology layers via `from_layername`/`to_layername` (vertical/via port) or `ta
    structure, not a bug.
 
 Port shape requirement: ports are **2D-sheet lumped ports**. For a vertical (via) port, draw a
-zero-width box in GDSII (a line, effectively) — a finite-area box still works, but the port sheet
-is placed along its centerline. Composite ports (multiple EM ports grouped into one logical port)
+zero-width box in GDSII (a line, effectively): one vertical sheet. A long, narrow box (short side
+up to 10 % of the long side) also gives one sheet, along its xmin or ymin edge. A shape with more
+area gives a tube port: the four side walls of its bounding box as one multielement port
+(`via_port_is_tube()` in `util_simulation_setup.py`; its walls are marked `"tube": true` in
+`port_information.json` and are not de-embedded by `combine_snp`). Composite ports (multiple EM ports grouped into one logical port)
 are **not supported**.
 
 ---
@@ -785,7 +788,8 @@ within (or above) the directory tree holding the Palace/Elmer output — which i
    DC-extrapolated inductor), and gets the port's shunt and series element from the double delay
    T_L^-1 T_2L T_L^-1 (`port_from_double`). The elements are interpolated to the device's frequencies
    (imaginary part per omega linear in f, real part linear in sqrt(f), held outside the standards' frequencies; from
-   a frequency below fmax/20, the model's lowest one, only the series resistance is used). One
+   a frequency below fmax/100, the model's lowest one, only the series resistance is used, and the same for a
+   point between fmax/100 and fmax/20 whose capacitances and inductance don't agree with the point at fmax/20). One
    2N-port error network at 50 ohm holds the calibrated blocks of all walls (plus `expm(A s)` of the
    line for a reference plane shift) and the estimated inductance of the other ports; it is removed in
    the S domain (`deembed_s`). Writes `_deembedded.s<N>p` with one `!` comment line per port and

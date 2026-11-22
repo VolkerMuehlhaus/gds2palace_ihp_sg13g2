@@ -2,6 +2,27 @@
 
 This is an (incomplete) list of changes and new features.
 
+## 21 November-2026
+
+gds2palace 0.12.0
+
+**New: tube ports, for via ports that stand for a conductor with a cross section**  
+A via port shape drawn with an area now gives a tube port: the four side walls of the shape's bounding box, as one Palace multielement port with the given Z0. This is meant for ports that stand for a real conductor, e.g. the copper pillars between two chips that are simulated as two separate models and joined at the pillars. The port current flows on the outline of the drawn shape, as it does on the conductor. In a test with a chip on an interposer, joined by 50 µm copper pillars (a line through two ground-signal-ground pillar groups, 0 to 100 GHz), each half model ended at a PEC sheet at half pillar height and a port stood for each half signal pillar. The two half models joined at these ports differed from the model of the whole assembly by at most 0.012 in |S| with tube ports and by 0.032 with single sheet ports of the same width.
+
+**Changed behaviour: a via port shape with an area**  
+Via ports are drawn as lines, and those are unchanged: one vertical sheet. A shape counts as a line when its short side is at most 10 % of its long side. A shape with more area gave one sheet along its xmin or ymin edge before, and gives a tube port now. All via ports of the shipped examples are lines. `combine_snp` leaves tube ports as they are in the `_deembedded` file: the port's inductance belongs to the conductor that it stands for. The walls of a tube port are marked `"tube": true` in `port_information.json`. Tube ports are for Palace only, like other multielement ports. `combine_extend_snp.py` is version 1.7.
+
+**New example: two stacked chips split at the copper pillars**  
+`more_examples/chiplet_split_at_pillars` simulates a die flip-chip mounted on an interposer, from the public example layouts of IHP OpenIntM4TM2, as two models cut at half pillar height: tube ports on the signal pillars to a PEC cut plane, the results joined with scikit-rf. With one 50 Ω GSG port at each end of the line, the joined 2-port agrees with the one-model reference within 0.03 in |S| up to 100 GHz, mostly a 1.9° phase difference in S21 at 100 GHz. The example also shows how to read two GDS files into one model (mirrored, with a layer number offset) and a stackup with absolute z values for both chips.
+
+gds2palace 0.11.1
+
+**Port walls: smaller error of a reference plane shift**  
+The calibration standards are solved at nine frequencies from fstop/100 to fstop, instead of fstop/20, fstop/5 and fstop. The port and the line are interpolated between these frequencies, and with three of them, this was the largest error of a reference plane shift: a line over a thin ground plane changes its inductance towards low frequency. The line's inductance and capacitance are now also taken from the three points between fstop/100 and fstop/20, when they agree with the point at fstop/20; otherwise `combine_snp` prints a note and uses them for the resistance only, as before. In a zero-length thru test (a TopMetal2 line between two port walls, both reference planes shifted to its middle, 0 to 50 GHz), the remaining S11 went from -44 dB to -58 dB for an 880 µm line, and the same for a pair of coupled lines. The standards take longer to solve (ten instead of four frequencies). Results of models with port walls change slightly; standards solved before are solved again. `combine_extend_snp.py` is version 1.6. The test is described in `more_examples/calibrated_boxwall_ports`, section "Sanity check: a zero-length thru".
+
+**Fix**  
+A model without air on all four side walls (`air_around` 0 on xmin, xmax, ymin and ymax, e.g. `[0, 0, 0, 0, 200, 200]`, or two port walls and 0 on the other two sides) lost the air above or below the stack: the dielectrics cut the airbox into two volumes, only one of them got the air material, and Palace removed the elements of the other without an error. The simulation boundary on that side was then at the top or bottom of the stack. Both volumes now get the air material.
+
 ## 19 November-2026
 
 gds2palace 0.11.0

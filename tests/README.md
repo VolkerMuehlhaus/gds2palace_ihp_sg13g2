@@ -17,6 +17,7 @@ The same two commands run on GitHub for every push and pull request (`.github/wo
 | `test_examples_geometry.py` | gmsh model of the shipped examples, without meshing |
 | `test_examples_model.py` | Model files of the shipped examples, with meshing (marker `examples`) |
 | `test_port_walls.py`, `test_deembedding.py` | Port walls and calibrated de-embedding |
+| `test_tube_port.py` | Via port shapes: line gives a sheet, shape with area gives a tube port; tube ports are not de-embedded |
 
 ## The example tests
 

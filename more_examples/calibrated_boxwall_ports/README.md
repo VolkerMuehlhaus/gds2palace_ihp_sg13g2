@@ -41,6 +41,8 @@ works is in [Behind the scenes](#behind-the-scenes) at the end.
 - **gds2palace 0.10.6 or newer**, on the machine that writes the model. Port walls came with 0.10.0, but the Q of
   this example at low frequency needs 0.10.6: before, too little of the feed lines' resistance was removed below
   fstop/20. The results in this folder are from 0.10.6.
+  The [sanity check](#sanity-check-a-zero-length-thru) at the end was run with 0.11.1, which solves the standards
+  at more frequencies.
 - **Palace** on Linux. The results in this folder are from Palace 0.19.0.
 - **An up-to-date `combine_snp`** on the Linux machine, from gds2palace 0.10.0 or newer: copy it once from
   [`scripts/`](../../scripts). An older one leaves the feed lines in the result, without an error, see
@@ -53,8 +55,9 @@ works is in [Behind the scenes](#behind-the-scenes) at the end.
 | [`rfcmim_boxwall.gds`](rfcmim_boxwall.gds) | The layout: capacitor, two feed lines, Metal1 ground, two port lines |
 | [`rfcmim_boxwall.py`](rfcmim_boxwall.py) | The gds2palace model script |
 | [`compare_with_pdk.py`](compare_with_pdk.py) | Plots the result next to the PDK model `cap_rfcmim` |
-| [`results/`](results) | Palace results: raw `.s2p` (with ports and feed lines), calibrated `_deembedded.s2p` (capacitor alone), `_deembedding.json`, the plot |
-| [`layout_and_ports.png`](layout_and_ports.png), [`double_delay.png`](double_delay.png), [`D_at_port_walls.png`](D_at_port_walls.png) | Pictures for this README |
+| [`results/`](results) | Palace results: raw `.s2p` (with ports and feed lines), calibrated `_deembedded.s2p` (capacitor alone), `_deembedding.json`, the plot; the same three files for the zero-length thru |
+| [`zero_length_thru.gds`](zero_length_thru.gds), [`zero_length_thru.py`](zero_length_thru.py) | Layout and model script of the [sanity check](#sanity-check-a-zero-length-thru): a line between two port walls |
+| [`layout_and_ports.png`](layout_and_ports.png), [`double_delay.png`](double_delay.png), [`D_at_port_walls.png`](D_at_port_walls.png), [`zero_length_thru_sketch.png`](zero_length_thru_sketch.png) | Pictures for this README |
 
 ## Step by step
 
@@ -166,8 +169,9 @@ On Linux with Palace installed, in `palace_model/rfcmim_boxwall_data/`:
 ./run_sim
 ```
 
-`run_sim` first solves the four standards, at four frequencies each: fstop/20, fstop/5 and fstop (9, 36 and
-180 GHz), and the model's lowest frequency (0.01 GHz), which gives the feed lines' resistance at low frequency. Then it solves the model, and `combine_snp` writes the results into
+`run_sim` first solves the four standards, at ten frequencies each: nine from fstop/100 to fstop (1.8 to
+180 GHz), and the model's lowest frequency (0.01 GHz), which gives the feed lines' resistance at low frequency.
+(Until gds2palace 0.11.0 these were fstop/20, fstop/5 and fstop only; the results in this folder are from then.) Then it solves the model, and `combine_snp` writes the results into
 `output/rfcmim_boxwall/`:
 
 - `rfcmim_boxwall.s2p`: the raw result, as Palace computed it at the ports on the walls (see below)
@@ -235,6 +239,65 @@ series resistance at 0.01 GHz is 0.253 Ω, and the PDK model's 0.252 Ω. The raw
 result includes the loss of 70 µm of feed line: 0.76 Ω at 0.01 GHz.
 
 The small step near 165 GHz in both Palace curves is in the raw result too, so it doesn't come from the calibration.
+
+## Sanity check: a zero-length thru
+
+The comparison with the PDK model above tests the capacitor model, the mesh and the calibration together. This test
+is for the calibration alone, because its exact answer is known. It is a benchmark known from planar EM tools.
+
+A straight line runs from one port wall to the other, and both reference planes are shifted to the middle of the
+line. Nothing is left between them: the ideal result is a thru of length zero, with no reflection, no loss and no
+phase. What Palace and the calibration leave is the error of ports, calibration and reference plane shift together.
+
+![Top view of the two layouts, with the reference plane shifts](zero_length_thru_sketch.png)
+
+Two layouts were tested, both on TopMetal2 over a 220 µm wide Metal1 ground strip, from 0 to 50 GHz: one line 15 µm
+wide, and a pair of such lines 10 µm apart, with two ports on each port wall. [`zero_length_thru.py`](zero_length_thru.py)
+is the single line, 880 µm long, with a 2 µm mesh and the surface conductor model; its results are in
+[`results/`](results). The other lengths and the pair use the same settings and are not in this folder.
+
+The numbers are the largest values from 0.5 to 50 GHz, with gds2palace 0.11.1:
+
+| Line length (shift on each side) | One line: S11 | One line: phase of S21 | Pair: reflection | Pair: coupling between the lines |
+|---|---|---|---|---|
+| 220 µm (110 µm) | -70 dB | 0.02° | -70 dB | -77 dB |
+| 440 µm (220 µm) | -64 dB | 0.06° | -64 dB | -71 dB |
+| 880 µm (440 µm) | -58 dB | 0.13° | -58 dB | -65 dB |
+| 1760 µm (880 µm) | -53 dB | 0.22° | -52 dB | -54 dB |
+
+The magnitude of S21 of the single line stays within 0.004 dB of 0 dB at 880 µm, and within 0.008 dB at 1760 µm.
+For the pair, the differential and the common mode behave alike; the common mode's reflection is about 5 dB higher
+than the differential mode's.
+
+What this shows:
+
+- **The error grows with the shifted length**, by about 6 dB each time the length doubles. Keep a reference plane
+  shift as short as the layout allows.
+- **The raw result is far from a thru**: before the calibration, S11 of the 880 µm line is up to -28 dB and S21 has
+  104° of phase at 50 GHz. The calibration removes that down to the values in the table.
+- **Most of the error was the interpolation of the line between the standards' frequencies.** Until gds2palace
+  0.11.0, the standards were solved at fstop/20, fstop/5 and fstop only, and the same test gave -56 dB at 220 µm and
+  -38 dB at 1760 µm. Since 0.11.1 they are solved at nine frequencies from fstop/100 to fstop, which gains about
+  14 dB.
+
+The test was also run with other settings. These made no difference, or only little (the last two groups were
+tested with gds2palace 0.11.0 only, at its error of -44 dB for the 880 µm line):
+
+- The side walls without ports: absorbing, PEC or PMC, from 50 to 400 µm away from the ground strip.
+- The length of the standards (2 D, 4 D, 8 D), and the gap of the port (0.5 to 4 µm; the port's capacitance
+  changes from 6.4 to 1.2 fF and is removed all the same).
+- A discrete instead of the adaptive frequency sweep, and the solver tolerance.
+
+These did:
+
+- **The mesh.** 1 µm and 2 µm give the same result. With 4 µm, the single line is unchanged, but the pair's
+  reflection rises by about 4 dB, and its mode conversion from -75 to -65 dB: the mesh is not the same on the two
+  lines. With 8 µm, both layouts are at -38 to -40 dB.
+- **A ground strip that ends on an absorbing side wall.** For the single line, this gave -44 dB instead of -58 dB,
+  and Palace needed about twice as long. Leave some dielectric between the ground metal and the wall (`margin`).
+
+These numbers are for these two lines up to 50 GHz. Other lines, a filled-metal conductor model and higher
+frequencies were not tested this way.
 
 ## Behind the scenes
 
